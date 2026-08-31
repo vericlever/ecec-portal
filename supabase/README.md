@@ -1,6 +1,6 @@
 # Database
 
-Multi-tenant schema for The Portal. Step 1 of the build sequence.
+Multi-tenant schema for The Portal. Steps 1 and 2 of the build sequence.
 
 ## Migrations
 
@@ -11,9 +11,16 @@ Applied in order:
 | `migrations/0001_init_schema.sql` | Tables, enums, `set_updated_at` trigger, and the `credential_types` / `external_providers` lookup seeds (WWCC and Gecko Training as placeholder rows) |
 | `migrations/0002_rls_policies.sql` | RLS helper functions and a policy on every tenant table |
 | `migrations/0003_indexes.sql` | Indexes supporting RLS organisation filtering and common lookups |
+| `migrations/0004_document_import_schema.sql` | SOP role tier, per-site scoping (`site_id` null = multicampus), nullable sign-off/status, policy `document_type` and `program`, `metadata` columns, link provenance |
+| `migrations/0005_import_documents_fn.sql` | `import_documents(org, jsonb)` - the generic policy/SOP/link importer every provider uses |
+| `migrations/0006_policy_views.sql` | `policy_views` - a lightweight "staff viewed this policy version" record, weaker than SOP sign-off |
 
-Seed data for the tenants themselves (Ready Set Go, Science Kinder) is step 2 and
-is not in this folder yet.
+Then the seed and the RSG bootstrap:
+
+| File | Contents |
+|---|---|
+| `seed/0001_tenants.sql` | The only hard-coded seed: Ready Set Go, Science Kinder, and RSG's Timboon and Mortlake sites |
+| `import/rsg/rsg_import.sql` | Calls `import_documents()` with RSG's reviewed library (70 policies, 129 SOPs, 56 links). See `import/rsg/README.md` |
 
 ## Applying
 
@@ -24,13 +31,16 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
+Then run `seed/0001_tenants.sql` and `import/rsg/rsg_import.sql`.
+
 ### Supabase dashboard
 
-Paste the three migration files, in order, into the SQL Editor and run each.
+Paste each migration (`0001`-`0006`), in order, into the SQL Editor and run it.
+Then `seed/0001_tenants.sql`, then `import/rsg/rsg_import.sql`.
 
 ### Direct connection
 
-Run the three files in order against the connection string from
+Run the files in order against the connection string from
 Project Settings and Database. Do not commit that string.
 
 ## Tenant model
