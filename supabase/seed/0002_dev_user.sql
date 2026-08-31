@@ -1,38 +1,33 @@
 -- seed/0002_dev_user.sql
--- Step 4: promote Zeke's account to the RSG approved provider (admin).
+-- Step 4 rework: point the two seeded accounts at the four-tier model.
 --
--- FIRST, in the Supabase dashboard (Authentication -> Users):
---   1. Delete the existing passwordless "zeke@readyset.au" user if present
---      (it was created by the step 3 seed; its profile cascades away).
---   2. "Add user" -> zeke@readyset.au, set your password, Auto Confirm User = on.
---
--- THEN run this. It finds that auth user by email and gives it an approved
--- provider profile at Ready Set Go. The educator test account
--- (zekepottage@gmail.com) is created afterwards through the app's
--- "Add staff member" screen, which is the real onboarding path.
+-- Both auth users already exist. This only fixes their profiles. Run after
+-- migration 0007 and after seed/0005_job_roles.sql (for the Educator job role
+-- lookup); re-run once 0005 is in if the job role did not resolve the first
+-- time. Idempotent.
 
-insert into public.profiles
-  (id, organisation_id, site_id, full_name, email, role, start_date, is_active)
-select
-  u.id,
-  'a0000000-0000-4000-8000-000000000001',
-  'b0000000-0000-4000-8000-000000000001',  -- Timboon
-  'Zeke Pottage',
-  'zeke@readyset.au',
-  'approved_provider',
-  '2026-01-01',
-  true
-from auth.users u
-where u.email = 'zeke@readyset.au'
-on conflict (id) do update set
-  organisation_id = excluded.organisation_id,
-  site_id         = excluded.site_id,
-  full_name       = excluded.full_name,
-  role            = excluded.role,
-  is_active       = true;
+-- Zeke: organisation admin. Not scoped to one service.
+update public.profiles
+set access_tier = 'admin',
+    service_id  = null,
+    job_role_id = null,
+    full_name   = 'Zeke Pottage'
+where email = 'zeke@readyset.au';
 
--- Confirm: should return one row with role = approved_provider.
-select p.email, p.role, o.name as organisation
-from public.profiles p
-join public.organisations o on o.id = p.organisation_id
-where p.email = 'zeke@readyset.au';
+-- Educator test account: staff tier, Timboon, Educator job role.
+update public.profiles
+set access_tier = 'staff',
+    service_id  = 'b0000000-0000-4000-8000-000000000001',
+    job_role_id = (
+      select id from public.job_roles
+      where organisation_id = 'a0000000-0000-4000-8000-000000000001'
+        and name = 'Educator'
+    ),
+    full_name   = 'Zeke Pottage (educator)'
+where email = 'zekepottage@gmail.com';
+
+select email, access_tier,
+       service_id is not null  as scoped_to_service,
+       job_role_id is not null as has_job_role
+from public.profiles
+where email in ('zeke@readyset.au', 'zekepottage@gmail.com');

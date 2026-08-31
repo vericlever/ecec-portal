@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireManager, isAdmin } from "@/lib/auth";
 import { NewStaffForm } from "./form";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewStaffPage() {
-  await requireAdmin();
+  const me = await requireManager();
   const supabase = createClient();
-  const { data: sites } = await supabase
-    .from("sites")
-    .select("id, name")
-    .order("name");
+
+  const [{ data: services }, { data: jobRoles }] = await Promise.all([
+    supabase.from("services").select("id, name").order("name"),
+    supabase.from("job_roles").select("id, name, is_placeholder").order("name"),
+  ]);
 
   return (
     <div className="max-w-md">
@@ -27,7 +28,17 @@ export default async function NewStaffPage() {
         password to pass on; they change it after signing in.
       </p>
 
-      <NewStaffForm sites={(sites ?? []) as { id: string; name: string }[]} />
+      <NewStaffForm
+        canSetTier={isAdmin(me.access_tier)}
+        services={(services ?? []) as { id: string; name: string }[]}
+        jobRoles={
+          (jobRoles ?? []) as {
+            id: string;
+            name: string;
+            is_placeholder: boolean;
+          }[]
+        }
+      />
     </div>
   );
 }

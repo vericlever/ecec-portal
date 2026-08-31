@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto mt-16 max-w-sm">
-      <h1 className="text-lg font-semibold">The Portal</h1>
+      <h1 className="text-lg font-semibold">VeriClever</h1>
       <p className="mt-1 text-sm text-slate-500">Sign in to continue.</p>
 
       <form action={formAction} className="mt-6 space-y-4">

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { getProfile, isAdmin, ROLE_LABELS } from "@/lib/auth";
+import { getProfile, isManager, TIER_LABELS } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "The Portal",
+  title: "VeriClever",
   description:
     "Staff compliance and training for early childhood education and care",
 };
@@ -24,9 +24,9 @@ export default async function RootLayout({
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
               <div className="flex items-center gap-4">
                 <Link href="/sops" className="text-sm font-semibold tracking-tight">
-                  The Portal
+                  VeriClever
                 </Link>
-                {isAdmin(profile.role) && (
+                {isManager(profile.access_tier) && (
                   <Link
                     href="/admin/staff"
                     className="text-sm text-slate-500 hover:text-slate-900"
@@ -40,7 +40,7 @@ export default async function RootLayout({
                   <div className="font-medium text-slate-700">
                     {profile.full_name}
                   </div>
-                  <div>{ROLE_LABELS[profile.role]}</div>
+                  <div>{TIER_LABELS[profile.access_tier]}</div>
                 </div>
                 <form action="/logout" method="post">
                   <button

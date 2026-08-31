@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase.from("sign_offs").insert({
     organisation_id: sop.organisation_id,
-    site_id: profile.site_id,
+    service_id: profile.service_id,
     user_id: profile.id,
     sop_id: sop.id,
     sop_version: sop.current_version,

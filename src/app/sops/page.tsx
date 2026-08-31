@@ -17,11 +17,46 @@ export default async function SopListPage() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  // RLS scopes both queries to the user's organisation automatically.
+  if (!profile.job_role_id) {
+    return (
+      <div>
+        <h1 className="text-xl font-semibold">Standard operating procedures</h1>
+        <p className="mt-3 max-w-prose text-sm text-slate-500">
+          You have not been assigned a job role yet, so you have no SOPs to sign.
+          Ask an administrator to set your job role.
+        </p>
+      </div>
+    );
+  }
+
+  // The SOPs a person must sign are exactly the suite attached to their job
+  // role, nothing else.
+  const { data: suite, error: suiteError } = await supabase
+    .from("job_role_sops")
+    .select("sop_id")
+    .eq("job_role_id", profile.job_role_id);
+
+  if (suiteError) {
+    return <p className="text-red-600">Could not load your SOPs: {suiteError.message}</p>;
+  }
+
+  const sopIds = (suite ?? []).map((r) => r.sop_id as string);
+  if (sopIds.length === 0) {
+    return (
+      <div>
+        <h1 className="text-xl font-semibold">Standard operating procedures</h1>
+        <p className="mt-3 max-w-prose text-sm text-slate-500">
+          Your job role has no SOPs attached yet.
+        </p>
+      </div>
+    );
+  }
+
   const [{ data: sops, error }, { data: signOffs }] = await Promise.all([
     supabase
       .from("sops")
       .select("id, name, target_tier, signoff_type, current_version")
+      .in("id", sopIds)
       .order("name"),
     supabase
       .from("sign_offs")
@@ -30,7 +65,7 @@ export default async function SopListPage() {
   ]);
 
   if (error) {
-    return <p className="text-red-600">Could not load SOPs: {error.message}</p>;
+    return <p className="text-red-600">Could not load your SOPs: {error.message}</p>;
   }
 
   const signed = new Set(
@@ -45,6 +80,7 @@ export default async function SopListPage() {
     list.push(sop);
     byTier.set(sop.target_tier, list);
   }
+  const tiersPresent = SOP_TIER_ORDER.filter((t) => byTier.has(t));
 
   const signedCount = rows.filter(isSigned).length;
 
@@ -56,11 +92,13 @@ export default async function SopListPage() {
       </p>
 
       <div className="mt-6 space-y-8">
-        {SOP_TIER_ORDER.filter((tier) => byTier.has(tier)).map((tier) => (
+        {tiersPresent.map((tier) => (
           <section key={tier}>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              {SOP_TIER_LABELS[tier] ?? tier}
-            </h2>
+            {tiersPresent.length > 1 && (
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                {SOP_TIER_LABELS[tier] ?? tier}
+              </h2>
+            )}
             <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
               {(byTier.get(tier) ?? []).map((sop) => (
                 <li key={sop.id}>
