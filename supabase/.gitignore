@@ -1,0 +1,7 @@
+# Supabase CLI local artefacts
+.branches
+.temp
+.env
+
+# Never commit connection strings or keys
+*.env
