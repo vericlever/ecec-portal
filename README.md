@@ -73,10 +73,12 @@ npm run dev
 Also run the dev-only seeds once (Supabase SQL editor or psql):
 `supabase/seed/0002_dev_user.sql` and `supabase/seed/0003_dev_sop_body.sql`.
 
-Open http://localhost:3000 - it redirects to `/sops`. Pick a SOP, read it, tick
-the box, Sign. A `sign_offs` row is written and the page shows the signed state
-on refresh. There is no authentication yet: everything runs as one hardcoded
-test educator against the Ready Set Go tenant (`src/lib/constants.ts`).
+Open http://localhost:3000 - it redirects to `/sops`. Open **Nappy Changing and
+Toilet Training** (the one SOP with real content so far), read it, tick the box,
+Sign. A `sign_offs` row is written and the page shows the signed state on
+refresh. There is no authentication yet: everything runs as one hardcoded test
+educator (zeke@readyset.au) against the Ready Set Go tenant
+(`src/lib/constants.ts`).
 
 ## License
 
