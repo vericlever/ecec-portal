@@ -1,63 +1,38 @@
 -- seed/0002_dev_user.sql
--- DEV. One test staff member so step 3's read-and-sign has a real person to
--- attach sign_offs to (sign_offs.user_id -> profiles.id -> auth.users.id).
+-- Step 4: promote Zeke's account to the RSG approved provider (admin).
 --
--- This is Zeke's own account, kept at educator level so he can see the staff
--- view. Step 3 has no login screen: the app is hardcoded to this user. A
--- password is NOT set here (setting one from plaintext does not belong in a
--- committed file). When step 4 adds login, set the password in the Supabase
--- dashboard: Authentication -> Users -> zeke@readyset.au -> reset password.
+-- FIRST, in the Supabase dashboard (Authentication -> Users):
+--   1. Delete the existing passwordless "zeke@readyset.au" user if present
+--      (it was created by the step 3 seed; its profile cascades away).
+--   2. "Add user" -> zeke@readyset.au, set your password, Auto Confirm User = on.
 --
--- Fixed UUID matches DEV_USER_ID in src/lib/constants.ts.
--- To remove: delete from auth.users where id = 'c0000000-0000-4000-8000-000000000001';
+-- THEN run this. It finds that auth user by email and gives it an approved
+-- provider profile at Ready Set Go. The educator test account
+-- (zekepottage@gmail.com) is created afterwards through the app's
+-- "Add staff member" screen, which is the real onboarding path.
 
-insert into auth.users (
-  instance_id,
-  id,
-  aud,
-  role,
-  email,
-  encrypted_password,
-  email_confirmed_at,
-  created_at,
-  updated_at,
-  raw_app_meta_data,
-  raw_user_meta_data,
-  confirmation_token,
-  recovery_token,
-  email_change_token_new,
-  email_change
-)
-values (
-  '00000000-0000-0000-0000-000000000000',
-  'c0000000-0000-4000-8000-000000000001',
-  'authenticated',
-  'authenticated',
-  'zeke@readyset.au',
-  '',
-  now(),
-  now(),
-  now(),
-  '{"provider":"email","providers":["email"]}'::jsonb,
-  '{}'::jsonb,
-  '',
-  '',
-  '',
-  ''
-)
-on conflict (id) do nothing;
-
-insert into public.profiles (
-  id, organisation_id, site_id, full_name, email, role, start_date, is_active
-)
-values (
-  'c0000000-0000-4000-8000-000000000001',
+insert into public.profiles
+  (id, organisation_id, site_id, full_name, email, role, start_date, is_active)
+select
+  u.id,
   'a0000000-0000-4000-8000-000000000001',
   'b0000000-0000-4000-8000-000000000001',  -- Timboon
   'Zeke Pottage',
   'zeke@readyset.au',
-  'educator',
+  'approved_provider',
   '2026-01-01',
   true
-)
-on conflict (id) do nothing;
+from auth.users u
+where u.email = 'zeke@readyset.au'
+on conflict (id) do update set
+  organisation_id = excluded.organisation_id,
+  site_id         = excluded.site_id,
+  full_name       = excluded.full_name,
+  role            = excluded.role,
+  is_active       = true;
+
+-- Confirm: should return one row with role = approved_provider.
+select p.email, p.role, o.name as organisation
+from public.profiles p
+join public.organisations o on o.id = p.organisation_id
+where p.email = 'zeke@readyset.au';

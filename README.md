@@ -60,29 +60,33 @@ Parent notifications are a policy-tier feature only, and fire only once a policy
 See `supabase/README.md`. Apply the migrations, then `supabase/seed/0001_tenants.sql`
 and `supabase/import/rsg/rsg_import.sql`.
 
-### App (step 3: one working SOP page)
+### App
 
 Requires Node.js 18.18+ and the database set up.
 
 ```bash
 npm install
-cp .env.local.example .env.local        # then set DATABASE_URL
+cp .env.local.example .env.local   # then fill NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY
 npm run dev
 ```
 
-`DATABASE_URL` is the Supabase **session pooler** connection string (dashboard →
-Project Settings → Database → Connection string → "Session pooler"). Step 3 has
-no auth, so it queries Postgres directly, scoped to the RSG organisation in SQL.
-Step 4 switches to the Supabase auth client with row-level security.
+Both keys come from the Supabase dashboard → Project Settings → API.
 
-Also run the dev-only seeds once (Supabase SQL editor):
-`supabase/seed/0002_dev_user.sql` and `supabase/seed/0003_dev_sop_body.sql`.
+**Accounts.** In the dashboard → Authentication → Users, add `zeke@readyset.au`
+with a password (Auto Confirm on). Then run `supabase/seed/0002_dev_user.sql` to
+give it an approved-provider profile at Ready Set Go, and
+`supabase/seed/0003_dev_sop_body.sql` for the sample SOP content. Optionally
+`supabase/seed/0004_isolation_check.sql` to make cross-tenant isolation testable.
 
-Open http://localhost:3000 - it redirects to `/sops`. Open **Nappy Changing and
-Toilet Training** (the one SOP with real content so far), read it, tick the box,
-Sign. A `sign_offs` row is written and the page shows the signed state on
-refresh. Everything runs as one hardcoded test educator (zeke@readyset.au)
-against the Ready Set Go tenant (`src/lib/constants.ts`).
+**Auth model.** Every normal query runs through `@supabase/ssr` under the
+signed-in user's session, so row-level security scopes it to their
+organisation. The service-role key is used only by the admin staff-creation
+flow. Middleware redirects unauthenticated requests to `/login`.
+
+Open http://localhost:3000 → `/login`. Sign in as `zeke@readyset.au`. The SOP
+list and read-and-sign work as before, now under a real session. As an admin you
+also get **Staff** → **Add staff member**, which creates an account in your own
+organisation and hands back a temporary password.
 
 ## License
 
