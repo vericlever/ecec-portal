@@ -11,3 +11,30 @@ body {
   color: var(--foreground);
   background: var(--background);
 }
+
+/* Sign-off confirmation: the tick draws itself in, then the page redirects. */
+.signoff-check-circle {
+  stroke-dasharray: 152;
+  stroke-dashoffset: 152;
+  animation: signoff-draw 0.4s ease-out forwards;
+}
+
+.signoff-check-mark {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: signoff-draw 0.3s 0.35s ease-out forwards;
+}
+
+@keyframes signoff-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signoff-check-circle,
+  .signoff-check-mark {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
