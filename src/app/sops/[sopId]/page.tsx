@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createServiceClient } from "@/lib/supabase";
+import { query } from "@/lib/db";
 import {
   RSG_ORGANISATION_ID,
   DEV_USER_ID,
@@ -15,6 +15,18 @@ const SIGNOFF_LABELS: Record<string, string> = {
   supervisor: "Supervisor verified",
 };
 
+type SopRow = {
+  id: string;
+  name: string;
+  target_tier: string;
+  status: string | null;
+  signoff_type: string | null;
+  notes: string | null;
+  body: string | null;
+  current_version: number;
+  signed_at: string | null;
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-AU", {
     dateStyle: "medium",
@@ -27,37 +39,35 @@ export default async function SopDetailPage({
 }: {
   params: { sopId: string };
 }) {
-  const supabase = createServiceClient();
-
-  const { data: sop } = await supabase
-    .from("sops")
-    .select(
-      "id, name, target_tier, status, signoff_type, priority, notes, body, current_version",
-    )
-    .eq("id", params.sopId)
-    .eq("organisation_id", RSG_ORGANISATION_ID)
-    .maybeSingle();
+  const [sop] = await query<SopRow>(
+    `
+    select s.id, s.name, s.target_tier, s.status, s.signoff_type, s.notes,
+           s.body, s.current_version,
+           (
+             select so.signed_at from sign_offs so
+             where so.user_id = $3
+               and so.sop_id = s.id
+               and so.sop_version = s.current_version
+             limit 1
+           ) as signed_at
+    from sops s
+    where s.id = $1 and s.organisation_id = $2
+    `,
+    [params.sopId, RSG_ORGANISATION_ID, DEV_USER_ID],
+  );
 
   if (!sop) notFound();
 
-  const [{ data: links }, { data: signOff }] = await Promise.all([
-    supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
-    supabase
-      .from("sign_offs")
-      .select("signed_at")
-      .eq("user_id", DEV_USER_ID)
-      .eq("sop_id", sop.id)
-      .eq("sop_version", sop.current_version)
-      .maybeSingle(),
-  ]);
-
-  const policyIds = (links ?? []).map((l) => l.policy_id);
-  const { data: policyRows } = policyIds.length
-    ? await supabase.from("policies").select("name").in("id", policyIds)
-    : { data: [] as { name: string }[] };
-  const policies = (policyRows ?? [])
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const policies = await query<{ name: string }>(
+    `
+    select p.name
+    from policy_sop_links l
+    join policies p on p.id = l.policy_id
+    where l.sop_id = $1
+    order by p.name
+    `,
+    [sop.id],
+  );
 
   return (
     <div>
@@ -83,7 +93,7 @@ export default async function SopDetailPage({
 
       <article className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
         {sop.body ? (
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+          <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
             {sop.body}
           </div>
         ) : (
@@ -107,9 +117,9 @@ export default async function SopDetailPage({
         </section>
       )}
 
-      {signOff ? (
+      {sop.signed_at ? (
         <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-          Signed on {formatDate(signOff.signed_at)} (version {sop.current_version}).
+          Signed on {formatDate(sop.signed_at)} (version {sop.current_version}).
         </div>
       ) : (
         <SignForm sopId={sop.id} />

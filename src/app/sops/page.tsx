@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createServiceClient } from "@/lib/supabase";
+import { query } from "@/lib/db";
 import {
   RSG_ORGANISATION_ID,
   DEV_USER_ID,
@@ -9,60 +9,50 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type Sop = {
+type SopRow = {
   id: string;
   name: string;
   target_tier: string;
   signoff_type: string | null;
-  status: string | null;
   current_version: number;
+  signed: boolean;
 };
 
 export default async function SopListPage() {
-  const supabase = createServiceClient();
-
-  const [{ data: sops, error: sopsError }, { data: signOffs, error: signError }] =
-    await Promise.all([
-      supabase
-        .from("sops")
-        .select("id, name, target_tier, signoff_type, status, current_version")
-        .eq("organisation_id", RSG_ORGANISATION_ID)
-        .order("name"),
-      supabase
-        .from("sign_offs")
-        .select("sop_id, sop_version")
-        .eq("user_id", DEV_USER_ID),
-    ]);
-
-  if (sopsError || signError) {
-    return (
-      <p className="text-red-600">
-        Could not load SOPs: {(sopsError ?? signError)?.message}
-      </p>
-    );
-  }
-
-  const signedKey = new Set(
-    (signOffs ?? []).map((s) => `${s.sop_id}:${s.sop_version}`),
+  const sops = await query<SopRow>(
+    `
+    select s.id,
+           s.name,
+           s.target_tier,
+           s.signoff_type,
+           s.current_version,
+           exists (
+             select 1 from sign_offs so
+             where so.user_id = $2
+               and so.sop_id = s.id
+               and so.sop_version = s.current_version
+           ) as signed
+    from sops s
+    where s.organisation_id = $1
+    order by s.name
+    `,
+    [RSG_ORGANISATION_ID, DEV_USER_ID],
   );
-  const isSigned = (sop: Sop) =>
-    signedKey.has(`${sop.id}:${sop.current_version}`);
 
-  const byTier = new Map<string, Sop[]>();
-  for (const sop of (sops ?? []) as Sop[]) {
+  const byTier = new Map<string, SopRow[]>();
+  for (const sop of sops) {
     const list = byTier.get(sop.target_tier) ?? [];
     list.push(sop);
     byTier.set(sop.target_tier, list);
   }
 
-  const total = sops?.length ?? 0;
-  const signedCount = ((sops ?? []) as Sop[]).filter(isSigned).length;
+  const signedCount = sops.filter((s) => s.signed).length;
 
   return (
     <div>
       <h1 className="text-xl font-semibold">Standard operating procedures</h1>
       <p className="mt-1 text-sm text-slate-500">
-        {signedCount} of {total} signed
+        {signedCount} of {sops.length} signed
       </p>
 
       <div className="mt-6 space-y-8">
@@ -79,7 +69,7 @@ export default async function SopListPage() {
                     className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
                   >
                     <span className="text-sm">{sop.name}</span>
-                    {isSigned(sop) ? (
+                    {sop.signed ? (
                       <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                         Signed
                       </span>
