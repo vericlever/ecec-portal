@@ -55,7 +55,34 @@ Parent notifications are a policy-tier feature only, and fire only once a policy
 
 ## Getting started
 
-_Setup instructions to be added once the initial migration and app scaffold are committed._
+### Database
+
+See `supabase/README.md`. Apply the migrations, then `supabase/seed/0001_tenants.sql`
+and `supabase/import/rsg/rsg_import.sql`.
+
+### App (step 3: one working SOP page)
+
+Requires Node.js 18.18+ and the database set up.
+
+```bash
+npm install
+cp .env.local.example .env.local        # then set DATABASE_URL
+npm run dev
+```
+
+`DATABASE_URL` is the Supabase **session pooler** connection string (dashboard →
+Project Settings → Database → Connection string → "Session pooler"). Step 3 has
+no auth, so it queries Postgres directly, scoped to the RSG organisation in SQL.
+Step 4 switches to the Supabase auth client with row-level security.
+
+Also run the dev-only seeds once (Supabase SQL editor):
+`supabase/seed/0002_dev_user.sql` and `supabase/seed/0003_dev_sop_body.sql`.
+
+Open http://localhost:3000 - it redirects to `/sops`. Open **Nappy Changing and
+Toilet Training** (the one SOP with real content so far), read it, tick the box,
+Sign. A `sign_offs` row is written and the page shows the signed state on
+refresh. Everything runs as one hardcoded test educator (zeke@readyset.au)
+against the Ready Set Go tenant (`src/lib/constants.ts`).
 
 ## License
 
