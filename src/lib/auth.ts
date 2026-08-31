@@ -1,37 +1,19 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { type AccessTier, isManager, isAdmin } from "@/lib/roles";
 
-export type Role =
-  | "platform_superuser"
-  | "approved_provider"
-  | "centre_director"
-  | "educator";
+export * from "@/lib/roles";
 
 export type Profile = {
   id: string;
   organisation_id: string | null;
-  site_id: string | null;
+  service_id: string | null;
+  job_role_id: string | null;
   full_name: string;
   email: string;
-  role: Role;
+  access_tier: AccessTier;
 };
 
-export function isAdmin(role: Role | undefined | null): boolean {
-  return (
-    role === "approved_provider" ||
-    role === "centre_director" ||
-    role === "platform_superuser"
-  );
-}
-
-export const ROLE_LABELS: Record<Role, string> = {
-  platform_superuser: "Platform superuser",
-  approved_provider: "Approved provider",
-  centre_director: "Centre director",
-  educator: "Educator",
-};
-
-// The signed-in user's profile, or null if not signed in / no profile row.
 export async function getProfile(): Promise<Profile | null> {
   const supabase = createClient();
   const {
@@ -41,23 +23,30 @@ export async function getProfile(): Promise<Profile | null> {
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, organisation_id, site_id, full_name, email, role")
+    .select(
+      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
   return (data as Profile) ?? null;
 }
 
-// Use in a page/action that requires a signed-in user with a profile.
 export async function requireProfile(): Promise<Profile> {
   const profile = await getProfile();
   if (!profile) redirect("/login");
   return profile;
 }
 
-// Use in an admin-only page/action.
+// A manager (either kind) or an admin.
+export async function requireManager(): Promise<Profile> {
+  const profile = await requireProfile();
+  if (!isManager(profile.access_tier)) redirect("/sops");
+  return profile;
+}
+
 export async function requireAdmin(): Promise<Profile> {
   const profile = await requireProfile();
-  if (!isAdmin(profile.role)) redirect("/sops");
+  if (!isAdmin(profile.access_tier)) redirect("/sops");
   return profile;
 }

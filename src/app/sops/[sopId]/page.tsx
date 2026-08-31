@@ -37,16 +37,25 @@ export default async function SopDetailPage({
 
   if (!sop) notFound();
 
-  const [{ data: links }, { data: signOff }] = await Promise.all([
-    supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
-    supabase
-      .from("sign_offs")
-      .select("signed_at")
-      .eq("user_id", profile.id)
-      .eq("sop_id", sop.id)
-      .eq("sop_version", sop.current_version)
-      .maybeSingle(),
-  ]);
+  const [{ data: links }, { data: signOff }, { data: inSuite }] =
+    await Promise.all([
+      supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
+      supabase
+        .from("sign_offs")
+        .select("signed_at")
+        .eq("user_id", profile.id)
+        .eq("sop_id", sop.id)
+        .eq("sop_version", sop.current_version)
+        .maybeSingle(),
+      profile.job_role_id
+        ? supabase
+            .from("job_role_sops")
+            .select("sop_id")
+            .eq("job_role_id", profile.job_role_id)
+            .eq("sop_id", sop.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
 
   const policyIds = (links ?? []).map((l) => l.policy_id);
   const { data: policyRows } = policyIds.length
@@ -55,6 +64,8 @@ export default async function SopDetailPage({
   const policies = (policyRows ?? [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  const isInSuite = Boolean(inSuite);
 
   return (
     <div>
@@ -94,7 +105,7 @@ export default async function SopDetailPage({
       {policies.length > 0 && (
         <section className="mt-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Governed by
+            Source policies
           </h2>
           <ul className="mt-2 text-sm text-slate-600">
             {policies.map((p) => (
@@ -109,8 +120,13 @@ export default async function SopDetailPage({
           Signed on {formatDate(signOff.signed_at)} (version {sop.current_version}
           ).
         </div>
-      ) : (
+      ) : isInSuite ? (
         <SignForm sopId={sop.id} />
+      ) : (
+        <p className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
+          This SOP is not part of your assigned job role, so it is shown for
+          reference only.
+        </p>
       )}
     </div>
   );

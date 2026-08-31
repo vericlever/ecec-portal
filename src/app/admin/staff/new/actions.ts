@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProfile, isAdmin } from "@/lib/auth";
+import { getProfile, isAdmin, isManager, type AccessTier } from "@/lib/auth";
 
 export type CreateStaffState =
   | { status: "idle" }
   | { status: "error"; error: string }
   | { status: "created"; email: string; tempPassword: string };
 
+const TIERS: AccessTier[] = ["staff", "manager_staff", "manager_policy", "admin"];
+
 function tempPassword(): string {
-  // Readable-ish temporary password, replaced by the staff member on first use.
-  return "rsg-" + randomBytes(6).toString("base64url");
+  return "vc-" + randomBytes(6).toString("base64url");
 }
 
 export async function createStaff(
@@ -20,33 +21,52 @@ export async function createStaff(
   formData: FormData,
 ): Promise<CreateStaffState> {
   const me = await getProfile();
-  if (!me || !isAdmin(me.role) || !me.organisation_id) {
+  if (!me || !isManager(me.access_tier) || !me.organisation_id) {
     return { status: "error", error: "You are not allowed to add staff." };
   }
 
   const fullName = String(formData.get("full_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const roleInput = String(formData.get("role") ?? "educator");
-  const siteId = String(formData.get("site_id") ?? "").trim() || null;
+  const tierInput = String(formData.get("access_tier") ?? "staff") as AccessTier;
+  const jobRoleId = String(formData.get("job_role_id") ?? "").trim() || null;
+  const serviceInput = String(formData.get("service_id") ?? "").trim() || null;
 
   if (!fullName || !email) {
     return { status: "error", error: "Name and email are required." };
   }
-  // Admins may create educators and centre directors, not other admins.
-  const role = roleInput === "centre_director" ? "centre_director" : "educator";
+
+  // An admin may create any tier. A manager may only create staff-tier accounts,
+  // and only in their own service.
+  const accessTier: AccessTier = isAdmin(me.access_tier)
+    ? TIERS.includes(tierInput)
+      ? tierInput
+      : "staff"
+    : "staff";
+  const serviceId = isAdmin(me.access_tier) ? serviceInput : me.service_id;
 
   const admin = createAdminClient();
 
-  // The site, if given, must belong to this admin's organisation.
-  if (siteId) {
-    const { data: site } = await admin
-      .from("sites")
+  if (serviceId) {
+    const { data: service } = await admin
+      .from("services")
       .select("id")
-      .eq("id", siteId)
+      .eq("id", serviceId)
       .eq("organisation_id", me.organisation_id)
       .maybeSingle();
-    if (!site) {
-      return { status: "error", error: "That site is not in your organisation." };
+    if (!service) {
+      return { status: "error", error: "That service is not in your organisation." };
+    }
+  }
+
+  if (jobRoleId) {
+    const { data: role } = await admin
+      .from("job_roles")
+      .select("id")
+      .eq("id", jobRoleId)
+      .eq("organisation_id", me.organisation_id)
+      .maybeSingle();
+    if (!role) {
+      return { status: "error", error: "That job role is not in your organisation." };
     }
   }
 
@@ -68,15 +88,15 @@ export async function createStaff(
     };
   }
 
-  // organisation_id comes from the admin's own profile, never from the form,
-  // so an admin can only ever add staff to their own organisation.
+  // organisation_id comes from the caller's own profile, never the form.
   const { error: profileErr } = await admin.from("profiles").insert({
     id: created.user.id,
     organisation_id: me.organisation_id,
-    site_id: siteId,
+    service_id: serviceId,
+    job_role_id: jobRoleId,
     full_name: fullName,
     email,
-    role,
+    access_tier: accessTier,
     is_active: true,
   });
 
