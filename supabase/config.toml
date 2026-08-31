@@ -1,0 +1,18 @@
+# Supabase local configuration.
+#
+# The hosted project runs in the Sydney region (ap-southeast-2). Region is set
+# at project creation in the Supabase dashboard, not in this file.
+#
+# Run `supabase init` to regenerate this file with the full set of defaults for
+# your installed CLI version if you need the local stack (studio, auth, storage).
+
+project_id = "ecec-portal"
+
+[db]
+port = 54322
+# Match this to the hosted project's Postgres major version before running the
+# local stack. Supabase projects created recently are on 15.
+major_version = 15
+
+[db.migrations]
+schema_paths = ["./migrations/*.sql"]
