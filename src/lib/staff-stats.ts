@@ -19,7 +19,7 @@ export type StaffStat = {
 // every table to rows the caller may see, which matches the people list.
 export async function staffStatsByProfile(
   supabase: ServerClient,
-  people: { id: string; job_role_id: string | null }[],
+  people: { id: string; job_role_id: string | null; service_id: string | null }[],
   currentProfileId: string,
 ): Promise<Map<string, StaffStat>> {
   const jobRoleIds = Array.from(
@@ -43,7 +43,7 @@ export async function staffStatsByProfile(
       .in("job_role_id", jobRoleIds),
     supabase.from("sops").select("id, current_version"),
     supabase.from("sign_offs").select("user_id, sop_id, sop_version"),
-    supabase.from("policies").select("id, current_version"),
+    supabase.rpc("org_published_policies"),
     supabase.from("policy_views").select("user_id, policy_id, policy_version"),
     supabase.from("worker_details").select("profile_id, onboarding_completed_at"),
     pendingSightingsByProfile(supabase, currentProfileId),
@@ -66,10 +66,11 @@ export async function staffStatsByProfile(
     signedByUser.set(s.user_id as string, set);
   }
 
-  const policyTotal = (policies ?? []).length;
-  const currentPolicyKeys = new Set(
-    (policies ?? []).map((p) => `${p.id}:${p.current_version}`),
-  );
+  // Every published policy in the org, with its site scope. A person is
+  // "expected to view" a policy if it has no site scope or matches their site.
+  // (Job-role targeting is deferred - no audience rows exist for it yet.)
+  type PubPolicy = { id: string; published_version: number; service_id: string | null };
+  const publishedPolicies = (policies ?? []) as PubPolicy[];
   const viewedByUser = new Map<string, Set<string>>();
   for (const v of policyViews ?? []) {
     const set = viewedByUser.get(v.user_id as string) ?? new Set<string>();
@@ -93,9 +94,14 @@ export async function staffStatsByProfile(
       return v !== undefined && signed.has(`${sopId}:${v}`);
     }).length;
 
+    const expected = publishedPolicies.filter(
+      (pol) => pol.service_id == null || pol.service_id === p.service_id,
+    );
+    const policyTotal = expected.length;
     const viewed = viewedByUser.get(p.id) ?? new Set<string>();
-    let policyViewed = 0;
-    for (const key of viewed) if (currentPolicyKeys.has(key)) policyViewed++;
+    const policyViewed = expected.filter((pol) =>
+      viewed.has(`${pol.id}:${pol.published_version}`),
+    ).length;
 
     const onboardingOutstanding =
       p.job_role_id && !onboarded.has(p.id) ? 1 : 0;

@@ -101,22 +101,22 @@ export default async function StaffRecordPage({
     }
   }
 
-  // Policy view progress: every organisation policy, and how many this person
-  // has opened at the current version.
-  const [{ data: allPolicies }, { data: policyViewRows }] = await Promise.all([
-    supabase.from("policies").select("id, current_version"),
+  // Policy view progress: the published policies that target this person, and
+  // how many they have opened at the current published version.
+  const [{ data: targetPolicies }, { data: policyViewRows }] = await Promise.all([
+    supabase.rpc("visible_published_policies", { p_profile: person.id }),
     supabase
       .from("policy_views")
       .select("policy_id, policy_version")
       .eq("user_id", person.id),
   ]);
-  const policyTotal = (allPolicies ?? []).length;
+  const policyTotal = (targetPolicies ?? []).length;
   const viewedSet = new Set(
     (policyViewRows ?? []).map((v) => `${v.policy_id}:${v.policy_version}`),
   );
-  const policyViewed = (allPolicies ?? []).filter((p) =>
-    viewedSet.has(`${p.id}:${p.current_version}`),
-  ).length;
+  const policyViewed = (
+    (targetPolicies ?? []) as { id: string; published_version: number }[]
+  ).filter((p) => viewedSet.has(`${p.id}:${p.published_version}`)).length;
 
   const documents: {
     label: string;
@@ -253,14 +253,8 @@ export default async function StaffRecordPage({
             label="Policies viewed"
             done={policyViewed}
             total={policyTotal}
-            emptyNote="No policies in the library yet."
+            emptyNote="No published policies target this person yet."
           />
-          {policyTotal > 0 && policyViewed === 0 && (
-            <p className="text-xs text-slate-500">
-              Staff cannot view policies in the portal yet, so this stays at zero
-              until the policy library is live.
-            </p>
-          )}
         </div>
       </section>
 

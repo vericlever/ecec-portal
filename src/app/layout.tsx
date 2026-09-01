@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { getProfile, isManager, TIER_LABELS } from "@/lib/auth";
+import { getProfile, isManager, canEditContent, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
 
@@ -47,6 +47,18 @@ export default async function RootLayout({
                 <Link href="/sops" className="text-sm font-semibold tracking-tight">
                   VeriClever
                 </Link>
+                <Link
+                  href="/sops"
+                  className="text-sm text-slate-500 hover:text-slate-900"
+                >
+                  SOPs
+                </Link>
+                <Link
+                  href="/policies"
+                  className="text-sm text-slate-500 hover:text-slate-900"
+                >
+                  Policies
+                </Link>
                 {profile.job_role_id && (
                   <Link
                     href="/onboarding"
@@ -70,6 +82,14 @@ export default async function RootLayout({
                       Verification
                     </Link>
                   </>
+                )}
+                {canEditContent(profile.access_tier) && (
+                  <Link
+                    href="/admin/policies"
+                    className="text-sm text-slate-500 hover:text-slate-900"
+                  >
+                    Manage policies
+                  </Link>
                 )}
               </div>
               <div className="flex items-center gap-3 text-right text-xs text-slate-500">

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { type AccessTier, isManager, isAdmin } from "@/lib/roles";
+import { type AccessTier, isManager, isAdmin, canEditContent } from "@/lib/roles";
 
 export * from "@/lib/roles";
 
@@ -61,5 +61,12 @@ export async function requireStaffAccess(): Promise<Profile> {
 export async function requireAdmin(): Promise<Profile> {
   const profile = await requireProfile();
   if (!isAdmin(profile.access_tier)) redirect("/sops");
+  return profile;
+}
+
+// May add and edit policies and SOPs: Manager (policy) or Admin.
+export async function requireContentEditor(): Promise<Profile> {
+  const profile = await requireProfile();
+  if (!canEditContent(profile.access_tier)) redirect("/policies");
   return profile;
 }
