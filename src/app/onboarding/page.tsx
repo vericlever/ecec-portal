@@ -67,7 +67,6 @@ export default async function OnboardingPage() {
     non_educator_role: str(wd?.non_educator_role),
     start_date: str(wd?.start_date),
     employment_nature: str(wd?.employment_nature),
-    on_probation: ynStr(wd?.on_probation),
     wwcc_exempt: ynStr(wd?.wwcc_exempt),
     wwcc_exemption_reason: str(wd?.wwcc_exemption_reason),
     wwcc_check_number: str(wwcc?.check_number),

@@ -37,7 +37,6 @@ export type OnboardingPayload = {
   non_educator_role: string;
   start_date: string;
   employment_nature: string;
-  on_probation: "" | "yes" | "no";
   // wwcc
   wwcc_exempt: "" | "yes" | "no";
   wwcc_exemption_reason: string;
@@ -122,7 +121,6 @@ async function persist(
           ? s(payload.non_educator_role)
           : null,
       employment_nature: s(payload.employment_nature),
-      on_probation: yn(payload.on_probation),
       wwcc_exempt: payload.wwcc_exempt === "yes",
       wwcc_exemption_reason:
         payload.wwcc_exempt === "yes" ? s(payload.wwcc_exemption_reason) : null,

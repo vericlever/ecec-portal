@@ -168,15 +168,26 @@ export function OnboardingForm({
 
           {step.key === "position" && (
             <>
-              <Select label="Position" value={data.nqaits_position} onChange={(v) => set("nqaits_position", v)} options={NQAITS_POSITIONS} />
+              <Select
+                label="Position - NQAITS Worker Register"
+                hint="The regulatory position category recorded on the national Worker Register. This is separate from your job role and your access level in the portal."
+                value={data.nqaits_position}
+                onChange={(v) => set("nqaits_position", v)}
+                options={NQAITS_POSITIONS}
+              />
               {data.nqaits_position === "Non-Educator Staff" && (
                 <Select label="Non-educator role" value={data.non_educator_role} onChange={(v) => set("non_educator_role", v)} options={NON_EDUCATOR_ROLES} />
               )}
               <div className="grid grid-cols-2 gap-4">
                 <DateField label="Start date" value={data.start_date} onChange={(v) => set("start_date", v)} />
-                <Select label="Nature of employment" value={data.employment_nature} onChange={(v) => set("employment_nature", v)} options={EMPLOYMENT_NATURES} />
+                <Select
+                  label="Nature of employment"
+                  hint="Direct: you are employed by Ready Set Go. Indirect: you are employed by an outside organisation, such as an agency, and placed here."
+                  value={data.employment_nature}
+                  onChange={(v) => set("employment_nature", v)}
+                  options={EMPLOYMENT_NATURES}
+                />
               </div>
-              <YesNo label="Currently on a probationary period" value={data.on_probation} onChange={(v) => set("on_probation", v as OnboardingPayload["on_probation"])} />
             </>
           )}
 
@@ -356,11 +367,13 @@ function DateField({
 
 function Select({
   label,
+  hint,
   value,
   onChange,
   options,
 }: {
   label: string;
+  hint?: string;
   value: string;
   onChange: (v: string) => void;
   options: readonly string[];
@@ -380,6 +393,7 @@ function Select({
           </option>
         ))}
       </select>
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </label>
   );
 }
