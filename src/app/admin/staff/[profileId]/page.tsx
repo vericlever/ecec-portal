@@ -44,8 +44,16 @@ export default async function StaffRecordPage({
       .eq("id", params.profileId)
       .maybeSingle(),
     supabase.from("worker_details").select("*").eq("profile_id", params.profileId).maybeSingle(),
-    supabase.from("wwcc_checks").select("*").eq("profile_id", params.profileId),
-    supabase.from("teacher_registrations").select("*").eq("profile_id", params.profileId),
+    supabase
+      .from("wwcc_checks")
+      .select("*")
+      .eq("profile_id", params.profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("teacher_registrations")
+      .select("*")
+      .eq("profile_id", params.profileId)
+      .order("created_at", { ascending: false }),
     supabase.from("qualifications").select("*").eq("profile_id", params.profileId),
     supabase.from("training_records").select("*").eq("profile_id", params.profileId),
     supabase.from("services").select("id, name"),
@@ -113,15 +121,16 @@ export default async function StaffRecordPage({
   const documents: {
     label: string;
     table: "wwcc_checks" | "teacher_registrations" | "qualifications" | "training_records";
-    rows: { id: string; lines: [string, string][]; sighted_at: string | null; sighted_by: string | null }[];
+    rows: { id: string; lines: [string, string][]; sighted_at: string | null; sighted_by: string | null; note?: string }[];
   }[] = [
     {
       label: "Working with Children Check",
       table: "wwcc_checks",
-      rows: (wwcc ?? []).map((r) => ({
+      rows: (wwcc ?? []).map((r, i) => ({
         id: r.id,
         sighted_at: r.sighted_at,
         sighted_by: r.sighted_by,
+        note: i > 0 ? "Superseded by a newer check, kept for the record" : undefined,
         lines: [
           ["Check number", r.check_number ?? "—"],
           ["Expiry", fmtDate(r.expiry_date)],
@@ -132,10 +141,11 @@ export default async function StaffRecordPage({
     {
       label: "Teacher registration",
       table: "teacher_registrations",
-      rows: (teacher ?? []).map((r) => ({
+      rows: (teacher ?? []).map((r, i) => ({
         id: r.id,
         sighted_at: r.sighted_at,
         sighted_by: r.sighted_by,
+        note: i > 0 ? "Superseded by a newer check, kept for the record" : undefined,
         lines: [
           ["Check number", r.check_number ?? "—"],
           ["Expiry", fmtDate(r.expiry_date)],
@@ -307,6 +317,9 @@ export default async function StaffRecordPage({
               doc.rows.map((row) => (
                 <div key={row.id} className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="text-sm font-medium">{doc.label}</div>
+                  {row.note && (
+                    <div className="text-xs text-slate-400">{row.note}</div>
+                  )}
                   <dl className="mt-1 grid grid-cols-2 gap-x-6 gap-y-0.5 text-sm">
                     {row.lines.map(([k, v]) => (
                       <Row key={k} k={k}>
