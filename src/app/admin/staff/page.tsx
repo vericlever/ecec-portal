@@ -29,11 +29,14 @@ export default async function StaffPage() {
   // managers and HR verifiers see their own service.
   const [{ data: staff, error }, { data: services }, { data: jobRoles }] =
     await Promise.all([
+      // The staff list is for people with compliance obligations. Admin
+      // (operator) accounts are managed elsewhere and are left off.
       supabase
         .from("profiles")
         .select(
           "id, full_name, email, access_tier, is_active, service_id, job_role_id, hr_verifier",
         )
+        .neq("access_tier", "admin")
         .order("full_name"),
       supabase.from("services").select("id, name"),
       supabase.from("job_roles").select("id, name"),
