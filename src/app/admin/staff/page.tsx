@@ -76,12 +76,6 @@ export default async function StaffPage() {
               >
                 Bulk import
               </Link>
-              <Link
-                href="/admin/registry"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Training register
-              </Link>
             </>
           )}
           {isManager(me.access_tier) && (
