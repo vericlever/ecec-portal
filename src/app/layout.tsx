@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { getProfile, isManager, TIER_LABELS } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "VeriClever",
@@ -15,6 +16,16 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const profile = await getProfile();
+
+  let onboardingDone = true;
+  if (profile) {
+    const { data } = await createClient()
+      .from("worker_details")
+      .select("onboarding_completed_at")
+      .eq("profile_id", profile.id)
+      .maybeSingle();
+    onboardingDone = Boolean(data?.onboarding_completed_at);
+  }
 
   return (
     <html lang="en-AU">
@@ -53,6 +64,19 @@ export default async function RootLayout({
               </div>
             </div>
           </header>
+        )}
+        {profile && !onboardingDone && (
+          <div className="border-b border-amber-200 bg-amber-50">
+            <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-2 text-sm text-amber-900">
+              <span>Your onboarding details are not complete yet.</span>
+              <Link
+                href="/onboarding"
+                className="shrink-0 rounded-md bg-amber-900 px-2.5 py-1 text-xs font-medium text-white"
+              >
+                Complete onboarding
+              </Link>
+            </div>
+          </div>
         )}
         <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
       </body>
