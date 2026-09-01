@@ -63,12 +63,20 @@ export default async function StaffPage() {
         <h1 className="text-xl font-semibold">Staff</h1>
         <div className="flex gap-2">
           {isAdmin(me.access_tier) && (
-            <Link
-              href="/admin/staff/import"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Bulk import
-            </Link>
+            <>
+              <Link
+                href="/admin/staff/export"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Export (NQAITS)
+              </Link>
+              <Link
+                href="/admin/staff/import"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Bulk import
+              </Link>
+            </>
           )}
           {isManager(me.access_tier) && (
             <Link
