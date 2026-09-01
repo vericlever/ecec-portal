@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 type Status = "idle" | "signing" | "done";
 
@@ -9,13 +8,17 @@ export function SignForm({ sopId }: { sopId: string }) {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("idle");
-  const router = useRouter();
 
   useEffect(() => {
     if (status !== "done") return;
-    const timer = setTimeout(() => router.replace("/sops"), 1600);
+    // Full navigation, not a client transition, so the SOP list reloads fresh
+    // from the server and shows the new sign-off (the client router would serve
+    // a cached copy).
+    const timer = setTimeout(() => {
+      window.location.assign("/sops");
+    }, 1600);
     return () => clearTimeout(timer);
-  }, [status, router]);
+  }, [status]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
