@@ -37,15 +37,34 @@ export function NewStaffForm({
         <p className="font-medium text-green-800">
           Account created for {state.email}.
         </p>
-        <p className="mt-2 text-green-800">
-          Temporary password:{" "}
-          <code className="rounded bg-white px-1.5 py-0.5 font-mono text-slate-900">
-            {state.tempPassword}
-          </code>
-        </p>
-        <p className="mt-2 text-green-700">
-          Pass this to them securely. It is shown once.
-        </p>
+
+        {state.emailed ? (
+          <p className="mt-2 text-green-800">
+            An invite to set their password has been emailed to them.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-green-800">
+              Email is not set up yet, so send them their first-login link
+              yourself:
+            </p>
+            {state.inviteLink && (
+              <p className="mt-1 break-all rounded bg-white px-2 py-1.5 font-mono text-xs text-slate-800">
+                {state.inviteLink}
+              </p>
+            )}
+            <p className="mt-2 text-green-800">
+              Or a temporary password:{" "}
+              <code className="rounded bg-white px-1.5 py-0.5 font-mono text-slate-900">
+                {state.tempPassword}
+              </code>
+            </p>
+            <p className="mt-2 text-green-700">
+              Pass these on securely. They are shown once.
+            </p>
+          </>
+        )}
+
         <div className="mt-4">
           <Link
             href="/admin/staff"

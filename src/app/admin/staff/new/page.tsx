@@ -24,8 +24,9 @@ export default async function NewStaffPage() {
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Add staff member</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Creates an account in your organisation. You will get a temporary
-        password to pass on; they change it after signing in.
+        Creates an account in your organisation. They are emailed a link to set
+        their own password. Until email is set up, you are given the link to
+        pass on yourself.
       </p>
 
       <NewStaffForm

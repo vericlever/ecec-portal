@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // access. Unauthenticated requests to anything other than /login are redirected
 // to /login; an authenticated request to /login is sent on to /sops.
 
-const PUBLIC_PATHS = new Set(["/login"]);
+const PUBLIC_PATHS = new Set(["/login", "/auth/confirm"]);
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

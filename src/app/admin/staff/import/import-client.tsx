@@ -52,16 +52,19 @@ export function ImportClient() {
     if (!result || !result.ok) return;
     const created = result.rows.filter((r) => r.outcome === "created");
     const csv =
-      "email,temporary_password,name\r\n" +
+      "email,name,invite_link,temporary_password\r\n" +
       created
-        .map((r) => `${r.email},${r.tempPassword ?? ""},"${r.name.replace(/"/g, '""')}"`)
+        .map(
+          (r) =>
+            `${r.email},"${r.name.replace(/"/g, '""')}",${r.inviteLink ?? ""},${r.tempPassword ?? ""}`,
+        )
         .join("\r\n") +
       "\r\n";
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "vericlever-new-staff-passwords.csv";
+    a.download = "vericlever-new-staff-logins.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -151,6 +154,13 @@ export function ImportClient() {
           <div className="flex items-center justify-between">
             <p className="text-sm">
               <span className="font-medium">{result.createdCount}</span> created
+              {result.emailedCount > 0 && (
+                <>
+                  {" · "}
+                  <span className="font-medium">{result.emailedCount}</span>{" "}
+                  invited by email
+                </>
+              )}
               {result.rejectedCount > 0 && (
                 <>
                   {" · "}
@@ -167,14 +177,15 @@ export function ImportClient() {
                 onClick={downloadPasswords}
                 className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"
               >
-                Download passwords (CSV)
+                Download logins (CSV)
               </button>
             )}
           </div>
           {result.createdCount > 0 && (
             <p className="mt-1 text-xs text-slate-500">
-              Download the passwords now. They are shown once and cannot be
-              retrieved later.
+              {result.emailConfigured
+                ? "Everyone created has been emailed an invite. The CSV has their invite links and temporary passwords as a backup - download it now, it is shown once."
+                : "Email is not set up yet. Download the CSV of invite links and temporary passwords and pass them on. It is shown once."}
             </p>
           )}
           <RowTable

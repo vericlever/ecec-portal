@@ -12,6 +12,8 @@ import {
   type ParsedWorker,
   type RawRecord,
 } from "@/lib/nqaits-import";
+import { generateFirstLoginLink } from "@/lib/invite";
+import { emailEnabled, sendStaffInvite } from "@/lib/email";
 
 export type ImportFormat = "csv" | "json";
 
@@ -33,12 +35,21 @@ export type ImportResultRow = {
   name: string;
   outcome: "created" | "rejected";
   tempPassword?: string;
+  inviteLink?: string;
+  emailed?: boolean;
   detail?: string;
 };
 
 export type RunResult =
   | { ok: false; error: string }
-  | { ok: true; rows: ImportResultRow[]; createdCount: number; rejectedCount: number };
+  | {
+      ok: true;
+      rows: ImportResultRow[];
+      createdCount: number;
+      rejectedCount: number;
+      emailedCount: number;
+      emailConfigured: boolean;
+    };
 
 async function loadContext(): Promise<ImportContext> {
   const supabase = createClient();
@@ -114,6 +125,14 @@ export async function runImport(
   const org = me.organisation_id;
   const source = format === "json" ? "json" : "csv";
 
+  const { data: orgRow } = await createClient()
+    .from("organisations")
+    .select("name")
+    .eq("id", org)
+    .maybeSingle();
+  const orgName = orgRow?.name ?? "VeriClever";
+  const canEmail = emailEnabled();
+
   const rows: ImportResultRow[] = [];
 
   for (const r of validated) {
@@ -146,12 +165,25 @@ export async function runImport(
     });
 
     if (result.ok) {
+      const link = await generateFirstLoginLink(r.email);
+      let emailed = false;
+      if (link.ok && canEmail) {
+        const sent = await sendStaffInvite({
+          to: r.email,
+          fullName: r.name,
+          link: link.link,
+          orgName,
+        });
+        emailed = sent.ok;
+      }
       rows.push({
         line: r.line,
         email: r.email,
         name: r.name,
         outcome: "created",
         tempPassword: result.tempPassword,
+        inviteLink: link.ok ? link.link : undefined,
+        emailed,
         detail: result.problems.join("; ") || undefined,
       });
     } else {
@@ -173,6 +205,8 @@ export async function runImport(
     rows,
     createdCount,
     rejectedCount: rows.length - createdCount,
+    emailedCount: rows.filter((r) => r.emailed).length,
+    emailConfigured: canEmail,
   };
 }
 

@@ -4,11 +4,20 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile, isAdmin, isManager, type AccessTier } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { generateFirstLoginLink } from "@/lib/invite";
+import { emailEnabled, sendStaffInvite } from "@/lib/email";
 
 export type CreateStaffState =
   | { status: "idle" }
   | { status: "error"; error: string }
-  | { status: "created"; email: string; tempPassword: string };
+  | {
+      status: "created";
+      email: string;
+      emailed: boolean;
+      inviteLink: string | null;
+      tempPassword: string;
+    };
 
 const TIERS: AccessTier[] = ["staff", "manager_staff", "manager_policy", "admin"];
 
@@ -105,6 +114,35 @@ export async function createStaff(
     return { status: "error", error: profileErr.message };
   }
 
+  // Invite: a first-login link, emailed if email is set up, otherwise handed
+  // back for the admin to pass on.
+  let inviteLink: string | null = null;
+  let emailed = false;
+  const link = await generateFirstLoginLink(email);
+  if (link.ok) {
+    inviteLink = link.link;
+    if (emailEnabled()) {
+      const { data: org } = await createClient()
+        .from("organisations")
+        .select("name")
+        .eq("id", me.organisation_id)
+        .maybeSingle();
+      const sent = await sendStaffInvite({
+        to: email,
+        fullName,
+        link: link.link,
+        orgName: org?.name ?? "VeriClever",
+      });
+      emailed = sent.ok;
+    }
+  }
+
   revalidatePath("/admin/staff");
-  return { status: "created", email, tempPassword: password };
+  return {
+    status: "created",
+    email,
+    emailed,
+    inviteLink,
+    tempPassword: password,
+  };
 }
