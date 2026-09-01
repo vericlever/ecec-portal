@@ -132,13 +132,15 @@ async function persist(
   );
   if (wdError) return { ok: false, error: wdError.message };
 
-  // WWCC: one row from onboarding, only once there is something to record. The
-  // trigger protects sighted_at / sighted_by.
+  // WWCC and teacher registration are standalone checks. A still-unsighted check
+  // is corrected in place; once a leader has sighted one it becomes permanent
+  // history and a changed check number, expiry or state is recorded as a new
+  // check that re-enters the verification queue (see upsertCheck).
   const wwccHasData =
     s(payload.wwcc_check_number) ||
     d(payload.wwcc_expiry_date) ||
     s(payload.wwcc_state_of_issue);
-  await upsertSingle(supabase, "wwcc_checks", me, org, payload.wwcc_exempt !== "yes" && wwccHasData
+  await upsertCheck(supabase, "wwcc_checks", me, org, payload.wwcc_exempt !== "yes" && wwccHasData
     ? {
         check_number: s(payload.wwcc_check_number),
         expiry_date: d(payload.wwcc_expiry_date),
@@ -150,7 +152,7 @@ async function persist(
     s(payload.teacher_check_number) ||
     d(payload.teacher_expiry_date) ||
     s(payload.teacher_state_of_issue);
-  await upsertSingle(
+  await upsertCheck(
     supabase,
     "teacher_registrations",
     me,
@@ -231,7 +233,7 @@ async function persist(
 
 async function upsertSingle(
   supabase: ReturnType<typeof createClient>,
-  table: "wwcc_checks" | "teacher_registrations" | "qualifications",
+  table: "qualifications",
   profileId: string,
   org: string,
   fields: Record<string, unknown> | null,
@@ -257,6 +259,59 @@ async function upsertSingle(
       .from(table)
       .insert({ profile_id: profileId, organisation_id: org, ...fields });
   }
+}
+
+type CheckFields = {
+  check_number: string | null;
+  expiry_date: string | null;
+  state_of_issue: string | null;
+};
+
+// WWCC / teacher registration checks, which keep a history rather than a single
+// mutable row:
+//   * no check yet, or an unsighted one waiting to be sighted -> write in place
+//   * the latest check has been sighted and the new details differ -> insert a
+//     new unsighted row; the sighted one stays as history and the new one shows
+//     up in /admin/verification
+//   * the new details match the latest sighted check -> nothing to do
+// Clearing the details removes an unsighted check but never a sighted one.
+async function upsertCheck(
+  supabase: ReturnType<typeof createClient>,
+  table: "wwcc_checks" | "teacher_registrations",
+  profileId: string,
+  org: string,
+  fields: CheckFields | null,
+) {
+  const { data: rows } = await supabase
+    .from(table)
+    .select("id, check_number, expiry_date, state_of_issue, sighted_at")
+    .eq("profile_id", profileId)
+    .order("created_at", { ascending: false });
+
+  const all = rows ?? [];
+  const pending = all.find((r) => !r.sighted_at) ?? null;
+
+  if (!fields) {
+    if (pending) await supabase.from(table).delete().eq("id", pending.id);
+    return;
+  }
+
+  if (pending) {
+    await supabase.from(table).update(fields).eq("id", pending.id);
+    return;
+  }
+
+  const latest = all[0];
+  const unchanged =
+    latest &&
+    (latest.check_number ?? null) === fields.check_number &&
+    (latest.expiry_date ?? null) === fields.expiry_date &&
+    (latest.state_of_issue ?? null) === fields.state_of_issue;
+  if (unchanged) return;
+
+  await supabase
+    .from(table)
+    .insert({ profile_id: profileId, organisation_id: org, ...fields });
 }
 
 export async function saveOnboardingProgress(

@@ -19,12 +19,24 @@ import { RegistrySearch } from "@/components/registry-search";
 
 type FieldKey = keyof OnboardingPayload;
 
+export type LockedCheck = {
+  check_number: string;
+  expiry_date: string;
+  state_of_issue: string;
+  sighted_at: string;
+  sighted_by: string;
+};
+
 export function OnboardingForm({
   initial,
   completed,
+  wwccLocked,
+  teacherLocked,
 }: {
   initial: OnboardingPayload;
   completed: boolean;
+  wwccLocked: LockedCheck | null;
+  teacherLocked: LockedCheck | null;
 }) {
   const [data, setData] = useState<OnboardingPayload>(initial);
   const [stepIndex, setStepIndex] = useState(0);
@@ -229,6 +241,12 @@ export function OnboardingForm({
                 <Text label="Reason for exemption" value={data.wwcc_exemption_reason} onChange={(v) => set("wwcc_exemption_reason", v)} />
               ) : (
                 <>
+                  {wwccLocked && <LockedCheckPanel kind="Working with Children Check" locked={wwccLocked} />}
+                  {wwccLocked && (
+                    <p className="text-sm font-medium text-slate-700">
+                      Enter a renewed or replacement check
+                    </p>
+                  )}
                   <Text label="Check number" value={data.wwcc_check_number} onChange={(v) => set("wwcc_check_number", v)} />
                   <div className="grid grid-cols-2 gap-4">
                     <DateField label="Check expiry date" value={data.wwcc_expiry_date} onChange={(v) => set("wwcc_expiry_date", v)} />
@@ -241,6 +259,12 @@ export function OnboardingForm({
 
           {step.key === "teacher" && (
             <>
+              {teacherLocked && <LockedCheckPanel kind="teacher registration" locked={teacherLocked} />}
+              {teacherLocked && (
+                <p className="text-sm font-medium text-slate-700">
+                  Enter a renewed or replacement check
+                </p>
+              )}
               <Text label="Check number" value={data.teacher_check_number} onChange={(v) => set("teacher_check_number", v)} />
               <div className="grid grid-cols-2 gap-4">
                 <DateField label="Check expiry date" value={data.teacher_expiry_date} onChange={(v) => set("teacher_expiry_date", v)} />
@@ -402,6 +426,43 @@ export function OnboardingForm({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function LockedCheckPanel({
+  kind,
+  locked,
+}: {
+  kind: string;
+  locked: LockedCheck;
+}) {
+  const sighted = locked.sighted_at
+    ? new Date(locked.sighted_at).toLocaleDateString("en-AU", { dateStyle: "medium" })
+    : null;
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+      <p className="font-medium text-slate-700">Sighted {kind}</p>
+      <dl className="mt-1.5 grid grid-cols-2 gap-x-6 gap-y-0.5 text-slate-600">
+        <dt className="text-slate-500">Check number</dt>
+        <dd>{locked.check_number || "—"}</dd>
+        <dt className="text-slate-500">Expiry</dt>
+        <dd>
+          {locked.expiry_date
+            ? new Date(locked.expiry_date).toLocaleDateString("en-AU", { dateStyle: "medium" })
+            : "—"}
+        </dd>
+        <dt className="text-slate-500">State of issue</dt>
+        <dd>{locked.state_of_issue || "—"}</dd>
+      </dl>
+      <p className="mt-2 text-xs text-slate-500">
+        {sighted
+          ? `A leader sighted this check on ${sighted}${locked.sighted_by ? ` (${locked.sighted_by})` : ""}.`
+          : "A leader has sighted this check."}{" "}
+        It stays on your record as it was sighted and cannot be changed here. If
+        the check has been renewed or reissued, enter the new details below and a
+        leader will sight them with you.
+      </p>
     </div>
   );
 }

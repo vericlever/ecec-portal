@@ -156,11 +156,13 @@ Roles are clearer now, this simplifies the sign-off requirement from earlier: Ad
 - A week with no policy changes sends no parent email at all
 
 ## Step 10: Credential tracking, director view and staff self-service
-**Status: not started**
+**Status: partly done - self-service re-verification of WWCC / teacher registration done (migration 0017); director expiring-credentials view and training self-service view not started**
 
 - Director view of what's expiring across staff at their site(s)
 - **Staff self-service**: staff can update their own WWCC details and see their own training record, not just have it managed entirely by an admin or manager. Staff-tier access here is limited to their own record, viewing and updating their own WWCC and training, not anyone else's.
 - Any WWCC or training record a staff member submits or updates here goes through the same site-wide manager verification queue defined in Step 5 (Date Sighted, Sighted By), it's the same underlying mechanism, not a separate one for self-service updates.
+
+**WWCC and teacher registration re-verification (done, migration 0017).** These two are standalone checks (a police check, a teacher registration body check), not tied to an RTO, so their details are never corrected in place once sighted. A staff member can edit a check while it is still unsighted. Once a leader has sighted it the row is locked as permanent history: the `protect_sighted_fields()` trigger blocks any non-verifier change to a sighted `wwcc_checks` / `teacher_registrations` row, and the onboarding form records a renewed or reissued check as a new unsighted row that re-enters `/admin/verification`. The staff record page shows the older sighted check as "superseded, kept for the record". Qualifications and training records keep the earlier behaviour (a self-edit silently leaves the sighting untouched) until the rest of this step is built.
 
 **Done when**
 - A director-level view shows expiring credentials across their site(s)

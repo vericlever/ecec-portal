@@ -16,17 +16,42 @@ export default async function OnboardingPage() {
 
   const [
     { data: wd },
-    { data: wwcc },
-    { data: teacher },
+    { data: wwccRows },
+    { data: teacherRows },
     { data: qual },
     { data: training },
   ] = await Promise.all([
     supabase.from("worker_details").select("*").eq("profile_id", profile.id).maybeSingle(),
-    supabase.from("wwcc_checks").select("*").eq("profile_id", profile.id).limit(1).maybeSingle(),
-    supabase.from("teacher_registrations").select("*").eq("profile_id", profile.id).limit(1).maybeSingle(),
+    supabase
+      .from("wwcc_checks")
+      .select("*")
+      .eq("profile_id", profile.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("teacher_registrations")
+      .select("*")
+      .eq("profile_id", profile.id)
+      .order("created_at", { ascending: false }),
     supabase.from("qualifications").select("*").eq("profile_id", profile.id).limit(1).maybeSingle(),
     supabase.from("training_records").select("*").eq("profile_id", profile.id),
   ]);
+
+  // A staff member can still edit a check a leader has not sighted yet. Once it
+  // is sighted it is locked: the form shows it read-only and any renewal or
+  // correction is entered as a new check. currentCheck picks the row the form
+  // works with (an unsighted one if present) and, when the latest check is
+  // locked, the sighted row to display above the entry fields.
+  const currentCheck = (rows: Record<string, unknown>[] | null) => {
+    const list = rows ?? [];
+    const pending = list.find((r) => !r.sighted_at) ?? null;
+    const latestSighted = list.find((r) => r.sighted_at) ?? null;
+    return {
+      forForm: pending,
+      locked: pending ? null : latestSighted,
+    };
+  };
+  const wwcc = currentCheck(wwccRows);
+  const teacher = currentCheck(teacherRows);
 
   const trainingByType: OnboardingPayload["training"] = {};
   for (const type of [...CORE_TRAINING_TYPES, "Other"]) {
@@ -69,12 +94,12 @@ export default async function OnboardingPage() {
     employment_nature: str(wd?.employment_nature),
     wwcc_exempt: ynStr(wd?.wwcc_exempt),
     wwcc_exemption_reason: str(wd?.wwcc_exemption_reason),
-    wwcc_check_number: str(wwcc?.check_number),
-    wwcc_expiry_date: str(wwcc?.expiry_date),
-    wwcc_state_of_issue: str(wwcc?.state_of_issue),
-    teacher_check_number: str(teacher?.check_number),
-    teacher_expiry_date: str(teacher?.expiry_date),
-    teacher_state_of_issue: str(teacher?.state_of_issue),
+    wwcc_check_number: str(wwcc.forForm?.check_number),
+    wwcc_expiry_date: str(wwcc.forForm?.expiry_date),
+    wwcc_state_of_issue: str(wwcc.forForm?.state_of_issue),
+    teacher_check_number: str(teacher.forForm?.check_number),
+    teacher_expiry_date: str(teacher.forForm?.expiry_date),
+    teacher_state_of_issue: str(teacher.forForm?.state_of_issue),
     has_no_qualifications: wd?.has_no_qualifications ?? false,
     qualification_type: str(qual?.qualification_type),
     qualification_rto_name: str(qual?.rto_name),
@@ -88,6 +113,17 @@ export default async function OnboardingPage() {
 
   const completed = Boolean(wd?.onboarding_completed_at);
 
+  const lockedCheck = (row: Record<string, unknown> | null) =>
+    row
+      ? {
+          check_number: str(row.check_number),
+          expiry_date: str(row.expiry_date),
+          state_of_issue: str(row.state_of_issue),
+          sighted_at: str(row.sighted_at),
+          sighted_by: str(row.sighted_by),
+        }
+      : null;
+
   return (
     <div>
       <h1 className="text-xl font-semibold">
@@ -98,7 +134,12 @@ export default async function OnboardingPage() {
           ? "Your Worker Register details. Update them whenever they change - a leader will sight any new documents with you."
           : "Enter your details and the information from your documents. A leader will check the original documents with you and record that they have sighted them."}
       </p>
-      <OnboardingForm initial={initial} completed={completed} />
+      <OnboardingForm
+        initial={initial}
+        completed={completed}
+        wwccLocked={lockedCheck(wwcc.locked)}
+        teacherLocked={lockedCheck(teacher.locked)}
+      />
     </div>
   );
 }
