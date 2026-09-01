@@ -86,18 +86,19 @@ export default async function OnboardingPage() {
     training: trainingByType,
   };
 
+  const completed = Boolean(wd?.onboarding_completed_at);
+
   return (
     <div>
-      <h1 className="text-xl font-semibold">Your onboarding</h1>
+      <h1 className="text-xl font-semibold">
+        {completed ? "Your details" : "Your onboarding"}
+      </h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Enter your details and the information from your documents. A leader will
-        check the original documents with you and record that they have sighted
-        them.
+        {completed
+          ? "Your Worker Register details. Update them whenever they change - a leader will sight any new documents with you."
+          : "Enter your details and the information from your documents. A leader will check the original documents with you and record that they have sighted them."}
       </p>
-      <OnboardingForm
-        initial={initial}
-        completed={Boolean(wd?.onboarding_completed_at)}
-      />
+      <OnboardingForm initial={initial} completed={completed} />
     </div>
   );
 }

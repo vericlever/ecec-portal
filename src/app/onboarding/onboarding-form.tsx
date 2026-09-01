@@ -30,7 +30,8 @@ export function OnboardingForm({
   const [stepIndex, setStepIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(completed);
+  const [submitting, setSubmitting] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   const set = (key: FieldKey, value: OnboardingPayload[FieldKey]) =>
     setData((d) => ({ ...d, [key]: value }));
@@ -73,58 +74,78 @@ export function OnboardingForm({
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const isLast = stepIndex >= steps.length - 1;
 
-  async function go(direction: 1 | -1) {
+  async function persist(): Promise<boolean> {
     setError(null);
-    if (direction === -1) {
-      setStepIndex((i) => Math.max(0, i - 1));
-      return;
-    }
     setSaving(true);
-    const result = isLast
-      ? await submitOnboarding(data)
-      : await saveOnboardingProgress(data);
+    const result = await saveOnboardingProgress(data);
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
-      return;
+      return false;
     }
-    if (isLast) {
-      setDone(true);
-      window.location.assign("/sops");
-    } else {
-      setStepIndex((i) => i + 1);
-    }
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2500);
+    return true;
   }
 
-  if (done) {
-    return (
-      <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-6 text-sm text-green-800">
-        <p className="font-medium">Your onboarding details are submitted.</p>
-        <p className="mt-1">
-          You can come back and update them any time. A leader will sight your
-          documents with you.
-        </p>
-      </div>
-    );
+  // First run: step through, saving each step, then submit on the last one.
+  async function next() {
+    if (isLast && !completed) {
+      setError(null);
+      setSubmitting(true);
+      const result = await submitOnboarding(data);
+      if (!result.ok) {
+        setSubmitting(false);
+        setError(result.error);
+        return;
+      }
+      window.location.assign("/sops");
+      return;
+    }
+    if (await persist()) setStepIndex((i) => Math.min(i + 1, steps.length - 1));
+  }
+
+  // Edit mode: jump straight to a section. Edits are held in one object, so
+  // moving between steps never loses anything; Save writes the lot.
+  function jumpTo(i: number) {
+    setError(null);
+    setStepIndex(i);
   }
 
   return (
     <div className="mt-6">
-      <ol className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
-        {steps.map((s, i) => (
-          <li
-            key={s.key}
-            className={
-              i === stepIndex
-                ? "font-medium text-slate-900"
-                : i < stepIndex
-                  ? "text-slate-500"
-                  : ""
-            }
-          >
-            {i + 1}. {s.title}
-          </li>
-        ))}
+      {completed && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800">
+          Your details are submitted. Change anything below and press Save.
+        </div>
+      )}
+
+      <ol className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+        {steps.map((s, i) => {
+          const cls =
+            i === stepIndex
+              ? "font-medium text-slate-900"
+              : i < stepIndex
+                ? "text-slate-500"
+                : "";
+          return (
+            <li key={s.key} className={cls}>
+              {completed ? (
+                <button
+                  type="button"
+                  onClick={() => jumpTo(i)}
+                  className="hover:text-slate-900 hover:underline"
+                >
+                  {i + 1}. {s.title}
+                </button>
+              ) : (
+                <span>
+                  {i + 1}. {s.title}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ol>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
@@ -326,23 +347,59 @@ export function OnboardingForm({
 
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-        <div className="mt-6 flex items-center justify-between">
+        <div className="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => go(-1)}
-            disabled={stepIndex === 0 || saving}
+            onClick={() => jumpTo(Math.max(0, stepIndex - 1))}
+            disabled={stepIndex === 0 || saving || submitting}
             className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 disabled:opacity-40"
           >
             Back
           </button>
-          <button
-            type="button"
-            onClick={() => go(1)}
-            disabled={saving}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
-          >
-            {saving ? "Saving…" : isLast ? "Submit" : "Save and continue"}
-          </button>
+
+          <div className="flex items-center gap-3">
+            {justSaved && (
+              <span className="text-xs font-medium text-green-700">Saved</span>
+            )}
+
+            {completed ? (
+              <>
+                {!isLast && (
+                  <button
+                    type="button"
+                    onClick={() => jumpTo(stepIndex + 1)}
+                    disabled={saving}
+                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={persist}
+                  disabled={saving}
+                  className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={next}
+                disabled={saving || submitting}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
+              >
+                {submitting
+                  ? "Submitting…"
+                  : saving
+                    ? "Saving…"
+                    : isLast
+                      ? "Submit"
+                      : "Save and continue"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

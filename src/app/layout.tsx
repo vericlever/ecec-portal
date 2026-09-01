@@ -47,6 +47,14 @@ export default async function RootLayout({
                 <Link href="/sops" className="text-sm font-semibold tracking-tight">
                   VeriClever
                 </Link>
+                {profile.job_role_id && (
+                  <Link
+                    href="/onboarding"
+                    className="text-sm text-slate-500 hover:text-slate-900"
+                  >
+                    My details
+                  </Link>
+                )}
                 {(isManager(profile.access_tier) || profile.hr_verifier) && (
                   <>
                     <Link
