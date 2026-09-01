@@ -37,13 +37,21 @@ export default async function RootLayout({
                 <Link href="/sops" className="text-sm font-semibold tracking-tight">
                   VeriClever
                 </Link>
-                {isManager(profile.access_tier) && (
-                  <Link
-                    href="/admin/staff"
-                    className="text-sm text-slate-500 hover:text-slate-900"
-                  >
-                    Staff
-                  </Link>
+                {(isManager(profile.access_tier) || profile.hr_verifier) && (
+                  <>
+                    <Link
+                      href="/admin/staff"
+                      className="text-sm text-slate-500 hover:text-slate-900"
+                    >
+                      Staff
+                    </Link>
+                    <Link
+                      href="/admin/verification"
+                      className="text-sm text-slate-500 hover:text-slate-900"
+                    >
+                      Verification
+                    </Link>
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-3 text-right text-xs text-slate-500">
