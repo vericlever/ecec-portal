@@ -99,60 +99,114 @@ export function SightingControl({
   );
 }
 
+function fmtDate(v: string) {
+  return new Date(v).toLocaleDateString("en-AU", { dateStyle: "medium" });
+}
+
 export function ProbationControl({
   profileId,
-  value,
+  onProbation,
+  startDate,
   canEdit,
 }: {
   profileId: string;
-  value: boolean | null;
+  onProbation: boolean | null;
+  startDate: string | null;
   canEdit: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const current = value === true ? "yes" : value === false ? "no" : "";
+
+  const savedStatus =
+    onProbation === true ? "yes" : onProbation === false ? "no" : "";
+  const [status, setStatus] = useState<"" | "yes" | "no">(savedStatus);
+  const [date, setDate] = useState(startDate ?? "");
+
+  const dirty = status !== savedStatus || date !== (startDate ?? "");
 
   if (!canEdit) {
     return (
-      <p className="text-sm text-slate-700">
-        {current === "yes"
-          ? "On a probationary period"
-          : current === "no"
-            ? "Not on a probationary period"
-            : "Not set"}
-      </p>
+      <div className="space-y-1 text-sm text-slate-700">
+        <p>
+          {savedStatus === "yes"
+            ? "On a probationary period"
+            : savedStatus === "no"
+              ? "Not on a probationary period"
+              : "Not set"}
+        </p>
+        {savedStatus === "yes" && (
+          <p className="text-slate-500">
+            Probation start date:{" "}
+            {startDate ? fmtDate(startDate) : "not set"}
+          </p>
+        )}
+      </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-3 text-sm">
-      <span className="text-slate-600">On a probationary period</span>
-      <div className="flex gap-3">
-        {[
-          { v: "yes", label: "Yes" },
-          { v: "no", label: "No" },
-          { v: "", label: "Not set" },
-        ].map((opt) => (
-          <label key={opt.v} className="flex items-center gap-1.5">
-            <input
-              type="radio"
-              checked={current === opt.v}
-              disabled={pending}
-              onChange={() =>
-                start(async () => {
-                  setError(null);
-                  const r = await setProbation(profileId, opt.v as "" | "yes" | "no");
-                  if (r.ok) router.refresh();
-                  else setError(r.error);
-                })
-              }
-            />
-            {opt.label}
-          </label>
-        ))}
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center gap-3">
+        <span className="text-slate-600">On a probationary period</span>
+        <div className="flex gap-3">
+          {[
+            { v: "yes", label: "Yes" },
+            { v: "no", label: "No" },
+            { v: "", label: "Not set" },
+          ].map((opt) => (
+            <label key={opt.v} className="flex items-center gap-1.5">
+              <input
+                type="radio"
+                name={`probation-${profileId}`}
+                checked={status === opt.v}
+                disabled={pending}
+                onChange={() => setStatus(opt.v as "" | "yes" | "no")}
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
       </div>
-      {error && <span className="text-red-600">{error}</span>}
+
+      {status === "yes" && (
+        <label className="flex flex-wrap items-center gap-3">
+          <span className="text-slate-600">Probation start date</span>
+          <input
+            type="date"
+            value={date}
+            disabled={pending}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+          />
+          <span className="text-xs text-slate-500">
+            Separate from the employment start date. SOP sign-off deadlines are
+            measured from here.
+          </span>
+        </label>
+      )}
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!dirty || pending}
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              const r = await setProbation(profileId, {
+                onProbation: status,
+                startDate: status === "yes" ? date : "",
+              });
+              if (r.ok) router.refresh();
+              else setError(r.error);
+            })
+          }
+          className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+        {error && <span className="text-red-600">{error}</span>}
+      </div>
     </div>
   );
 }

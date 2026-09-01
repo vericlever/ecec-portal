@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireStaffAccess, canVerify } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { pendingSightingsByProfile } from "@/lib/verification";
 
 export const dynamic = "force-dynamic";
 
@@ -8,30 +9,13 @@ export default async function VerificationPage() {
   const me = await requireStaffAccess();
   const supabase = createClient();
 
-  const [
-    { data: wwcc },
-    { data: teacher },
-    { data: quals },
-    { data: training },
-    { data: profiles },
-  ] = await Promise.all([
-    supabase.from("wwcc_checks").select("id, profile_id").is("sighted_at", null),
-    supabase.from("teacher_registrations").select("id, profile_id").is("sighted_at", null),
-    supabase.from("qualifications").select("id, profile_id").is("sighted_at", null),
-    supabase.from("training_records").select("id, profile_id").is("sighted_at", null),
+  const [counts, { data: profiles }] = await Promise.all([
+    pendingSightingsByProfile(supabase, me.id),
     supabase.from("profiles").select("id, full_name, is_active"),
   ]);
 
   const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
   const activeOf = new Map((profiles ?? []).map((p) => [p.id, p.is_active]));
-
-  const counts = new Map<string, number>();
-  for (const list of [wwcc, teacher, quals, training]) {
-    for (const r of list ?? []) {
-      if (r.profile_id === me.id) continue; // a leader does not sight their own
-      counts.set(r.profile_id, (counts.get(r.profile_id) ?? 0) + 1);
-    }
-  }
 
   const rows = Array.from(counts.entries())
     .map(([profileId, count]) => ({

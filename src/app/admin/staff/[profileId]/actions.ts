@@ -72,19 +72,43 @@ export async function clearSighting(
 
 export async function setProbation(
   profileId: string,
-  value: "" | "yes" | "no",
+  input: { onProbation: "" | "yes" | "no"; startDate: string },
 ): Promise<Result> {
   const me = await getProfile();
   if (!canVerify(me)) {
     return { ok: false, error: "You are not allowed to change this." };
   }
+
   const supabase = createClient();
-  const { error } = await supabase
-    .from("worker_details")
-    .update({
-      on_probation: value === "yes" ? true : value === "no" ? false : null,
-    })
-    .eq("profile_id", profileId);
+
+  // worker_details may not exist yet if the staff member has not started their
+  // onboarding questionnaire, so upsert rather than update.
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("organisation_id")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!target) return { ok: false, error: "Staff member not found." };
+
+  const on_probation =
+    input.onProbation === "yes"
+      ? true
+      : input.onProbation === "no"
+        ? false
+        : null;
+  // The probation start date only means anything while someone is on probation.
+  const probation_start_date =
+    input.onProbation === "yes" && input.startDate ? input.startDate : null;
+
+  const { error } = await supabase.from("worker_details").upsert(
+    {
+      profile_id: profileId,
+      organisation_id: target.organisation_id,
+      on_probation,
+      probation_start_date,
+    },
+    { onConflict: "profile_id" },
+  );
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/staff", "layout");
   return { ok: true };

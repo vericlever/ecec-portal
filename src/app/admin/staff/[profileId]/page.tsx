@@ -58,6 +58,58 @@ export default async function StaffRecordPage({
   const jobRoleName = new Map((jobRoles ?? []).map((r) => [r.id, r.name]));
   const verifier = canVerify(me);
 
+  // Onboarding documents this person has entered that a leader has not sighted.
+  const pendingSightings = [wwcc, teacher, quals, training].reduce(
+    (n, list) => n + (list ?? []).filter((r) => !r.sighted_at).length,
+    0,
+  );
+  const showSignOffPrompt = person.id !== me.id && pendingSightings > 0;
+
+  // SOP sign-off progress: the suite attached to this person's job role, and how
+  // many of those they have signed at the current version.
+  let sopTotal = 0;
+  let sopSigned = 0;
+  if (person.job_role_id) {
+    const { data: suite } = await supabase
+      .from("job_role_sops")
+      .select("sop_id")
+      .eq("job_role_id", person.job_role_id);
+    const suiteIds = (suite ?? []).map((r) => r.sop_id as string);
+    sopTotal = suiteIds.length;
+    if (suiteIds.length > 0) {
+      const [{ data: sopRows }, { data: signRows }] = await Promise.all([
+        supabase.from("sops").select("id, current_version").in("id", suiteIds),
+        supabase
+          .from("sign_offs")
+          .select("sop_id, sop_version")
+          .eq("user_id", person.id),
+      ]);
+      const signed = new Set(
+        (signRows ?? []).map((s) => `${s.sop_id}:${s.sop_version}`),
+      );
+      sopSigned = (sopRows ?? []).filter((s) =>
+        signed.has(`${s.id}:${s.current_version}`),
+      ).length;
+    }
+  }
+
+  // Policy view progress: every organisation policy, and how many this person
+  // has opened at the current version.
+  const [{ data: allPolicies }, { data: policyViewRows }] = await Promise.all([
+    supabase.from("policies").select("id, current_version"),
+    supabase
+      .from("policy_views")
+      .select("policy_id, policy_version")
+      .eq("user_id", person.id),
+  ]);
+  const policyTotal = (allPolicies ?? []).length;
+  const viewedSet = new Set(
+    (policyViewRows ?? []).map((v) => `${v.policy_id}:${v.policy_version}`),
+  );
+  const policyViewed = (allPolicies ?? []).filter((p) =>
+    viewedSet.has(`${p.id}:${p.current_version}`),
+  ).length;
+
   const documents: {
     label: string;
     table: "wwcc_checks" | "teacher_registrations" | "qualifications" | "training_records";
@@ -147,6 +199,22 @@ export default async function StaffRecordPage({
         {!person.is_active && " · inactive"}
       </p>
 
+      {showSignOffPrompt && (
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <span>
+            Staff sign-off: {person.full_name} has {pendingSightings}{" "}
+            {pendingSightings === 1 ? "document" : "documents"} entered that a
+            leader still needs to sight.
+          </span>
+          <Link
+            href="/admin/verification"
+            className="shrink-0 rounded-md bg-amber-900 px-2.5 py-1 text-xs font-medium text-white"
+          >
+            Go to verification
+          </Link>
+        </div>
+      )}
+
       {isAdmin(me.access_tier) && (
         <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
           <HrVerifierToggle
@@ -155,6 +223,36 @@ export default async function StaffRecordPage({
           />
         </div>
       )}
+
+      <section className="mt-6">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Training progress
+        </h2>
+        <div className="mt-2 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+          <ProgressBar
+            label="SOPs signed"
+            done={sopSigned}
+            total={sopTotal}
+            emptyNote={
+              person.job_role_id
+                ? "This job role has no SOPs attached yet."
+                : "No job role set, so there are no SOPs to sign."
+            }
+          />
+          <ProgressBar
+            label="Policies viewed"
+            done={policyViewed}
+            total={policyTotal}
+            emptyNote="No policies in the library yet."
+          />
+          {policyTotal > 0 && policyViewed === 0 && (
+            <p className="text-xs text-slate-500">
+              Staff cannot view policies in the portal yet, so this stays at zero
+              until the policy library is live.
+            </p>
+          )}
+        </div>
+      </section>
 
       <section className="mt-6">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -188,7 +286,8 @@ export default async function StaffRecordPage({
         <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4">
           <ProbationControl
             profileId={person.id}
-            value={wd?.on_probation ?? null}
+            onProbation={wd?.on_probation ?? null}
+            startDate={wd?.probation_start_date ?? null}
             canEdit={verifier}
           />
         </div>
@@ -229,6 +328,42 @@ export default async function StaffRecordPage({
             )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function ProgressBar({
+  label,
+  done,
+  total,
+  emptyNote,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  emptyNote: string;
+}) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-sm">
+        <span className="text-slate-700">{label}</span>
+        {total > 0 ? (
+          <span className="text-slate-500">
+            {done} of {total} ({pct}%)
+          </span>
+        ) : (
+          <span className="text-slate-400">{emptyNote}</span>
+        )}
+      </div>
+      {total > 0 && (
+        <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-green-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }

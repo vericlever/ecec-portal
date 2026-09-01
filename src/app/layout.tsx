@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { getProfile, isManager, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { pendingSightingsByProfile } from "@/lib/verification";
 
 export const metadata: Metadata = {
   title: "VeriClever",
@@ -26,6 +27,14 @@ export default async function RootLayout({
       .eq("profile_id", profile.id)
       .maybeSingle();
     showOnboardingPrompt = !data?.onboarding_completed_at;
+  }
+
+  // Leaders and HR verifiers get a running count of staff whose onboarding
+  // documents they still need to sight.
+  let staffToSignOff = 0;
+  if (profile && (isManager(profile.access_tier) || profile.hr_verifier)) {
+    const counts = await pendingSightingsByProfile(createClient(), profile.id);
+    staffToSignOff = counts.size;
   }
 
   return (
@@ -83,6 +92,23 @@ export default async function RootLayout({
                 className="shrink-0 rounded-md bg-amber-900 px-2.5 py-1 text-xs font-medium text-white"
               >
                 Complete onboarding
+              </Link>
+            </div>
+          </div>
+        )}
+        {staffToSignOff > 0 && (
+          <div className="border-b border-amber-200 bg-amber-50">
+            <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-2 text-sm text-amber-900">
+              <span>
+                {staffToSignOff === 1
+                  ? "1 staff member has onboarding documents waiting for your sign-off."
+                  : `${staffToSignOff} staff members have onboarding documents waiting for your sign-off.`}
+              </span>
+              <Link
+                href="/admin/verification"
+                className="shrink-0 rounded-md bg-amber-900 px-2.5 py-1 text-xs font-medium text-white"
+              >
+                Complete staff sign-off
               </Link>
             </div>
           </div>
