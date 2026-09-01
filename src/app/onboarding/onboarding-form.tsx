@@ -15,6 +15,7 @@ import {
   submitOnboarding,
   type OnboardingPayload,
 } from "./actions";
+import { RegistrySearch } from "@/components/registry-search";
 
 type FieldKey = keyof OnboardingPayload;
 
@@ -40,6 +41,15 @@ export function OnboardingForm({
       training: {
         ...d.training,
         [type]: { ...d.training[type], [field]: value },
+      },
+    }));
+
+  const setTrainingMany = (type: string, patch: Record<string, string>) =>
+    setData((d) => ({
+      ...d,
+      training: {
+        ...d.training,
+        [type]: { ...d.training[type], ...patch },
       },
     }));
 
@@ -230,9 +240,30 @@ export function OnboardingForm({
                   <Select label="Qualification type" value={data.qualification_type} onChange={(v) => set("qualification_type", v)} options={QUALIFICATION_TYPES} />
                   <div className="grid grid-cols-2 gap-4">
                     <Text label="Registered Training Organisation" value={data.qualification_rto_name} onChange={(v) => set("qualification_rto_name", v)} />
-                    <Text label="RTO number" value={data.qualification_rto_number} onChange={(v) => set("qualification_rto_number", v)} />
+                    <RegistrySearch
+                      label="RTO number"
+                      type="rto"
+                      placeholder="Search name or code"
+                      value={data.qualification_rto_number}
+                      onChange={(v) => set("qualification_rto_number", v)}
+                      onPick={(item) =>
+                        setData((d) => ({
+                          ...d,
+                          qualification_rto_number: item.code,
+                          qualification_rto_name: item.name,
+                        }))
+                      }
+                    />
                   </div>
-                  <Text label="Course code" value={data.qualification_course_code} onChange={(v) => set("qualification_course_code", v)} />
+                  <RegistrySearch
+                    label="Course code"
+                    type="component"
+                    kind="qualification"
+                    placeholder="e.g. CHC50121"
+                    value={data.qualification_course_code}
+                    onChange={(v) => set("qualification_course_code", v)}
+                    onPick={(item) => set("qualification_course_code", item.code)}
+                  />
                   <YesNo label="I am working towards this qualification" value={data.qualification_working_towards} onChange={(v) => set("qualification_working_towards", v as OnboardingPayload["qualification_working_towards"])} />
                   <div className="grid grid-cols-2 gap-4">
                     <DateField label="Date attained" value={data.qualification_date_attained} onChange={(v) => set("qualification_date_attained", v)} />
@@ -261,9 +292,28 @@ export function OnboardingForm({
                   )}
                   <div className="grid grid-cols-2 gap-3">
                     <Text label="RTO" value={data.training[type]?.rto_name ?? ""} onChange={(v) => setTraining(type, "rto_name", v)} />
-                    <Text label="RTO number" value={data.training[type]?.rto_number ?? ""} onChange={(v) => setTraining(type, "rto_number", v)} />
+                    <RegistrySearch
+                      label="RTO number"
+                      type="rto"
+                      placeholder="Search name or code"
+                      value={data.training[type]?.rto_number ?? ""}
+                      onChange={(v) => setTraining(type, "rto_number", v)}
+                      onPick={(item) =>
+                        setTrainingMany(type, {
+                          rto_number: item.code,
+                          rto_name: item.name,
+                        })
+                      }
+                    />
                   </div>
-                  <Text label="Course code" value={data.training[type]?.course_code ?? ""} onChange={(v) => setTraining(type, "course_code", v)} />
+                  <RegistrySearch
+                    label="Course code"
+                    type="component"
+                    placeholder="e.g. HLTAID012"
+                    value={data.training[type]?.course_code ?? ""}
+                    onChange={(v) => setTraining(type, "course_code", v)}
+                    onPick={(item) => setTraining(type, "course_code", item.code)}
+                  />
                   <div className="grid grid-cols-2 gap-3">
                     <DateField label="Date attained" value={data.training[type]?.date_attained ?? ""} onChange={(v) => setTraining(type, "date_attained", v)} />
                     <DateField label="Expiry date" value={data.training[type]?.expiry_date ?? ""} onChange={(v) => setTraining(type, "expiry_date", v)} />
