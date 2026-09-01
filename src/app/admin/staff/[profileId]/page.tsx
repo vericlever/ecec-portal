@@ -110,18 +110,6 @@ export default async function StaffRecordPage({
     viewedSet.has(`${p.id}:${p.current_version}`),
   ).length;
 
-  const sopPct = sopTotal > 0 ? Math.round((sopSigned / sopTotal) * 100) : null;
-  const policyPct =
-    policyTotal > 0 ? Math.round((policyViewed / policyTotal) * 100) : null;
-
-  // Outstanding HR tasks on this person's record. A running tally that other
-  // features add to over time (mandatory SOPs like manual handling, credential
-  // renewals). For now: an incomplete onboarding questionnaire counts once, and
-  // each document they have entered that still needs sighting counts once.
-  const onboardingOutstanding =
-    person.job_role_id && !wd?.onboarding_completed_at ? 1 : 0;
-  const outstanding = onboardingOutstanding + pendingSightings;
-
   const documents: {
     label: string;
     table: "wwcc_checks" | "teacher_registrations" | "qualifications" | "training_records";
@@ -201,36 +189,15 @@ export default async function StaffRecordPage({
         ← Staff
       </Link>
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold">{person.full_name}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {person.email} ·{" "}
-            {TIER_LABELS[person.access_tier as keyof typeof TIER_LABELS]}
-            {" · "}
-            {person.job_role_id
-              ? jobRoleName.get(person.job_role_id)
-              : "no job role"}
-            {" · "}
-            {person.service_id
-              ? serviceName.get(person.service_id)
-              : "all services"}
-            {!person.is_active && " · inactive"}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <StatBox label="SOP" value={sopPct === null ? "—" : `${sopPct}%`} />
-          <StatBox
-            label="Policy"
-            value={policyPct === null ? "—" : `${policyPct}%`}
-          />
-          <StatBox
-            label="Outstanding"
-            value={String(outstanding)}
-            alert={outstanding > 0}
-          />
-        </div>
-      </div>
+      <h1 className="mt-3 text-xl font-semibold">{person.full_name}</h1>
+      <p className="mt-1 text-sm text-slate-500">
+        {person.email} · {TIER_LABELS[person.access_tier as keyof typeof TIER_LABELS]}
+        {" · "}
+        {person.job_role_id ? jobRoleName.get(person.job_role_id) : "no job role"}
+        {" · "}
+        {person.service_id ? serviceName.get(person.service_id) : "all services"}
+        {!person.is_active && " · inactive"}
+      </p>
 
       {showSignOffPrompt && (
         <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -261,26 +228,30 @@ export default async function StaffRecordPage({
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Training progress
         </h2>
-        <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white p-4 text-sm">
-          <Row k="SOPs signed">
-            {sopTotal > 0
-              ? `${sopSigned} of ${sopTotal} (${sopPct}%)`
-              : person.job_role_id
-                ? "Job role has no SOPs attached yet"
-                : "No job role set"}
-          </Row>
-          <Row k="Policies viewed">
-            {policyTotal > 0
-              ? `${policyViewed} of ${policyTotal} (${policyPct}%)`
-              : "No policies in the library yet"}
-          </Row>
-        </dl>
-        {policyTotal > 0 && policyViewed === 0 && (
-          <p className="mt-1 text-xs text-slate-500">
-            Staff cannot view policies in the portal yet, so this stays at zero
-            until the policy library is live.
-          </p>
-        )}
+        <div className="mt-2 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+          <ProgressBar
+            label="SOPs signed"
+            done={sopSigned}
+            total={sopTotal}
+            emptyNote={
+              person.job_role_id
+                ? "This job role has no SOPs attached yet."
+                : "No job role set, so there are no SOPs to sign."
+            }
+          />
+          <ProgressBar
+            label="Policies viewed"
+            done={policyViewed}
+            total={policyTotal}
+            emptyNote="No policies in the library yet."
+          />
+          {policyTotal > 0 && policyViewed === 0 && (
+            <p className="text-xs text-slate-500">
+              Staff cannot view policies in the portal yet, so this stays at zero
+              until the policy library is live.
+            </p>
+          )}
+        </div>
       </section>
 
       <section className="mt-6">
@@ -361,27 +332,38 @@ export default async function StaffRecordPage({
   );
 }
 
-function StatBox({
+function ProgressBar({
   label,
-  value,
-  alert = false,
+  done,
+  total,
+  emptyNote,
 }: {
   label: string;
-  value: string;
-  alert?: boolean;
+  done: number;
+  total: number;
+  emptyNote: string;
 }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className="w-20 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-2 text-center">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-        {label}
+    <div>
+      <div className="flex items-baseline justify-between text-sm">
+        <span className="text-slate-700">{label}</span>
+        {total > 0 ? (
+          <span className="text-slate-500">
+            {done} of {total} ({pct}%)
+          </span>
+        ) : (
+          <span className="text-slate-400">{emptyNote}</span>
+        )}
       </div>
-      <div
-        className={`mt-0.5 text-2xl font-semibold ${
-          alert ? "text-amber-700" : "text-slate-900"
-        }`}
-      >
-        {value}
-      </div>
+      {total > 0 && (
+        <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-green-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
