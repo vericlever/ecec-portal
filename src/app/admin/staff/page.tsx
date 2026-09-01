@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireStaffAccess,
+  isAdmin,
   isManager,
   TIER_LABELS,
   type AccessTier,
@@ -60,14 +61,24 @@ export default async function StaffPage() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Staff</h1>
-        {isManager(me.access_tier) && (
-          <Link
-            href="/admin/staff/new"
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
-          >
-            Add staff member
-          </Link>
-        )}
+        <div className="flex gap-2">
+          {isAdmin(me.access_tier) && (
+            <Link
+              href="/admin/staff/import"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Bulk import
+            </Link>
+          )}
+          {isManager(me.access_tier) && (
+            <Link
+              href="/admin/staff/new"
+              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+            >
+              Add staff member
+            </Link>
+          )}
+        </div>
       </div>
 
       <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
