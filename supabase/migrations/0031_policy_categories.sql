@@ -1,8 +1,10 @@
 -- 0031_policy_categories.sql
 --
 -- Policies are organised into categories: Parent policies, General policies,
--- HR policies, Manual handling, Other. A policy can be in more than one, since
--- a policy that affects staff can also be one parents view. The set is a
+-- HR policies, OHS policies, Other. A policy can be in more than one, since a
+-- policy that affects staff can also be one parents view. OHS is kept separate
+-- because it sits under the Victorian OHS Act and WorkSafe, a different regime
+-- from the education and care National Law. The set is a
 -- per-organisation lookup so a provider can add a sixth later without a code
 -- change.
 --
@@ -84,7 +86,7 @@ begin
     (target_org, 'parent', 'Parent policies', true, 1),
     (target_org, 'general', 'General policies', false, 2),
     (target_org, 'hr', 'HR policies', false, 3),
-    (target_org, 'manual_handling', 'Manual handling', false, 4),
+    (target_org, 'ohs', 'OHS policies', false, 4),
     (target_org, 'other', 'Other', false, 5)
   on conflict (organisation_id, slug) do nothing;
 end $$;
