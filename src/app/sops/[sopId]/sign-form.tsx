@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 
 type Status = "idle" | "signing" | "done";
 
-export function SignForm({ sopId }: { sopId: string }) {
+export function SignForm({
+  sopId,
+  needsManager = false,
+}: {
+  sopId: string;
+  needsManager?: boolean;
+}) {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -67,7 +73,9 @@ export function SignForm({ sopId }: { sopId: string }) {
           />
         </svg>
         <p className="text-sm font-medium text-green-800">
-          Signed. Taking you to the next one…
+          {needsManager
+            ? "Signed. A manager will countersign with you."
+            : "Signed. Taking you to the next one…"}
         </p>
       </div>
     );
@@ -88,6 +96,8 @@ export function SignForm({ sopId }: { sopId: string }) {
         <span>
           I have read this standard operating procedure and I understand what it
           requires of me.
+          {needsManager &&
+            " I understand a manager also needs to countersign this one."}
         </span>
       </label>
 

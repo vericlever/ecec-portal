@@ -27,11 +27,11 @@ export async function POST(request: Request) {
 
   const { data: sop } = await supabase
     .from("sops")
-    .select("id, current_version, organisation_id")
+    .select("id, published_version, organisation_id")
     .eq("id", sopId)
     .maybeSingle();
 
-  if (!sop) {
+  if (!sop || sop.published_version == null) {
     return NextResponse.json({ ok: false, error: "SOP not found." }, { status: 404 });
   }
 
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     service_id: profile.service_id,
     user_id: profile.id,
     sop_id: sop.id,
-    sop_version: sop.current_version,
+    sop_version: sop.published_version,
     comprehension_check_passed: null,
   });
 

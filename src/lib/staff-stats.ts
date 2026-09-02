@@ -41,16 +41,29 @@ export async function staffStatsByProfile(
       .from("job_role_sops")
       .select("job_role_id, sop_id")
       .in("job_role_id", jobRoleIds),
-    supabase.from("sops").select("id, current_version"),
-    supabase.from("sign_offs").select("user_id, sop_id, sop_version"),
+    supabase
+      .from("sops")
+      .select("id, published_version, signoff_type")
+      .not("published_version", "is", null),
+    supabase
+      .from("sign_offs")
+      .select("user_id, sop_id, sop_version, verified_at"),
     supabase.rpc("org_published_policies"),
     supabase.from("policy_views").select("user_id, policy_id, policy_version"),
     supabase.from("worker_details").select("profile_id, onboarding_completed_at"),
     pendingSightingsByProfile(supabase, currentProfileId),
   ]);
 
-  const sopVersion = new Map(
-    (sops ?? []).map((s) => [s.id as string, s.current_version as number]),
+  // Only published SOPs count. A self_and_manager SOP is not "signed" until the
+  // manager has countersigned too.
+  const publishedSop = new Map(
+    (sops ?? []).map((s) => [
+      s.id as string,
+      {
+        version: s.published_version as number,
+        needsManager: s.signoff_type === "self_and_manager",
+      },
+    ]),
   );
   const suiteByRole = new Map<string, string[]>();
   for (const rs of roleSops ?? []) {
@@ -59,11 +72,11 @@ export async function staffStatsByProfile(
     suiteByRole.set(rs.job_role_id as string, list);
   }
 
-  const signedByUser = new Map<string, Set<string>>();
+  const signedByUser = new Map<string, Map<string, boolean>>();
   for (const s of signOffs ?? []) {
-    const set = signedByUser.get(s.user_id as string) ?? new Set<string>();
-    set.add(`${s.sop_id}:${s.sop_version}`);
-    signedByUser.set(s.user_id as string, set);
+    const m = signedByUser.get(s.user_id as string) ?? new Map<string, boolean>();
+    m.set(`${s.sop_id}:${s.sop_version}`, Boolean(s.verified_at));
+    signedByUser.set(s.user_id as string, m);
   }
 
   // Every published policy in the org, with its site scope. A person is
@@ -86,12 +99,15 @@ export async function staffStatsByProfile(
 
   const out = new Map<string, StaffStat>();
   for (const p of people) {
-    const suite = p.job_role_id ? (suiteByRole.get(p.job_role_id) ?? []) : [];
+    const suite = (p.job_role_id ? (suiteByRole.get(p.job_role_id) ?? []) : [])
+      .filter((sopId) => publishedSop.has(sopId));
     const sopTotal = suite.length;
-    const signed = signedByUser.get(p.id) ?? new Set<string>();
+    const signed = signedByUser.get(p.id) ?? new Map<string, boolean>();
     const sopSigned = suite.filter((sopId) => {
-      const v = sopVersion.get(sopId);
-      return v !== undefined && signed.has(`${sopId}:${v}`);
+      const pub = publishedSop.get(sopId)!;
+      const verified = signed.get(`${sopId}:${pub.version}`);
+      if (verified === undefined) return false;
+      return pub.needsManager ? verified : true;
     }).length;
 
     const expected = publishedPolicies.filter(

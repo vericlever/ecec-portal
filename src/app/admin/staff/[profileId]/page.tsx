@@ -73,8 +73,9 @@ export default async function StaffRecordPage({
   );
   const showSignOffPrompt = person.id !== me.id && pendingSightings > 0;
 
-  // SOP sign-off progress: the suite attached to this person's job role, and how
-  // many of those they have signed at the current version.
+  // SOP sign-off progress: the published SOPs in this person's job-role suite,
+  // and how many they have fully signed (a self_and_manager SOP counts only
+  // once a manager has countersigned).
   let sopTotal = 0;
   let sopSigned = 0;
   if (person.job_role_id) {
@@ -83,21 +84,31 @@ export default async function StaffRecordPage({
       .select("sop_id")
       .eq("job_role_id", person.job_role_id);
     const suiteIds = (suite ?? []).map((r) => r.sop_id as string);
-    sopTotal = suiteIds.length;
     if (suiteIds.length > 0) {
       const [{ data: sopRows }, { data: signRows }] = await Promise.all([
-        supabase.from("sops").select("id, current_version").in("id", suiteIds),
+        supabase
+          .from("sops")
+          .select("id, published_version, signoff_type")
+          .in("id", suiteIds)
+          .not("published_version", "is", null),
         supabase
           .from("sign_offs")
-          .select("sop_id, sop_version")
+          .select("sop_id, sop_version, verified_at")
           .eq("user_id", person.id),
       ]);
-      const signed = new Set(
-        (signRows ?? []).map((s) => `${s.sop_id}:${s.sop_version}`),
+      const signOf = new Map(
+        (signRows ?? []).map((s) => [
+          `${s.sop_id}:${s.sop_version}`,
+          Boolean(s.verified_at),
+        ]),
       );
-      sopSigned = (sopRows ?? []).filter((s) =>
-        signed.has(`${s.id}:${s.current_version}`),
-      ).length;
+      const published = sopRows ?? [];
+      sopTotal = published.length;
+      sopSigned = published.filter((s) => {
+        const verified = signOf.get(`${s.id}:${s.published_version}`);
+        if (verified === undefined) return false;
+        return s.signoff_type === "self_and_manager" ? verified : true;
+      }).length;
     }
   }
 

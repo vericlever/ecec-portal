@@ -83,13 +83,35 @@ export default async function RootLayout({
                     </Link>
                   </>
                 )}
-                {canEditContent(profile.access_tier) && (
+                {isManager(profile.access_tier) && (
                   <Link
-                    href="/admin/policies"
+                    href="/admin/countersign"
                     className="text-sm text-slate-500 hover:text-slate-900"
                   >
-                    Manage policies
+                    Countersign
                   </Link>
+                )}
+                {canEditContent(profile.access_tier) && (
+                  <>
+                    <Link
+                      href="/admin/policies"
+                      className="text-sm text-slate-500 hover:text-slate-900"
+                    >
+                      Policies admin
+                    </Link>
+                    <Link
+                      href="/admin/sops"
+                      className="text-sm text-slate-500 hover:text-slate-900"
+                    >
+                      SOPs admin
+                    </Link>
+                    <Link
+                      href="/admin/job-roles"
+                      className="text-sm text-slate-500 hover:text-slate-900"
+                    >
+                      Job roles
+                    </Link>
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-3 text-right text-xs text-slate-500">

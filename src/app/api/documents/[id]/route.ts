@@ -24,17 +24,16 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  if (doc.owner_type === "policy") {
-    // A content editor can see any policy's document; anyone else only a
-    // published policy that is visible to them - the same rule policies_select
-    // enforces, so a plain select is enough.
+  if (doc.owner_type === "policy" || doc.owner_type === "sop") {
+    // A content editor can see any policy or SOP document; anyone else only
+    // once it is published.
     if (!canEditContent(me.access_tier)) {
-      const { data: policy } = await supabase
-        .from("policies")
+      const { data: owner } = await supabase
+        .from(doc.owner_type === "policy" ? "policies" : "sops")
         .select("id, published_version")
         .eq("id", doc.owner_id)
         .maybeSingle();
-      if (!policy || policy.published_version == null) {
+      if (!owner || owner.published_version == null) {
         return new NextResponse("Not found", { status: 404 });
       }
     }

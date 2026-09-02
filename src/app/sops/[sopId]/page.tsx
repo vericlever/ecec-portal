@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { SOP_TIER_LABELS } from "@/lib/constants";
 import { SignForm } from "./sign-form";
 
 export const dynamic = "force-dynamic";
@@ -30,22 +29,22 @@ export default async function SopDetailPage({
   const { data: sop } = await supabase
     .from("sops")
     .select(
-      "id, name, target_tier, status, signoff_type, notes, body, current_version",
+      "id, name, signoff_type, notes, published_body, published_version, published_at",
     )
     .eq("id", params.sopId)
     .maybeSingle();
 
-  if (!sop) notFound();
+  if (!sop || sop.published_version == null) notFound();
 
   const [{ data: links }, { data: signOff }, { data: inSuite }] =
     await Promise.all([
       supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
       supabase
         .from("sign_offs")
-        .select("signed_at")
+        .select("signed_at, verified_at, verified_by")
         .eq("user_id", profile.id)
         .eq("sop_id", sop.id)
-        .eq("sop_version", sop.current_version)
+        .eq("sop_version", sop.published_version)
         .maybeSingle(),
       profile.job_role_id
         ? supabase
@@ -66,6 +65,7 @@ export default async function SopDetailPage({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const isInSuite = Boolean(inSuite);
+  const needsManager = sop.signoff_type === "self_and_manager";
 
   return (
     <div>
@@ -76,30 +76,20 @@ export default async function SopDetailPage({
       <h1 className="mt-3 text-xl font-semibold">{sop.name}</h1>
 
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-700">
-          {SOP_TIER_LABELS[sop.target_tier] ?? sop.target_tier}
-        </span>
         {sop.signoff_type && (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
             {SIGNOFF_LABELS[sop.signoff_type] ?? sop.signoff_type}
           </span>
         )}
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-          Version {sop.current_version}
+          Version {sop.published_version}
         </span>
       </div>
 
       <article className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-        {sop.body ? (
-          <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
-            {sop.body}
-          </div>
-        ) : (
-          <p className="text-sm italic text-slate-500">
-            The written procedure for this SOP has not been uploaded yet.
-            {sop.notes ? ` Note on file: ${sop.notes}` : ""}
-          </p>
-        )}
+        <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
+          {sop.published_body || "(No text)"}
+        </div>
       </article>
 
       {policies.length > 0 && (
@@ -116,12 +106,21 @@ export default async function SopDetailPage({
       )}
 
       {signOff ? (
-        <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-          Signed on {formatDate(signOff.signed_at)} (version {sop.current_version}
-          ).
-        </div>
+        needsManager && !signOff.verified_at ? (
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            You signed this on {formatDate(signOff.signed_at)}. It now needs a
+            manager to countersign with you.
+          </div>
+        ) : (
+          <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            Signed on {formatDate(signOff.signed_at)} (version{" "}
+            {sop.published_version}).
+            {signOff.verified_at &&
+              ` Countersigned by a manager on ${formatDate(signOff.verified_at)}.`}
+          </div>
+        )
       ) : isInSuite ? (
-        <SignForm sopId={sop.id} />
+        <SignForm sopId={sop.id} needsManager={needsManager} />
       ) : (
         <p className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
           This SOP is not part of your assigned job role, so it is shown for
