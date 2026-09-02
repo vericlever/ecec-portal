@@ -19,7 +19,7 @@ export default async function RootLayout({
 }) {
   const profile = await getProfile();
   const leader = Boolean(
-    profile && (isManager(profile.access_tier) || profile.hr_verifier),
+    profile && (isManager(profile.access_tier) || profile.hr_manager),
   );
 
   // Anyone with a job role is a worker who needs a Worker Register entry.
@@ -36,7 +36,7 @@ export default async function RootLayout({
   // Leaders and HR verifiers get a running count of staff whose onboarding
   // documents they still need to sight.
   let staffToSignOff = 0;
-  if (profile && (isManager(profile.access_tier) || profile.hr_verifier)) {
+  if (profile && (isManager(profile.access_tier) || profile.hr_manager)) {
     const counts = await pendingSightingsByProfile(createClient(), profile.id);
     staffToSignOff = counts.size;
   }
@@ -83,11 +83,11 @@ export default async function RootLayout({
                   </Link>
                 )}
                 {(isManager(profile.access_tier) ||
-                  profile.hr_verifier ||
+                  profile.hr_manager ||
                   canEditContent(profile.access_tier)) && (
                   <ManageMenu
                     canManageStaff={
-                      isManager(profile.access_tier) || profile.hr_verifier
+                      isManager(profile.access_tier) || profile.hr_manager
                     }
                     canCountersign={isManager(profile.access_tier)}
                     canEditContent={canEditContent(profile.access_tier)}

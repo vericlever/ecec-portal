@@ -8,6 +8,6 @@ export default async function Home() {
   if (!profile) redirect("/login");
   // Leaders land on the overview of what needs doing; everyone else on their
   // SOPs.
-  if (isManager(profile.access_tier) || profile.hr_verifier) redirect("/admin");
+  if (isManager(profile.access_tier) || profile.hr_manager) redirect("/admin");
   redirect("/sops");
 }

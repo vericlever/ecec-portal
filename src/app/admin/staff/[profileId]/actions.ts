@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProfile, canVerify, isAdmin, canEditContent } from "@/lib/auth";
+import { getProfile, isHrManager, isAdmin } from "@/lib/auth";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { calcExpiry } from "@/lib/contracts";
 
@@ -32,7 +32,7 @@ export async function recordSighting(
   sightedBy: string,
 ): Promise<Result> {
   const me = await getProfile();
-  if (!canVerify(me)) {
+  if (!isHrManager(me)) {
     return { ok: false, error: "You are not allowed to verify documents." };
   }
   if (!VERIFIABLE.includes(table)) {
@@ -59,7 +59,7 @@ export async function clearSighting(
   recordId: string,
 ): Promise<Result> {
   const me = await getProfile();
-  if (!canVerify(me)) {
+  if (!isHrManager(me)) {
     return { ok: false, error: "You are not allowed to change this." };
   }
   const supabase = createClient();
@@ -78,7 +78,7 @@ export async function setProbation(
   input: { onProbation: "" | "yes" | "no"; startDate: string },
 ): Promise<Result> {
   const me = await getProfile();
-  if (!canVerify(me)) {
+  if (!isHrManager(me)) {
     return { ok: false, error: "You are not allowed to change this." };
   }
 
@@ -117,9 +117,9 @@ export async function setProbation(
   return { ok: true };
 }
 
-// May upload or replace a contract: Admin anywhere in the organisation, or
-// Manager (policy) for staff at their own service. Mirrors the contracts_write
-// RLS policy, but gives a clean error before any file is touched.
+// May upload or replace a contract: Admin anywhere in the organisation, or an
+// HR manager for staff at their own service. Mirrors the contracts_write RLS
+// policy, but gives a clean error before any file is touched.
 async function canManageContractFor(
   profileId: string,
 ): Promise<
@@ -127,7 +127,7 @@ async function canManageContractFor(
   | { ok: false; error: string }
 > {
   const me = await getProfile();
-  if (!me || !canEditContent(me.access_tier)) {
+  if (!me || !isHrManager(me)) {
     return { ok: false, error: "You are not allowed to manage contracts." };
   }
   const supabase = createClient();
@@ -229,7 +229,7 @@ export async function uploadContract(
 
 export async function deleteContract(contractId: string): Promise<Result> {
   const me = await getProfile();
-  if (!me || !canEditContent(me.access_tier)) {
+  if (!me || !isHrManager(me)) {
     return { ok: false, error: "You are not allowed to manage contracts." };
   }
   const admin = createAdminClient();
@@ -267,18 +267,18 @@ export async function deleteContract(contractId: string): Promise<Result> {
   return { ok: true };
 }
 
-export async function setHrVerifier(
+export async function setHrManager(
   profileId: string,
   value: boolean,
 ): Promise<Result> {
   const me = await getProfile();
   if (!isAdmin(me?.access_tier)) {
-    return { ok: false, error: "Only an admin can change HR sign-off." };
+    return { ok: false, error: "Only an admin can change the HR manager flag." };
   }
   const supabase = createClient();
   const { error } = await supabase
     .from("profiles")
-    .update({ hr_verifier: value })
+    .update({ hr_manager: value })
     .eq("id", profileId);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/staff", "layout");

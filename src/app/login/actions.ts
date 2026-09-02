@@ -26,13 +26,13 @@ export async function login(
   // Leaders land on the overview; everyone else on their SOPs.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("access_tier, hr_verifier")
+    .select("access_tier, hr_manager")
     .maybeSingle();
   const leader =
     profile != null &&
     (["manager_staff", "manager_policy", "admin"].includes(
       profile.access_tier,
     ) ||
-      profile.hr_verifier);
+      profile.hr_manager);
   redirect(leader ? "/admin" : "/sops");
 }

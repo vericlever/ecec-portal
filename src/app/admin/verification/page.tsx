@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaffAccess, canVerify } from "@/lib/auth";
+import { requireStaffAccess, isHrManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
 
@@ -35,9 +35,9 @@ export default async function VerificationPage() {
         been sighted yet.
       </p>
 
-      {!canVerify(me) && (
+      {!isHrManager(me) && (
         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          You can see what is outstanding, but only someone with HR sign-off can
+          You can see what is outstanding, but only an HR manager can
           record a sighting.
         </p>
       )}

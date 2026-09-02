@@ -6,7 +6,7 @@ import { SIGHTED_BY } from "@/lib/nqaits";
 import {
   clearSighting,
   recordSighting,
-  setHrVerifier,
+  setHrManager,
   setProbation,
 } from "./actions";
 
@@ -211,7 +211,7 @@ export function ProbationControl({
   );
 }
 
-export function HrVerifierToggle({
+export function HrManagerToggle({
   profileId,
   value,
 }: {
@@ -231,7 +231,7 @@ export function HrVerifierToggle({
         onChange={(e) =>
           start(async () => {
             setError(null);
-            const r = await setHrVerifier(profileId, e.target.checked);
+            const r = await setHrManager(profileId, e.target.checked);
             if (r.ok) router.refresh();
             else setError(r.error);
           })
@@ -239,9 +239,10 @@ export function HrVerifierToggle({
         className="mt-0.5 h-4 w-4"
       />
       <span>
-        <span className="font-medium text-slate-800">HR sign-off</span>
+        <span className="font-medium text-slate-800">HR manager</span>
         <span className="block text-xs text-slate-500">
-          Can sight and verify onboarding documents for staff at their service.
+          Can sight onboarding documents, upload and replace contracts, and see
+          the payroll and screening details for staff at their service.
         </span>
         {error && <span className="block text-red-600">{error}</span>}
       </span>

@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireStaffAccess,
-  canVerify,
+  isHrManager,
   isAdmin,
   TIER_LABELS,
 } from "@/lib/auth";
 import {
-  HrVerifierToggle,
+  HrManagerToggle,
   ProbationControl,
   SightingControl,
 } from "./record-controls";
@@ -19,7 +19,6 @@ import {
   activeContract,
   renewalState,
 } from "@/lib/contracts";
-import { canEditContent } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +47,7 @@ export default async function StaffRecordPage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, email, access_tier, hr_verifier, service_id, job_role_id, is_active")
+      .select("id, full_name, email, access_tier, hr_manager, service_id, job_role_id, is_active")
       .eq("id", params.profileId)
       .maybeSingle(),
     supabase.from("worker_details").select("*").eq("profile_id", params.profileId).maybeSingle(),
@@ -80,13 +79,13 @@ export default async function StaffRecordPage({
   const contracts = (contractRows ?? []) as ContractRow[];
   const contract = activeContract(contracts);
   const contractRenewal = renewalState(contract);
-  const canManageContract =
-    canEditContent(me.access_tier) &&
-    (isAdmin(me.access_tier) || me.service_id === person.service_id);
-
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const jobRoleName = new Map((jobRoles ?? []).map((r) => [r.id, r.name]));
-  const verifier = canVerify(me);
+  const hrManager = isHrManager(me);
+  // Contract upload: Admin anywhere, or an HR manager for staff at their service.
+  const canManageContract =
+    hrManager &&
+    (isAdmin(me.access_tier) || me.service_id === person.service_id);
 
   // Onboarding documents this person has entered that a leader has not sighted.
   const pendingSightings = [wwcc, teacher, quals, training].reduce(
@@ -336,9 +335,9 @@ export default async function StaffRecordPage({
 
       {isAdmin(me.access_tier) && (
         <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-          <HrVerifierToggle
+          <HrManagerToggle
             profileId={person.id}
-            value={person.hr_verifier}
+            value={person.hr_manager}
           />
         </div>
       )}
@@ -449,7 +448,7 @@ export default async function StaffRecordPage({
             profileId={person.id}
             onProbation={wd?.on_probation ?? null}
             startDate={wd?.probation_start_date ?? null}
-            canEdit={verifier}
+            canEdit={hrManager}
           />
         </div>
       </section>
@@ -495,7 +494,7 @@ export default async function StaffRecordPage({
                       recordId={row.id}
                       sightedAt={row.sighted_at}
                       sightedBy={row.sighted_by}
-                      canVerify={verifier}
+                      canVerify={hrManager}
                     />
                   </div>
                 </div>

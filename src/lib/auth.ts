@@ -12,7 +12,7 @@ export type Profile = {
   full_name: string;
   email: string;
   access_tier: AccessTier;
-  hr_verifier: boolean;
+  hr_manager: boolean;
 };
 
 export async function getProfile(): Promise<Profile | null> {
@@ -25,7 +25,7 @@ export async function getProfile(): Promise<Profile | null> {
   const { data } = await supabase
     .from("profiles")
     .select(
-      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_verifier",
+      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -33,9 +33,10 @@ export async function getProfile(): Promise<Profile | null> {
   return (data as Profile) ?? null;
 }
 
-// May verify onboarding documents: an admin, or anyone with the HR sign-off flag.
-export function canVerify(profile: Profile | null): boolean {
-  return Boolean(profile && (profile.access_tier === "admin" || profile.hr_verifier));
+// An HR manager: an admin, or anyone with the hr_manager flag. Gates document
+// sighting, contract upload, and the payroll and screening sections.
+export function isHrManager(profile: Profile | null): boolean {
+  return Boolean(profile && (profile.access_tier === "admin" || profile.hr_manager));
 }
 
 export async function requireProfile(): Promise<Profile> {
@@ -54,7 +55,7 @@ export async function requireManager(): Promise<Profile> {
 // Anyone who can work through onboarding: a manager, an admin, or an HR verifier.
 export async function requireStaffAccess(): Promise<Profile> {
   const profile = await requireProfile();
-  if (!isManager(profile.access_tier) && !profile.hr_verifier) redirect("/sops");
+  if (!isManager(profile.access_tier) && !profile.hr_manager) redirect("/sops");
   return profile;
 }
 

@@ -19,7 +19,7 @@ type StaffRow = {
   is_active: boolean;
   service_id: string | null;
   job_role_id: string | null;
-  hr_verifier: boolean;
+  hr_manager: boolean;
 };
 
 export default async function StaffPage() {
@@ -35,7 +35,7 @@ export default async function StaffPage() {
       supabase
         .from("profiles")
         .select(
-          "id, full_name, email, access_tier, is_active, service_id, job_role_id, hr_verifier",
+          "id, full_name, email, access_tier, is_active, service_id, job_role_id, hr_manager",
         )
         .neq("access_tier", "admin")
         .order("full_name"),
@@ -146,9 +146,9 @@ export default async function StaffPage() {
                         inactive
                       </span>
                     )}
-                    {p.hr_verifier && (
+                    {p.hr_manager && (
                       <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                        HR sign-off
+                        HR manager
                       </span>
                     )}
                   </div>
