@@ -4,8 +4,14 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { bulkImportSops, type SopBulkOutcome } from "../actions";
 
-export function SopBulkUpload() {
+export function SopBulkUpload({
+  jobRoles,
+}: {
+  jobRoles: { id: string; name: string }[];
+}) {
   const [files, setFiles] = useState<File[]>([]);
+  const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [signoffType, setSignoffType] = useState("self");
   const [outcomes, setOutcomes] = useState<SopBulkOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -15,6 +21,8 @@ export function SopBulkUpload() {
     if (files.length === 0) return;
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
+    for (const r of roleIds) fd.append("newRoleIds", r);
+    fd.append("newSignoffType", signoffType);
     start(async () => {
       setError(null);
       const r = await bulkImportSops(fd);
@@ -48,11 +56,56 @@ export function SopBulkUpload() {
             {files.length} file{files.length === 1 ? "" : "s"} selected
           </p>
         )}
+
+        <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
+          <p className="text-xs text-slate-500">
+            These apply only to files that do <span className="font-medium">not</span>{" "}
+            match an existing SOP. A file that matches keeps that SOP&apos;s
+            current job roles and sign-off type.
+          </p>
+          <div>
+            <span className="text-sm font-medium text-slate-700">
+              Attach new SOPs to job roles
+            </span>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {jobRoles.map((r) => (
+                <label key={r.id} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={roleIds.includes(r.id)}
+                    onChange={(e) =>
+                      setRoleIds((cur) =>
+                        e.target.checked
+                          ? [...cur, r.id]
+                          : cur.filter((x) => x !== r.id),
+                      )
+                    }
+                  />
+                  {r.name}
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">
+              Sign-off type for new SOPs
+            </span>
+            <select
+              value={signoffType}
+              onChange={(e) => setSignoffType(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="self">Staff sign-off</option>
+              <option value="self_and_manager">Staff and manager sign-off</option>
+            </select>
+          </label>
+        </div>
+
         <button
           type="button"
           disabled={files.length === 0 || pending}
           onClick={run}
-          className="mt-3 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+          className="mt-4 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
         >
           {pending
             ? "Uploading…"
@@ -106,7 +159,7 @@ export function SopBulkUpload() {
               href="/admin/sops"
               className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700"
             >
-              Back to SOPs to review, attach and publish
+              Back to SOPs to review and publish
             </Link>
           </p>
         </div>

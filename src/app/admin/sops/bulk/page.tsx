@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { requireContentEditor } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { SopBulkUpload } from "./bulk-upload";
 
 export const dynamic = "force-dynamic";
 
 export default async function BulkSopUploadPage() {
   await requireContentEditor();
+  const supabase = createClient();
+  const { data: jobRoles } = await supabase
+    .from("job_roles")
+    .select("id, name")
+    .order("name");
+
   return (
     <div className="max-w-2xl">
       <Link href="/admin/sops" className="text-sm text-slate-500 hover:text-slate-900">
@@ -17,9 +24,11 @@ export default async function BulkSopUploadPage() {
         from the file name and its text pulled out automatically. A file whose
         name matches an existing SOP is attached to it and fills its empty
         content, rather than duplicating. Nothing is shown to staff until you
-        publish it and attach it to a job role.
+        publish it.
       </p>
-      <SopBulkUpload />
+      <SopBulkUpload
+        jobRoles={(jobRoles ?? []) as { id: string; name: string }[]}
+      />
     </div>
   );
 }

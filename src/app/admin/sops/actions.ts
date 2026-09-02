@@ -297,7 +297,29 @@ export async function bulkImportSops(
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
   if (files.length === 0) return { ok: false, error: "No files." };
 
+  // Defaults applied only to SOPs newly created by this upload, never to ones
+  // that matched an existing entry.
+  const newRoleIds = formData
+    .getAll("newRoleIds")
+    .map((v) => String(v))
+    .filter(Boolean);
+  const newSignoff = SIGNOFF_TYPES.includes(String(formData.get("newSignoffType")))
+    ? String(formData.get("newSignoffType"))
+    : "self";
+
   const admin = createAdminClient();
+
+  // Validate the chosen roles belong to this org up front.
+  let validRoleIds: string[] = [];
+  if (newRoleIds.length) {
+    const { data: roles } = await admin
+      .from("job_roles")
+      .select("id")
+      .eq("organisation_id", me.organisation_id)
+      .in("id", newRoleIds);
+    validRoleIds = (roles ?? []).map((r) => r.id as string);
+  }
+
   const outcomes: SopBulkOutcome[] = [];
 
   for (const file of files) {
@@ -322,7 +344,7 @@ export async function bulkImportSops(
             organisation_id: me.organisation_id,
             name: sopName,
             status: null,
-            signoff_type: "self",
+            signoff_type: newSignoff,
             target_tier: null,
             updated_by: me.id,
           })
@@ -338,6 +360,15 @@ export async function bulkImportSops(
           continue;
         }
         sopId = created.id;
+
+        // Attach the new SOP to the chosen job roles.
+        for (const roleId of validRoleIds) {
+          await admin.from("job_role_sops").insert({
+            organisation_id: me.organisation_id,
+            job_role_id: roleId,
+            sop_id: sopId,
+          });
+        }
       }
 
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -381,6 +412,19 @@ export async function bulkImportSops(
     }
   }
 
+  // A role that just gained SOPs is no longer a placeholder.
+  for (const roleId of validRoleIds) {
+    const { count } = await admin
+      .from("job_role_sops")
+      .select("sop_id", { count: "exact", head: true })
+      .eq("job_role_id", roleId);
+    await admin
+      .from("job_roles")
+      .update({ is_placeholder: (count ?? 0) === 0 })
+      .eq("id", roleId);
+  }
+
   revalidatePath("/admin/sops");
+  revalidatePath("/admin/job-roles");
   return { ok: true, outcomes };
 }
