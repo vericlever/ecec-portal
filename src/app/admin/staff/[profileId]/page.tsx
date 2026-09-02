@@ -10,6 +10,7 @@ import {
 import {
   HrManagerToggle,
   ProbationControl,
+  RefereeCheckControl,
   SightingControl,
 } from "./record-controls";
 import { ContractPanel } from "./contract-panel";
@@ -34,6 +35,17 @@ const WORK_ELIGIBILITY_LABEL = {
 function fmtDate(v: string | null | undefined) {
   if (!v) return "—";
   return new Date(v).toLocaleDateString("en-AU", { dateStyle: "medium" });
+}
+
+function ynLabel(v: boolean | null | undefined) {
+  return v === true ? "Yes" : v === false ? "No" : "—";
+}
+
+function maskTfn(v: string | null | undefined) {
+  if (!v) return "—";
+  const digits = v.replace(/\D/g, "");
+  if (digits.length < 3) return "•••";
+  return `••• ••• ${digits.slice(-3)}`;
 }
 
 export default async function StaffRecordPage({
@@ -111,6 +123,32 @@ export default async function StaffRecordPage({
   const canManageContract =
     hrManager &&
     (isAdmin(me.access_tier) || me.service_id === person.service_id);
+  // Payroll, screening and referees: Admin anywhere, or an HR manager at the
+  // person's service. Not the manager tiers.
+  const canSeeSensitive =
+    isAdmin(me.access_tier) ||
+    (me.hr_manager && me.service_id === person.service_id);
+
+  const [{ data: payroll }, { data: screening }, { data: referees }] =
+    canSeeSensitive
+      ? await Promise.all([
+          supabase
+            .from("worker_payroll")
+            .select("*")
+            .eq("profile_id", params.profileId)
+            .maybeSingle(),
+          supabase
+            .from("worker_screening")
+            .select("*")
+            .eq("profile_id", params.profileId)
+            .maybeSingle(),
+          supabase
+            .from("worker_referees")
+            .select("*")
+            .eq("profile_id", params.profileId)
+            .order("slot"),
+        ])
+      : [{ data: null }, { data: null }, { data: null }];
 
   // Onboarding documents this person has entered that a leader has not sighted.
   const pendingSightings = [wwcc, teacher, quals, training, identityRows].reduce(
@@ -575,6 +613,139 @@ export default async function StaffRecordPage({
           canManage={canManageContract}
         />
       </section>
+
+      {canSeeSensitive && (
+        <>
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Payroll
+              <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">
+                Admin and HR manager only
+              </span>
+            </h2>
+            <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4">
+              {payroll ? (
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-sm">
+                  <Row k="Tax File Number">{maskTfn(payroll.tfn)}</Row>
+                  <Row k="Claims tax free threshold">
+                    {ynLabel(payroll.claims_tax_free_threshold)}
+                  </Row>
+                  <Row k="HELP / SSL / TSL debt">
+                    {ynLabel(payroll.has_help_ssl_tsl_debt)}
+                  </Row>
+                  <Row k="Financial Supplement debt">
+                    {ynLabel(payroll.has_financial_supplement_debt)}
+                  </Row>
+                  <Row k="Superannuation fund">
+                    {payroll.super_fund_name ?? "—"}
+                  </Row>
+                  <Row k="Member number">
+                    {payroll.super_member_number ?? "—"}
+                  </Row>
+                  <Row k="Bank BSB">{payroll.bank_bsb ?? "—"}</Row>
+                  <Row k="Account number">
+                    {payroll.bank_account_number ?? "—"}
+                  </Row>
+                  <Row k="Account name">{payroll.bank_account_name ?? "—"}</Row>
+                </dl>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Not completed by the staff member yet.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Screening declarations
+              <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">
+                Admin and HR manager only
+              </span>
+            </h2>
+            <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+              {screening && screening.answered_at ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-slate-600">
+                      {screening.child_protection_question}
+                    </p>
+                    <p className="mt-0.5 font-medium text-slate-800">
+                      {ynLabel(screening.child_protection_history)}
+                      {screening.child_protection_detail
+                        ? ` — ${screening.child_protection_detail}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600">
+                      {screening.criminal_question}
+                    </p>
+                    <p className="mt-0.5 font-medium text-slate-800">
+                      {ynLabel(screening.criminal_history)}
+                      {screening.criminal_detail
+                        ? ` — ${screening.criminal_detail}`
+                        : ""}
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Answered {fmtDate(screening.answered_at.slice(0, 10))}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-slate-500">
+                  Not completed by the staff member yet.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Referees
+              <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">
+                Admin and HR manager only
+              </span>
+            </h2>
+            <div className="mt-2 space-y-3">
+              {(referees ?? []).length === 0 && (
+                <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
+                  No referees entered yet.
+                </p>
+              )}
+              {(referees ?? []).map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-lg border border-slate-200 bg-white p-4"
+                >
+                  <div className="text-sm font-medium">
+                    Referee {r.slot}: {r.name ?? "—"}
+                  </div>
+                  <dl className="mt-1 grid grid-cols-2 gap-x-6 gap-y-0.5 text-sm">
+                    <Row k="Organisation">{r.organisation ?? "—"}</Row>
+                    <Row k="Job title">{r.job_title ?? "—"}</Row>
+                    <Row k="Relationship">{r.relationship ?? "—"}</Row>
+                    <Row k="Phone">{r.phone ?? "—"}</Row>
+                    <Row k="Email">{r.email ?? "—"}</Row>
+                  </dl>
+                  {r.check_completed_at ? (
+                    <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-green-700">
+                      Reference check completed {fmtDate(r.check_completed_at)}
+                      {r.check_completed_by ? ` by ${r.check_completed_by}` : ""}
+                    </p>
+                  ) : (
+                    <RefereeCheckControl
+                      refereeId={r.id}
+                      completedAt={r.check_completed_at}
+                      completedBy={r.check_completed_by}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
 
       <section className="mt-6">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">

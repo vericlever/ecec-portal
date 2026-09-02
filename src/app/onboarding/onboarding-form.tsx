@@ -73,6 +73,14 @@ export function OnboardingForm({
       },
     }));
 
+  const setReferee = (index: number, field: string, value: string) =>
+    setData((d) => ({
+      ...d,
+      referees: d.referees.map((r, i) =>
+        i === index ? { ...r, [field]: value } : r,
+      ),
+    }));
+
   const isEct = data.nqaits_position === "Early Childhood Teacher";
 
   const steps = useMemo(
@@ -89,6 +97,9 @@ export function OnboardingForm({
         isEct ? { key: "teacher", title: "Teacher registration" } : null,
         { key: "qualifications", title: "Qualifications" },
         { key: "training", title: "Training records" },
+        { key: "payroll", title: "Tax, super and banking" },
+        { key: "screening", title: "Screening declarations" },
+        { key: "referees", title: "Referees" },
       ].filter(Boolean) as { key: string; title: string }[],
     [isEct],
   );
@@ -445,6 +456,118 @@ export function OnboardingForm({
                   <div className="grid grid-cols-2 gap-3">
                     <DateField label="Date attained" value={data.training[type]?.date_attained ?? ""} onChange={(v) => setTraining(type, "date_attained", v)} />
                     <DateField label="Expiry date" value={data.training[type]?.expiry_date ?? ""} onChange={(v) => setTraining(type, "expiry_date", v)} />
+                  </div>
+                </fieldset>
+              ))}
+            </>
+          )}
+
+          {step.key === "payroll" && (
+            <>
+              <p className="text-xs text-slate-500">
+                Only an administrator and the person you nominate for payroll can
+                see this. Your manager cannot.
+              </p>
+              <Text label="Tax File Number" value={data.tfn} onChange={(v) => set("tfn", v)} />
+              <YesNo label="Do you wish to claim the tax free threshold?" value={data.claims_tax_free_threshold} onChange={(v) => set("claims_tax_free_threshold", v as OnboardingPayload["claims_tax_free_threshold"])} />
+              <YesNo label="Do you have a HELP, SSL or TSL debt?" value={data.has_help_ssl_tsl_debt} onChange={(v) => set("has_help_ssl_tsl_debt", v as OnboardingPayload["has_help_ssl_tsl_debt"])} />
+              <YesNo label="Do you have a Financial Supplement debt?" value={data.has_financial_supplement_debt} onChange={(v) => set("has_financial_supplement_debt", v as OnboardingPayload["has_financial_supplement_debt"])} />
+              <div className="grid grid-cols-2 gap-4">
+                <Text label="Superannuation fund" value={data.super_fund_name} onChange={(v) => set("super_fund_name", v)} />
+                <Text label="Member number" value={data.super_member_number} onChange={(v) => set("super_member_number", v)} />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <Text label="BSB" value={data.bank_bsb} onChange={(v) => set("bank_bsb", v)} />
+                <Text label="Account number" value={data.bank_account_number} onChange={(v) => set("bank_account_number", v)} />
+                <Text label="Account name" value={data.bank_account_name} onChange={(v) => set("bank_account_name", v)} />
+              </div>
+            </>
+          )}
+
+          {step.key === "screening" && (
+            <>
+              <p className="text-xs text-slate-500">
+                Only an administrator and the person you nominate for HR can see
+                these answers. Your manager cannot.
+              </p>
+              <YesNo
+                label="Have you ever been the subject of a child protection investigation, finding or disciplinary action relating to children?"
+                value={data.screening_child_protection}
+                onChange={(v) =>
+                  set(
+                    "screening_child_protection",
+                    v as OnboardingPayload["screening_child_protection"],
+                  )
+                }
+              />
+              {data.screening_child_protection === "yes" && (
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">
+                    Please give details
+                  </span>
+                  <textarea
+                    value={data.screening_child_protection_detail}
+                    onChange={(e) =>
+                      set("screening_child_protection_detail", e.target.value)
+                    }
+                    rows={3}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
+              <YesNo
+                label="Do you have any current or historical criminal charges, convictions or findings relating to children or persons under 18?"
+                value={data.screening_criminal}
+                onChange={(v) =>
+                  set(
+                    "screening_criminal",
+                    v as OnboardingPayload["screening_criminal"],
+                  )
+                }
+              />
+              {data.screening_criminal === "yes" && (
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">
+                    Please give details
+                  </span>
+                  <textarea
+                    value={data.screening_criminal_detail}
+                    onChange={(e) =>
+                      set("screening_criminal_detail", e.target.value)
+                    }
+                    rows={3}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
+            </>
+          )}
+
+          {step.key === "referees" && (
+            <>
+              <p className="text-xs text-slate-500">
+                Two referees, ideally current or recent direct supervisors, at
+                least one from an early childhood or child-related setting.
+              </p>
+              {[0, 1].map((i) => (
+                <fieldset
+                  key={i}
+                  className="rounded-md border border-slate-200 p-3"
+                >
+                  <legend className="px-1 text-sm font-medium">
+                    Referee {i + 1}
+                  </legend>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Text label="Name" value={data.referees[i]?.name ?? ""} onChange={(v) => setReferee(i, "name", v)} />
+                    <Text label="Organisation" value={data.referees[i]?.organisation ?? ""} onChange={(v) => setReferee(i, "organisation", v)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Text label="Job title" value={data.referees[i]?.job_title ?? ""} onChange={(v) => setReferee(i, "job_title", v)} />
+                    <Text label="Relationship to you" value={data.referees[i]?.relationship ?? ""} onChange={(v) => setReferee(i, "relationship", v)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Text label="Phone" value={data.referees[i]?.phone ?? ""} onChange={(v) => setReferee(i, "phone", v)} />
+                    <Text label="Email" value={data.referees[i]?.email ?? ""} onChange={(v) => setReferee(i, "email", v)} />
                   </div>
                 </fieldset>
               ))}

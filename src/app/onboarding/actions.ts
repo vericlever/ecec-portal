@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { CORE_TRAINING_TYPES, type TrainingType } from "@/lib/nqaits";
+import {
+  SCREENING_CHILD_PROTECTION_Q,
+  SCREENING_CRIMINAL_Q,
+} from "@/lib/hr-screening";
 
 // The whole questionnaire, as the client holds it. Empty strings are treated as
 // "not answered" and stored as null.
@@ -54,6 +58,30 @@ export type OnboardingPayload = {
   work_eligibility: string;
   visa_number: string;
   visa_expiry: string;
+  // payroll (tax, super, banking)
+  tfn: string;
+  claims_tax_free_threshold: "" | "yes" | "no";
+  has_help_ssl_tsl_debt: "" | "yes" | "no";
+  has_financial_supplement_debt: "" | "yes" | "no";
+  super_fund_name: string;
+  super_member_number: string;
+  bank_bsb: string;
+  bank_account_number: string;
+  bank_account_name: string;
+  // screening declarations
+  screening_child_protection: "" | "yes" | "no";
+  screening_child_protection_detail: string;
+  screening_criminal: "" | "yes" | "no";
+  screening_criminal_detail: string;
+  // referees
+  referees: {
+    name: string;
+    organisation: string;
+    job_title: string;
+    relationship: string;
+    phone: string;
+    email: string;
+  }[];
   // wwcc
   wwcc_exempt: "" | "yes" | "no";
   wwcc_exemption_reason: string;
@@ -262,6 +290,96 @@ async function persist(
       await supabase.from("training_records").update(record).eq("id", existing.id);
     } else {
       await supabase.from("training_records").insert(record);
+    }
+  }
+
+  // Payroll: tax file number declaration, superannuation, banking.
+  const { error: payrollError } = await supabase.from("worker_payroll").upsert(
+    {
+      profile_id: me,
+      organisation_id: org,
+      tfn: s(payload.tfn),
+      claims_tax_free_threshold: yn(payload.claims_tax_free_threshold),
+      has_help_ssl_tsl_debt: yn(payload.has_help_ssl_tsl_debt),
+      has_financial_supplement_debt: yn(payload.has_financial_supplement_debt),
+      super_fund_name: s(payload.super_fund_name),
+      super_member_number: s(payload.super_member_number),
+      bank_bsb: s(payload.bank_bsb),
+      bank_account_number: s(payload.bank_account_number),
+      bank_account_name: s(payload.bank_account_name),
+    },
+    { onConflict: "profile_id" },
+  );
+  if (payrollError) return { ok: false, error: payrollError.message };
+
+  // Screening declarations. Snapshot the current question wording whenever an
+  // answer is given.
+  const cpAnswered = yn(payload.screening_child_protection);
+  const crimAnswered = yn(payload.screening_criminal);
+  const { error: screeningError } = await supabase
+    .from("worker_screening")
+    .upsert(
+      {
+        profile_id: me,
+        organisation_id: org,
+        child_protection_history: cpAnswered,
+        child_protection_detail:
+          cpAnswered === true
+            ? s(payload.screening_child_protection_detail)
+            : null,
+        child_protection_question:
+          cpAnswered != null ? SCREENING_CHILD_PROTECTION_Q : null,
+        criminal_history: crimAnswered,
+        criminal_detail:
+          crimAnswered === true ? s(payload.screening_criminal_detail) : null,
+        criminal_question: crimAnswered != null ? SCREENING_CRIMINAL_Q : null,
+        answered_at:
+          cpAnswered != null || crimAnswered != null
+            ? new Date().toISOString()
+            : null,
+      },
+      { onConflict: "profile_id" },
+    );
+  if (screeningError) return { ok: false, error: screeningError.message };
+
+  // Referees, two slots.
+  for (let i = 0; i < 2; i++) {
+    const r = payload.referees[i];
+    const slot = i + 1;
+    const { data: existing } = await supabase
+      .from("worker_referees")
+      .select("id")
+      .eq("profile_id", me)
+      .eq("slot", slot)
+      .maybeSingle();
+    const hasData =
+      r &&
+      (s(r.name) ||
+        s(r.organisation) ||
+        s(r.job_title) ||
+        s(r.relationship) ||
+        s(r.phone) ||
+        s(r.email));
+    if (!hasData) {
+      if (existing)
+        await supabase.from("worker_referees").delete().eq("id", existing.id);
+      continue;
+    }
+    const fields = {
+      profile_id: me,
+      organisation_id: org,
+      slot,
+      name: s(r.name),
+      organisation: s(r.organisation),
+      job_title: s(r.job_title),
+      relationship: s(r.relationship),
+      phone: s(r.phone),
+      email: s(r.email),
+    };
+    if (existing) {
+      await supabase.from("worker_referees").update(fields).eq("id", existing.id);
+    } else {
+      await supabase.from("worker_referees").insert(fields);
     }
   }
 

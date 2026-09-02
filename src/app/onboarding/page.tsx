@@ -26,6 +26,9 @@ export default async function OnboardingPage() {
     { data: teacherRows },
     { data: qual },
     { data: training },
+    { data: payroll },
+    { data: screening },
+    { data: refereeRows },
   ] = await Promise.all([
     supabase.from("worker_details").select("*").eq("profile_id", profile.id).maybeSingle(),
     supabase
@@ -40,7 +43,24 @@ export default async function OnboardingPage() {
       .order("created_at", { ascending: false }),
     supabase.from("qualifications").select("*").eq("profile_id", profile.id).limit(1).maybeSingle(),
     supabase.from("training_records").select("*").eq("profile_id", profile.id),
+    supabase.from("worker_payroll").select("*").eq("profile_id", profile.id).maybeSingle(),
+    supabase.from("worker_screening").select("*").eq("profile_id", profile.id).maybeSingle(),
+    supabase.from("worker_referees").select("*").eq("profile_id", profile.id).order("slot"),
   ]);
+
+  const refBySlot = (slot: number) =>
+    (refereeRows ?? []).find((r) => r.slot === slot) ?? null;
+  const refInitial = (slot: number) => {
+    const r = refBySlot(slot);
+    return {
+      name: str(r?.name),
+      organisation: str(r?.organisation),
+      job_title: str(r?.job_title),
+      relationship: str(r?.relationship),
+      phone: str(r?.phone),
+      email: str(r?.email),
+    };
+  };
 
   // A staff member can still edit a check a leader has not sighted yet. Once it
   // is sighted it is locked: the form shows it read-only and any renewal or
@@ -131,6 +151,20 @@ export default async function OnboardingPage() {
     work_eligibility: str(wd?.work_eligibility),
     visa_number: str(wd?.visa_number),
     visa_expiry: str(wd?.visa_expiry),
+    tfn: str(payroll?.tfn),
+    claims_tax_free_threshold: ynStr(payroll?.claims_tax_free_threshold),
+    has_help_ssl_tsl_debt: ynStr(payroll?.has_help_ssl_tsl_debt),
+    has_financial_supplement_debt: ynStr(payroll?.has_financial_supplement_debt),
+    super_fund_name: str(payroll?.super_fund_name),
+    super_member_number: str(payroll?.super_member_number),
+    bank_bsb: str(payroll?.bank_bsb),
+    bank_account_number: str(payroll?.bank_account_number),
+    bank_account_name: str(payroll?.bank_account_name),
+    screening_child_protection: ynStr(screening?.child_protection_history),
+    screening_child_protection_detail: str(screening?.child_protection_detail),
+    screening_criminal: ynStr(screening?.criminal_history),
+    screening_criminal_detail: str(screening?.criminal_detail),
+    referees: [refInitial(1), refInitial(2)],
     wwcc_exempt: ynStr(wd?.wwcc_exempt),
     wwcc_exemption_reason: str(wd?.wwcc_exemption_reason),
     wwcc_check_number: str(wwcc.forForm?.check_number),

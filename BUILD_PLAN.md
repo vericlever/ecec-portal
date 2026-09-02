@@ -284,6 +284,7 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 - An unsigned agreement counts as an outstanding item on the staff list, the dashboard and the person's record
 
 ### Step 18: Payroll and screening
+**Status: done (2026-09-02), on branch step-18-payroll-screening.**
 
 - Tax File Number declaration built as the ATO form: TFN, whether they claim the tax free threshold, HELP or SSL or TSL debt, Financial Supplement debt. Superannuation fund and member number. Banking BSB and account number, with the account name defaulting to the person's name.
 - Screening declarations: child protection investigation, finding or disciplinary history, and criminal charges, convictions or findings relating to children or under-18s. Yes or no with a detail field, recorded against the question wording and the date answered.

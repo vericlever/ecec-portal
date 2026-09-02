@@ -417,6 +417,36 @@ export async function deleteIdentityDocument(id: string): Promise<Result> {
   return { ok: true };
 }
 
+// An HR manager (or admin) records that a reference check was completed.
+export async function recordRefereeCheck(
+  refereeId: string,
+  input: { completedAt: string; completedBy: string },
+): Promise<Result> {
+  const me = await getProfile();
+  if (!me) return { ok: false, error: "Sign in." };
+  const supabase = createClient();
+  // worker_referees RLS already limits writes to the person or an HR manager
+  // at their service; a plain manager gets no row back.
+  const { data: referee } = await supabase
+    .from("worker_referees")
+    .select("id, profile_id")
+    .eq("id", refereeId)
+    .maybeSingle();
+  if (!referee || referee.profile_id === me.id) {
+    return { ok: false, error: "Not allowed." };
+  }
+  const { error } = await supabase
+    .from("worker_referees")
+    .update({
+      check_completed_at: input.completedAt || null,
+      check_completed_by: input.completedBy.trim() || null,
+    })
+    .eq("id", refereeId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/staff", "layout");
+  return { ok: true };
+}
+
 export async function setHrManager(
   profileId: string,
   value: boolean,

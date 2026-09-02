@@ -6,6 +6,7 @@ import { SIGHTED_BY } from "@/lib/nqaits";
 import {
   clearSighting,
   recordSighting,
+  recordRefereeCheck,
   setHrManager,
   setProbation,
 } from "./actions";
@@ -208,6 +209,67 @@ export function ProbationControl({
         </button>
         {error && <span className="text-red-600">{error}</span>}
       </div>
+    </div>
+  );
+}
+
+export function RefereeCheckControl({
+  refereeId,
+  completedAt,
+  completedBy,
+}: {
+  refereeId: string;
+  completedAt: string | null;
+  completedBy: string | null;
+}) {
+  const router = useRouter();
+  const [date, setDate] = useState(completedAt ?? "");
+  const [by, setBy] = useState(completedBy ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  const dirty = date !== (completedAt ?? "") || by !== (completedBy ?? "");
+
+  return (
+    <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-2 text-sm">
+      <label className="text-xs text-slate-500">
+        Reference check completed
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="mt-0.5 block rounded-md border border-slate-300 px-2 py-1 text-sm"
+        />
+      </label>
+      <label className="text-xs text-slate-500">
+        By
+        <input
+          type="text"
+          value={by}
+          onChange={(e) => setBy(e.target.value)}
+          placeholder="name"
+          className="mt-0.5 block rounded-md border border-slate-300 px-2 py-1 text-sm"
+        />
+      </label>
+      <button
+        type="button"
+        disabled={!dirty || pending}
+        onClick={() =>
+          start(async () => {
+            setError(null);
+            const r = await recordRefereeCheck(refereeId, {
+              completedAt: date,
+              completedBy: by,
+            });
+            if (r.ok) router.refresh();
+            else setError(r.error);
+          })
+        }
+        className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300"
+      >
+        {pending ? "Saving…" : "Save"}
+      </button>
+      {error && <span className="text-red-600">{error}</span>}
     </div>
   );
 }
