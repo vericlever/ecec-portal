@@ -4,6 +4,7 @@ import "./globals.css";
 import { getProfile, isManager, canEditContent, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
+import { ManageMenu } from "./manage-menu";
 
 export const metadata: Metadata = {
   title: "VeriClever",
@@ -67,51 +68,16 @@ export default async function RootLayout({
                     My details
                   </Link>
                 )}
-                {(isManager(profile.access_tier) || profile.hr_verifier) && (
-                  <>
-                    <Link
-                      href="/admin/staff"
-                      className="text-sm text-slate-500 hover:text-slate-900"
-                    >
-                      Staff
-                    </Link>
-                    <Link
-                      href="/admin/verification"
-                      className="text-sm text-slate-500 hover:text-slate-900"
-                    >
-                      Verification
-                    </Link>
-                  </>
-                )}
-                {isManager(profile.access_tier) && (
-                  <Link
-                    href="/admin/countersign"
-                    className="text-sm text-slate-500 hover:text-slate-900"
-                  >
-                    Countersign
-                  </Link>
-                )}
-                {canEditContent(profile.access_tier) && (
-                  <>
-                    <Link
-                      href="/admin/policies"
-                      className="text-sm text-slate-500 hover:text-slate-900"
-                    >
-                      Policies admin
-                    </Link>
-                    <Link
-                      href="/admin/sops"
-                      className="text-sm text-slate-500 hover:text-slate-900"
-                    >
-                      SOPs admin
-                    </Link>
-                    <Link
-                      href="/admin/job-roles"
-                      className="text-sm text-slate-500 hover:text-slate-900"
-                    >
-                      Job roles
-                    </Link>
-                  </>
+                {(isManager(profile.access_tier) ||
+                  profile.hr_verifier ||
+                  canEditContent(profile.access_tier)) && (
+                  <ManageMenu
+                    canManageStaff={
+                      isManager(profile.access_tier) || profile.hr_verifier
+                    }
+                    canCountersign={isManager(profile.access_tier)}
+                    canEditContent={canEditContent(profile.access_tier)}
+                  />
                 )}
               </div>
               <div className="flex items-center gap-3 text-right text-xs text-slate-500">
