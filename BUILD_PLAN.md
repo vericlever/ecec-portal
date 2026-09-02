@@ -1,10 +1,27 @@
 # Build plan v2
 
-Supersedes the original Steps 1 to 5 plan. This reflects the expanded scope confirmed on 31 August: four fixed access tiers, in-app staff management with NQAITS-aligned onboarding, policy upload, job-role-based SOP suites, reminders, staff reporting, staff self-service credential tracking, contract storage and renewal, a compliance heatmap dashboard, browser-native SOP read-aloud, and click-through from SOPs to their source policies, folded into the near-term build rather than deferred. Two-month build window, not a 1 November minimum only.
+Supersedes the original Steps 1 to 5 plan. Expanded scope confirmed 31 August: four fixed access tiers, in-app NQAITS-aligned staff onboarding, policy upload, job-role SOP suites, reminders, staff reporting, credential tracking, contract storage and renewal, a compliance heatmap, browser-native SOP read-aloud, and SOP-to-policy click-through. A further HR record expansion (Steps 16 to 18) and policy categories were added in early September after reviewing RSG's live onboarding survey.
 
-Three companion documents hold detail this file only summarises: `ROLE_ACCESS_MATRIX.md` (full feature-by-role breakdown), `STAFF_ONBOARDING_NQAITS.md` (full NQAITS field structure and verified dropdown lists), and `CONTRACT_MANAGEMENT.md` (full contract storage and renewal detail).
+Three companion documents hold detail this file only summarises: `ROLE_ACCESS_MATRIX.md` (feature-by-role breakdown), `STAFF_ONBOARDING_NQAITS.md` (NQAITS field structure and verified dropdown lists), and `CONTRACT_MANAGEMENT.md` (contract storage and renewal detail).
 
-Status markers reflect where things actually stood as of 31 August, based on manual verification, not just Claude Code's own "done" claims.
+Status lines are kept current and reflect manual verification against real logins, not Claude Code's own "done" claims.
+
+## Where things stand (3 September 2026)
+
+- **Built, verified, merged to `main`:** Steps 1 to 8, 10, 11, 16, 17.
+- **Built and verified, on a branch waiting to merge:** Step 18 and Policy categories, both on `step-18-payroll-screening`.
+- **Parked, blocked on the sending domain:** Step 9, and the email half of Steps 7 and 11. See "Email and notifications" below.
+- **Cut:** the Step 12 webhook receiver. External course completions are entered by hand through the training records screen. The effort moves to mobile capture, the new Step 12.
+- **Not started:** Steps 12 (mobile capture), 13, 14, 15.
+
+Two gaps outside the numbered steps block RSG actually using the portal:
+
+- **RSG's real SOPs and policies are not loaded.** They were cleared on 2 September for a clean upload trial and never restored. Re-run `supabase/import/rsg/rsg_import.sql` (70 policies, 129 SOPs) plus seeds `0004` and `0005`, or upload the current versions through the admin screens.
+- **Nothing is deployed.** It runs on localhost against the live Supabase database, and `main` has not been pushed to `github.com/vericlever/ecec-portal`. For staff to use it, it needs to be on Vercel with a real address.
+
+## Email and notifications, blocked on the VeriClever domain
+
+Every outbound-email feature is stubbed until the VeriClever domain, ABN and Resend domain verification are in place. The test sender `onboarding@resend.dev` only delivers to the Resend account owner. Blocked: staff invite emails (Step 5), SOP reminder emails (Step 7), Reg 172 parent notifications (Step 9), contract renewal alert emails (Step 11). The in-portal side of each, the flags, outstanding-items counts and to-do surfaces, is built and working. Only the send is waiting.
 
 ## Access tiers (confirmed)
 
@@ -22,32 +39,28 @@ See `ROLE_ACCESS_MATRIX.md` for the full feature-by-role breakdown.
 **Comprehension questions are parked, not built.** Leave a nullable `comprehension_questions` relation on the SOP table structure now, unused, so this can be added later without a schema rework.
 
 ## Step 1: Schema and migration
-**Status: done, isolation not yet verified**
+**Status: done. Cross-tenant isolation verified against the Science Kinder / RSG pair, all directions.**
 
-- RLS policy pattern completed across every table in `0001_init_schema.sql`
-- Migration applied to the Sydney (ap-southeast-2) Supabase project
-
-**Outstanding before anything further is built on top of this:**
-- Cross-tenant isolation has not actually been tested. Create one dummy staff login under Science Kinder, confirm it sees zero content, and confirm RSG sees none of it in return. Do this before Step 4's role work lands, since it gets harder to isolate a gap the more is built around it.
+- RLS policy pattern across every table, migrations now `0001` to `0031`, all applied to the Sydney (ap-southeast-2) Supabase project
+- Isolation proven with real Science Kinder logins: SK sees zero RSG content, RSG sees zero SK content, sign-off and view data is per-user
 
 ## Step 2: Seed data
-**Status: done**
+**Status: done. RSG's imported inventory was later cleared for an upload trial and not restored, see "Where things stand".**
 
-- RSG populated from the Policy to SOP Architecture spreadsheet
+- RSG populated from the Policy to SOP Architecture spreadsheet via a generic importer (`supabase/import/rsg/`), any org admin can run the same path
 - Science Kinder created empty, used for isolation testing
 
 ## Step 3: Single working SOP page
 **Status: done**
 
-- SOP read-and-sign working end to end, `sign_offs` row created on submission
-- Currently against a real login, not the original hardcoded test user
+- SOP read-and-sign working end to end, `sign_offs` row created on submission, against a real login
 
 ## Step 4: Auth and four-tier role model
-**Status: unknown, not yet verifiable**
+**Status: done, verified against real logins for all four tiers.**
 
-- Supabase Auth wired in, login working
-- Admin account creation proven possible
-- **Cannot yet be assessed either way:** there is no admin view yet to test role differentiation against, so whether the current build correctly separates the four tiers is unknown, not confirmed broken and not confirmed working. Building the admin view itself is part of this step's remaining work, not a separate thing.
+- Email/password auth via `@supabase/ssr`, RLS keyed off the authenticated user's organisation and tier
+- All queries go through the auth'd client, no service-role bypass in read paths
+- A later correction (migration `0014`): a manager's reach is now their own non-null service only, so a manager cannot open an admin's record
 
 **Deliverables**
 - Role enum updated to the four tiers above
@@ -63,7 +76,7 @@ See `ROLE_ACCESS_MATRIX.md` for the full feature-by-role breakdown.
 - Cross-tenant isolation (Step 1's outstanding item) is confirmed alongside this, since role and organisation scoping are being touched at the same time
 
 ## Step 5: Staff management tools, in-app, NQAITS-aligned onboarding
-**Status: not started**
+**Status: done, except staff invite emails (blocked on the domain, an on-screen invite link is the fallback). In-app onboarding questionnaire, CSV bulk import with validation, a bulk export in the exact NQAITS Worker Register format, and first-login invite links are all built. The HR record expansion in Steps 16 to 18 extends the onboarding field set.**
 
 This must be actionable from inside the app by an admin, not a script run beforehand. Two paths, both needed:
 
@@ -105,7 +118,7 @@ With Date Sighted and Sighted By removed from the staff-side form, a typical new
 - Submitting a credential or training record creates a flagged, unverified item visible to all managers at that site, and any manager can complete the verification
 
 ## Step 6: Policy management
-**Status: not started**
+**Status: done, merged. Extended by "Policy categories" (3 September), which replaces the standalone parent-facing checkbox.**
 
 - Add, edit, and **upload** policies (Admin, Manager staff+policy). Upload is the primary path, most policies will be existing documents brought in, not drafted from scratch in the app.
 - On upload, the policy's name is taken from the file name with the extension stripped (e.g. `Sun Protection Policy.docx` becomes "Sun Protection Policy"), not manually typed, though it should remain editable afterwards
@@ -119,7 +132,7 @@ With Date Sighted and Sighted By removed from the staff-side form, a typical new
 - Policies can be linked to one or more SOPs and vice versa
 
 ## Step 7: Job roles and SOP suites, plus reminders
-**Status: not started**
+**Status: done, merged, except the reminder emails (blocked on the domain). Job roles are configurable per organisation, SOP suites attach to roles, SOP authoring and bulk upload are built, and the sign-off model is self or self-and-manager (`0023`). The SOP-incomplete reminder email is the only outstanding piece.**
 
 The priority here is job-role-based SOP suites, not one-off individual assignment. Individual manager-to-staff SOP assignment is de-scoped from this step, it's a minor addition that can come later if actually needed.
 
@@ -134,7 +147,7 @@ The priority here is job-role-based SOP suites, not one-off individual assignmen
 - A reminder email sends correctly to a staff member with an outstanding sign-off
 
 ## Step 8: Staff reporting
-**Status: done (2026-09-02, on main)**
+**Status: done, merged (2026-09-02). Team compliance roll-up on the staff list and the dashboard, an outstanding-items breakdown on each staff record.**
 
 - Per-staff report: SOPs completed and policies viewed, shown as a percentage and as a table of outstanding items
 - Manager tiers see this scoped to their site(s), Admin sees it across all staff and sites
@@ -143,7 +156,7 @@ The priority here is job-role-based SOP suites, not one-off individual assignmen
 - Clicking into a staff member from a manager or admin view shows accurate completion percentages and an outstanding items table, matching what's actually in `sign_offs`
 
 ## Step 9: Reg 172 parent notification trigger
-**Status: not started**
+**Status: parked, blocked on the sending domain (see "Email and notifications"). The dual-sign-off simplification below is already true from the Step 6 and 7 work. "Parent-facing" is now the "Parent policies" category from the Policy categories work, so the trigger keys on that.**
 
 Roles are clearer now, this simplifies the sign-off requirement from earlier: Admin and Manager (staff, policy and procedures) do not require a separate dual sign-off to publish and send, since both tiers already carry that authority directly. This replaces the earlier "Centre Director and Approved Provider/Admin" dual gate.
 
@@ -187,15 +200,26 @@ Full detail in `CONTRACT_MANAGEMENT.md`, summarised here.
 - A contract set to no fixed period never triggers a renewal flag or expiry alert, at any tier
 - Uploading a new executed contract closes the flag, starts a new period, and the prior contract remains visible as history
 
-## Step 12: Webhook receiver
-**Status: not started**
+## Step 12: Mobile capture and installable app
+**Status: not started. Replaces the cut webhook receiver (see "Explicitly deferred").**
 
-- External course completion endpoint, writing into `credentials` without touching core schema
+The portal is already mobile-responsive. This step makes it work well in the two places it is actually used: an educator's phone, and a shared tablet in the room. Cut in three sizes, do the cheap ones first.
+
+- **Camera capture (small).** On a phone, a file input with `capture` opens the camera directly. Add it to every upload control: Photo ID, visa document, contract, SOP and policy source documents, and the onboarding verification documents. A staff member photographs a physical document instead of needing a scan on a laptop.
+- **Mobile and tablet polish (contained).** The nav is now six items wide and the onboarding wizard is thirteen steps. Walk every screen on a real phone and a real tablet and fix what is rough. Give the countersign and verification queues a tablet-friendly layout for a manager working through sign-offs on the floor.
+- **Installable app, a PWA (one step's worth).** A web app manifest and a service worker so the portal installs to the home screen, opens full screen, and tolerates a patchy connection. No app store, no native code. This is the "app version" without a separate project.
+
+A true native app in the app stores stays out of scope. It is a separate project of months, only worth it for push notifications or deep device features, and the PWA covers the rest.
+
+**Done when**
+- A staff member on a phone can photograph a document with the camera and have it upload, for every document type the portal accepts
+- Every screen is usable on a phone and on a tablet, checked by hand, not assumed
+- The portal installs to a phone or tablet home screen and opens as its own full-screen app
 
 ## Step 13: Compliance heatmap
-**Status: not started, confirmed in scope for v1.0**
+**Status: not started, confirmed in scope for v1.0. The dashboard at `/admin` already carries a "needs attention" list; this is the site-by-category grid on top.**
 
-Depends on Steps 8, 10 and 11 already existing, since it aggregates data from all three, staff sign-off completion, credential status, and contract renewal status, into one dashboard view.
+Aggregates the data from Steps 8, 10, 11, 16 and 17, staff sign-off completion, credential and visa status, contract renewal status, and agreement and contract signing, into one grid.
 
 - **Layout**: sites as rows, compliance categories as columns (SOP sign-off completion, credential status, contract status), each cell colour-coded red/amber/green. Admin sees every site across every organisation they manage, Manager tiers see only their own site(s).
 - **Drill-down**: clicking a cell opens the relevant outstanding-items view from Step 8 or Step 10, this is a summary layer sitting on top of existing reporting, not a separate data source.
@@ -254,7 +278,7 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 - Contract upload and replace: Admin and `hr_manager` only. Manager (policy) keeps view and download but loses upload, changed from Step 11 as built.
 
 ### Step 16: HR access model and identity, working rights, and the rest of the personal record
-**Status: done (2026-09-02). The rename and contract tightening are on main (merged with Step 11). The identity, working rights and personal-record fields are on branch step-16-hr-identity.**
+**Status: done, merged. `hr_verifier` renamed to `hr_manager` with the wider scope, contract write tightened to Admin and HR manager, and the identity, working-rights and personal-record fields added to onboarding and the staff record.**
 
 - Rename `profiles.hr_verifier` to `hr_manager` across the schema, RLS helpers and the UI. Tighten the `contracts` write policy to Admin plus `hr_manager` (this lands on the Step 11 branch before it merges).
 - Add to `worker_details`: gender, next of kin name, relationship, address and phone, uniform sizes (hoodie, polo, vest), roster availability (days available, ideal weekly hours, availability notes). Roster availability is captured once and drives no flags or reminders, it is scheduling context not compliance data. Job title is not captured from the staff, it is set by a manager through the existing position and SOP job role fields.
@@ -269,7 +293,7 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 - Photo ID uploaded by a staff member creates a sighting task for managers at their service
 
 ### Step 17: Agreements and the sign mechanism
-**Status: done (2026-09-02), on branch step-17-agreements.**
+**Status: done, merged. Org-level agreement templates published and versioned like SOPs, a staff signing screen at `/agreements`, contract signing on the onboarding page, and a signature roster on each agreement. The seed agreement types are created through the admin screen, the wording is RSG's.**
 
 - A generic agreement-template concept at organisation level: a named agreement with a body and a published version, the same publish and versioning as SOPs. Seed types: Code of Conduct, Confidentiality Agreement, Uniform Receipt Declaration, Individual Flexibility Agreement, Training Agreement (trainees), plus plain attestations that carry no document (WWCC currency acknowledgement, background and reference check consent, mandatory reporting obligations acknowledgement).
 - One signature row per staff member per agreement version, timestamped, recording the person and the version. Re-publishing an agreement makes prior signatures stale, same as SOPs.
@@ -284,7 +308,7 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 - An unsigned agreement counts as an outstanding item on the staff list, the dashboard and the person's record
 
 ### Step 18: Payroll and screening
-**Status: done (2026-09-02), on branch step-18-payroll-screening.**
+**Status: done, verified against real logins, on branch `step-18-payroll-screening` (with the Policy categories commit) waiting to merge.**
 
 - Tax File Number declaration built as the ATO form: TFN, whether they claim the tax free threshold, HELP or SSL or TSL debt, Financial Supplement debt. Superannuation fund and member number. Banking BSB and account number, with the account name defaulting to the person's name.
 - Screening declarations: child protection investigation, finding or disciplinary history, and criminal charges, convictions or findings relating to children or under-18s. Yes or no with a detail field, recorded against the question wording and the date answered.
@@ -302,8 +326,22 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 
 Policies are organised into a per-organisation set of categories, seeded with Parent policies, General policies, HR policies, Manual handling and Other. Many-to-many, a policy can be in more than one. The "Parent policies" category carries the parent-notification meaning, and a trigger keeps `policies.is_parent_facing` in step, so it replaces the standalone parent-facing checkbox. Categories are for organising the library and for linking policies to SOPs, they do not control who sees a policy. The category picker appears on the new-policy form, the bulk upload (applied to newly created policies), and the policy editor. Both the admin policy list and the staff Policies view are grouped by category. Migration `0031`.
 
-## Explicitly deferred, do not build ahead of schedule
+## Before RSG staff can use the portal
 
+Independent of the numbered steps. Roughly in order:
+
+1. **Merge the open branch.** Step 18 and Policy categories, verified, on `step-18-payroll-screening`.
+2. **Buy the VeriClever domain, register the ABN, verify the domain with Resend.** Unblocks every email feature at once. Zeke's action.
+3. **Load RSG's content.** Re-run the importer or upload the current SOPs and policies through the admin screens, then classify the policies into categories and publish.
+4. **Deploy.** Push `main` to `github.com/vericlever/ecec-portal`, connect Vercel, set the environment variables, confirm it runs against the live database at a real address.
+5. **Camera capture and a mobile pass** (Step 12), so it works on the phones and tablets staff will actually use.
+6. **Clear the test data.** The throwaway `delivered@resend.dev` account, and the demo records left on Sam Rivers and others during verification.
+7. **Create the real staff accounts** and send the invite links.
+
+## Explicitly deferred or cut
+
+- **Webhook receiver for external course completions (cut 3 September).** Was Step 12. Too speculative, it depended on Gecko Training or an equivalent existing and offering a webhook. Nothing was built for it. External completions are entered by hand through the training records screen. Revisit only if a real integration partner appears.
+- **Native app in the app stores.** A PWA (the new Step 12) covers the need without a separate project.
 - Comprehension check questions (parked, schema-ready placeholder only)
 - Live MYOB or Xero sync
 - Live NQAITS import or export
@@ -315,7 +353,8 @@ Policies are organised into a per-organisation set of categories, seeded with Pa
 
 - Australian English spelling throughout any user-facing copy or generated documentation
 - No em dashes in generated documentation or commit messages where prose is used
+- No Oxford comma in generated prose
 - Confirm each step's "done when" criteria against real, manually verified logins and data, not assumed from a prior step's claimed completion
-- The cross-tenant isolation test under Step 1 is a prerequisite for Step 4, not a nice-to-have, do not skip it
-- Read `STAFF_ONBOARDING_NQAITS.md` in full before building Step 5, it has the complete field list and verified dropdown values, this file only summarises them
-- Read `CONTRACT_MANAGEMENT.md` in full before building Step 11, same reason
+- One feature branch per step, committed there, `main` left untouched until Zeke merges. Migrations are applied to the live Supabase project as they are written, via `scripts/run-sql.mjs`
+- `STAFF_ONBOARDING_NQAITS.md` has the complete NQAITS field list and verified dropdown values, `CONTRACT_MANAGEMENT.md` has the contract detail, `ROLE_ACCESS_MATRIX.md` has the feature-by-role breakdown, read the relevant one before touching that area
+- Detailed running state, test accounts, migration list and known test data live in Claude's project memory (`ecec-portal-build-sequence.md`), not in this file
