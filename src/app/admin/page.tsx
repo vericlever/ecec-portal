@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
 import { pendingSightingsByProfile } from "@/lib/verification";
 import { expiringCredentials } from "@/lib/credentials";
+import { contractAlerts } from "@/lib/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
     sightings,
     { data: pendingCosign },
     credentialAlerts,
+    contractDue,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -35,6 +37,7 @@ export default async function DashboardPage() {
           .is("verified_at", null)
       : Promise.resolve({ data: [] as { id: string; user_id: string; sop_id: string; verified_at: string | null }[] }),
     expiringCredentials(supabase, { withinDays: 60 }),
+    contractAlerts(supabase),
   ]);
 
   const activeStaff = (staff ?? []).filter((p) => p.is_active);
@@ -70,6 +73,11 @@ export default async function DashboardPage() {
     (a) => a.status === "expired",
   ).length;
 
+  const contractPeople = new Set(contractDue.map((a) => a.profileId)).size;
+  const contractExpired = contractDue.filter(
+    (a) => a.bucket === "expired",
+  ).length;
+
   const staffWithOutstanding = activeStaff.filter(
     (p) => (stats.get(p.id)?.outstanding ?? 0) > 0,
   ).length;
@@ -95,6 +103,17 @@ export default async function DashboardPage() {
           ? `${expiredCount} already expired`
           : "within the next 60 days",
       alert: expiredCount > 0,
+    },
+    {
+      show: true,
+      href: "/admin/contracts",
+      label: "Contracts due for renewal or expired",
+      count: contractPeople,
+      detail:
+        contractExpired > 0
+          ? `${contractExpired} already expired`
+          : "within the next 4 weeks",
+      alert: contractExpired > 0,
     },
     {
       show: true,

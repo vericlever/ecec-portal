@@ -91,6 +91,7 @@ export async function staffStatsByProfile(
     { data: wwccRows },
     { data: teacherRows },
     { data: trainingRows },
+    { data: contractRows },
   ] = await Promise.all([
     supabase
       .from("job_role_sops")
@@ -119,6 +120,11 @@ export async function staffStatsByProfile(
       .from("training_records")
       .select("profile_id, training_type, other_description, expiry_date")
       .not("expiry_date", "is", null),
+    supabase
+      .from("contracts")
+      .select("profile_id, expiry_date")
+      .is("superseded_at", null)
+      .eq("period_type", "fixed"),
   ]);
 
   // Expired or soon-to-expire credentials per person: latest expiry of each
@@ -154,6 +160,19 @@ export async function staffStatsByProfile(
       profileId,
       (credAlertsByProfile.get(profileId) ?? 0) + 1,
     );
+  }
+
+  // Active fixed-period contracts within four weeks of expiry, or already
+  // expired. Mirrors renewalState() in src/lib/contracts.ts.
+  const contractDueByProfile = new Set<string>();
+  const contractCutoff = new Date(today);
+  contractCutoff.setDate(contractCutoff.getDate() + 28);
+  for (const c of contractRows ?? []) {
+    const expiry = c.expiry_date as string | null;
+    if (!expiry) continue;
+    if (new Date(expiry + "T00:00:00") <= contractCutoff) {
+      contractDueByProfile.add(c.profile_id as string);
+    }
   }
 
   // Only published SOPs count. A self_and_manager SOP is not "signed" until the
@@ -233,7 +252,8 @@ export async function staffStatsByProfile(
       (pendingSightings.get(p.id) ?? 0) +
       (sopTotal - sopSigned) +
       (policyTotal - policyViewed) +
-      (credAlertsByProfile.get(p.id) ?? 0);
+      (credAlertsByProfile.get(p.id) ?? 0) +
+      (contractDueByProfile.has(p.id) ? 1 : 0);
 
     out.set(p.id, {
       sopSigned,

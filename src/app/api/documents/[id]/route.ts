@@ -37,6 +37,15 @@ export async function GET(
         return new NextResponse("Not found", { status: 404 });
       }
     }
+  } else if (doc.owner_type === "contract") {
+    // The staff member sees their own contract; a manager or admin sees it via
+    // the contracts_select RLS on the owning row.
+    const { data: owner } = await supabase
+      .from("contracts")
+      .select("id")
+      .eq("id", doc.owner_id)
+      .maybeSingle();
+    if (!owner) return new NextResponse("Not found", { status: 404 });
   } else if (!canEditContent(me.access_tier)) {
     return new NextResponse("Not found", { status: 404 });
   }

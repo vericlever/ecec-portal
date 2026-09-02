@@ -170,7 +170,7 @@ Roles are clearer now, this simplifies the sign-off requirement from earlier: Ad
 - A self-service update creates the same flagged verification item as an onboarding submission, visible to all managers at that site
 
 ## Step 11: Contract storage and renewal
-**Status: not started**
+**Status: done (2026-09-02), except the email and pop-up parts of the renewal escalation, which are deferred with the rest of the reminder engine until the VeriClever domain clears. In-portal renewal flags, the outstanding-items surface, the /admin/contracts list, and the expired state are all built.**
 
 Full detail in `CONTRACT_MANAGEMENT.md`, summarised here.
 

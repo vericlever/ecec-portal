@@ -12,7 +12,14 @@ import {
   ProbationControl,
   SightingControl,
 } from "./record-controls";
+import { ContractPanel } from "./contract-panel";
 import { classifyPersonCredentials } from "@/lib/credentials";
+import {
+  type ContractRow,
+  activeContract,
+  renewalState,
+} from "@/lib/contracts";
+import { canEditContent } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +69,20 @@ export default async function StaffRecordPage({
   ]);
 
   if (!person) notFound();
+
+  const { data: contractRows } = await supabase
+    .from("contracts")
+    .select(
+      "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, created_at",
+    )
+    .eq("profile_id", params.profileId)
+    .order("created_at", { ascending: false });
+  const contracts = (contractRows ?? []) as ContractRow[];
+  const contract = activeContract(contracts);
+  const contractRenewal = renewalState(contract);
+  const canManageContract =
+    canEditContent(me.access_tier) &&
+    (isAdmin(me.access_tier) || me.service_id === person.service_id);
 
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const jobRoleName = new Map((jobRoles ?? []).map((r) => [r.id, r.name]));
@@ -261,13 +282,25 @@ export default async function StaffRecordPage({
     return `${a.label} — ${fmtDate(a.expiryDate)} (${when})`;
   });
 
+  const contractItems: string[] = [];
+  if (contractRenewal.bucket === "expired") {
+    contractItems.push(
+      `Contract expired ${fmtDate(contract?.expiry_date)} — needs renewing`,
+    );
+  } else if (contractRenewal.bucket === "due") {
+    contractItems.push(
+      `Contract expires ${fmtDate(contract?.expiry_date)} (${contractRenewal.daysLeft} days) — due for renewal`,
+    );
+  }
+
   const outstandingCount =
     (onboardingOutstanding ? 1 : 0) +
     unsignedSops.length +
     awaitingCosignSops.length +
     unviewedPolicies.length +
     unsightedDocs.length +
-    credentialItems.length;
+    credentialItems.length +
+    contractItems.length;
 
   return (
     <div>
@@ -370,6 +403,7 @@ export default async function StaffRecordPage({
                 title="Credentials expired or expiring"
                 items={credentialItems}
               />
+              <OutstandingGroup title="Contract" items={contractItems} />
               <OutstandingGroup
                 title="Documents a leader has not sighted"
                 items={unsightedDocs.map((d) =>
@@ -418,6 +452,17 @@ export default async function StaffRecordPage({
             canEdit={verifier}
           />
         </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Contract
+        </h2>
+        <ContractPanel
+          profileId={person.id}
+          contracts={contracts}
+          canManage={canManageContract}
+        />
       </section>
 
       <section className="mt-6">
