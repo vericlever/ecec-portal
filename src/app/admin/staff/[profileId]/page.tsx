@@ -12,6 +12,7 @@ import {
   ProbationControl,
   SightingControl,
 } from "./record-controls";
+import { classifyPersonCredentials } from "@/lib/credentials";
 
 export const dynamic = "force-dynamic";
 
@@ -239,12 +240,34 @@ export default async function StaffRecordPage({
     person.job_role_id && !wd?.onboarding_completed_at,
   );
 
+  // Expired or soon-to-expire credentials (WWCC, teacher registration,
+  // training), latest record of each kind only.
+  const credentialAlerts = classifyPersonCredentials({
+    wwcc: (wwcc ?? []) as { expiry_date: string | null }[],
+    teacher: (teacher ?? []) as { expiry_date: string | null }[],
+    training: (training ?? []) as {
+      training_type: string;
+      other_description: string | null;
+      expiry_date: string | null;
+    }[],
+  });
+  const credentialItems = credentialAlerts.map((a) => {
+    const when =
+      a.daysLeft < 0
+        ? `expired ${Math.abs(a.daysLeft)} ${Math.abs(a.daysLeft) === 1 ? "day" : "days"} ago`
+        : a.daysLeft === 0
+          ? "expires today"
+          : `expires in ${a.daysLeft} ${a.daysLeft === 1 ? "day" : "days"}`;
+    return `${a.label} — ${fmtDate(a.expiryDate)} (${when})`;
+  });
+
   const outstandingCount =
     (onboardingOutstanding ? 1 : 0) +
     unsignedSops.length +
     awaitingCosignSops.length +
     unviewedPolicies.length +
-    unsightedDocs.length;
+    unsightedDocs.length +
+    credentialItems.length;
 
   return (
     <div>
@@ -342,6 +365,10 @@ export default async function StaffRecordPage({
               <OutstandingGroup
                 title="Policies not viewed"
                 items={unviewedPolicies}
+              />
+              <OutstandingGroup
+                title="Credentials expired or expiring"
+                items={credentialItems}
               />
               <OutstandingGroup
                 title="Documents a leader has not sighted"

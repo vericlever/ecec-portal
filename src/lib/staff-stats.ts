@@ -13,6 +13,58 @@ export type StaffStat = {
   outstanding: number;
 };
 
+export type TeamSummary = {
+  total: number;
+  clear: number;
+  sopSigned: number;
+  sopTotal: number;
+  policyViewed: number;
+  policyTotal: number;
+  outstanding: number;
+  sopPct: number | null;
+  policyPct: number | null;
+};
+
+// Roll the per-person stats up across a set of people. "clear" is the count of
+// people with nothing outstanding and everything expected of them done.
+export function summariseTeam(
+  ids: string[],
+  stats: Map<string, StaffStat>,
+): TeamSummary {
+  const acc = {
+    total: ids.length,
+    clear: 0,
+    sopSigned: 0,
+    sopTotal: 0,
+    policyViewed: 0,
+    policyTotal: 0,
+    outstanding: 0,
+  };
+  for (const id of ids) {
+    const s = stats.get(id);
+    if (!s) continue;
+    acc.sopSigned += s.sopSigned;
+    acc.sopTotal += s.sopTotal;
+    acc.policyViewed += s.policyViewed;
+    acc.policyTotal += s.policyTotal;
+    acc.outstanding += s.outstanding;
+    const sopClear = s.sopPct === null || s.sopPct === 100;
+    const policyClear = s.policyPct === null || s.policyPct === 100;
+    if (s.outstanding === 0 && sopClear && policyClear) acc.clear += 1;
+  }
+  return {
+    ...acc,
+    sopPct:
+      acc.sopTotal > 0
+        ? Math.round((acc.sopSigned / acc.sopTotal) * 100)
+        : null,
+    policyPct:
+      acc.policyTotal > 0
+        ? Math.round((acc.policyViewed / acc.policyTotal) * 100)
+        : null,
+  };
+}
+
 // Batch version of the per-person figures shown on a staff record: SOP sign-off
 // %, policy view %, and the count of outstanding HR tasks. Computed set-based so
 // a staff list of any size is a fixed number of queries. RLS already limits
@@ -36,6 +88,9 @@ export async function staffStatsByProfile(
     { data: policyViews },
     { data: workerDetails },
     pendingSightings,
+    { data: wwccRows },
+    { data: teacherRows },
+    { data: trainingRows },
   ] = await Promise.all([
     supabase
       .from("job_role_sops")
@@ -52,7 +107,54 @@ export async function staffStatsByProfile(
     supabase.from("policy_views").select("user_id, policy_id, policy_version"),
     supabase.from("worker_details").select("profile_id, onboarding_completed_at"),
     pendingSightingsByProfile(supabase, currentProfileId),
+    supabase
+      .from("wwcc_checks")
+      .select("profile_id, expiry_date")
+      .not("expiry_date", "is", null),
+    supabase
+      .from("teacher_registrations")
+      .select("profile_id, expiry_date")
+      .not("expiry_date", "is", null),
+    supabase
+      .from("training_records")
+      .select("profile_id, training_type, other_description, expiry_date")
+      .not("expiry_date", "is", null),
   ]);
+
+  // Expired or soon-to-expire credentials per person: latest expiry of each
+  // kind (WWCC, teacher registration, each training type), counted if it is
+  // already past or falls within 60 days. Mirrors src/lib/credentials.ts.
+  const CRED_WINDOW_DAYS = 60;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const credCutoff = new Date(today);
+  credCutoff.setDate(credCutoff.getDate() + CRED_WINDOW_DAYS);
+  const latestExpiry = new Map<string, string>(); // `${profile}|${key}` -> ISO date
+  const noteExpiry = (profileId: string, key: string, expiry: string | null) => {
+    if (!expiry) return;
+    const k = `${profileId}|${key}`;
+    const cur = latestExpiry.get(k);
+    if (!cur || expiry > cur) latestExpiry.set(k, expiry);
+  };
+  for (const r of wwccRows ?? [])
+    noteExpiry(r.profile_id as string, "wwcc", r.expiry_date as string | null);
+  for (const r of teacherRows ?? [])
+    noteExpiry(r.profile_id as string, "teacher", r.expiry_date as string | null);
+  for (const r of trainingRows ?? [])
+    noteExpiry(
+      r.profile_id as string,
+      `training|${r.training_type}|${r.other_description ?? ""}`,
+      r.expiry_date as string | null,
+    );
+  const credAlertsByProfile = new Map<string, number>();
+  for (const [k, expiry] of latestExpiry) {
+    if (new Date(expiry + "T00:00:00") > credCutoff) continue;
+    const profileId = k.slice(0, k.indexOf("|"));
+    credAlertsByProfile.set(
+      profileId,
+      (credAlertsByProfile.get(profileId) ?? 0) + 1,
+    );
+  }
 
   // Only published SOPs count. A self_and_manager SOP is not "signed" until the
   // manager has countersigned too.
@@ -130,7 +232,8 @@ export async function staffStatsByProfile(
       onboardingOutstanding +
       (pendingSightings.get(p.id) ?? 0) +
       (sopTotal - sopSigned) +
-      (policyTotal - policyViewed);
+      (policyTotal - policyViewed) +
+      (credAlertsByProfile.get(p.id) ?? 0);
 
     out.set(p.id, {
       sopSigned,

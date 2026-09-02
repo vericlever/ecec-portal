@@ -41,6 +41,7 @@ export function ManageMenu({
     const items: Item[] = [];
     if (canManageStaff) {
       items.push({ href: "/admin/staff", label: "Staff" });
+      items.push({ href: "/admin/credentials", label: "Expiring credentials" });
       items.push({ href: "/admin/verification", label: "Document verification" });
     }
     if (canCountersign) {

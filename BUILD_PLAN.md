@@ -156,7 +156,7 @@ Roles are clearer now, this simplifies the sign-off requirement from earlier: Ad
 - A week with no policy changes sends no parent email at all
 
 ## Step 10: Credential tracking, director view and staff self-service
-**Status: partly done - self-service re-verification of WWCC / teacher registration done (migration 0017); director expiring-credentials view and training self-service view not started**
+**Status: done (2026-09-02). Self-service re-verification (migration 0017), staff self-service via /onboarding "Your details", director expiring-credentials view at /admin/credentials, and a manager/admin overview dashboard at /admin that is now their landing page. Email escalation deferred with the rest of the reminder engine until the VeriClever domain clears.**
 
 - Director view of what's expiring across staff at their site(s)
 - **Staff self-service**: staff can update their own WWCC details and see their own training record, not just have it managed entirely by an admin or manager. Staff-tier access here is limited to their own record, viewing and updating their own WWCC and training, not anyone else's.

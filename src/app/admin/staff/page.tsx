@@ -7,7 +7,7 @@ import {
   TIER_LABELS,
   type AccessTier,
 } from "@/lib/auth";
-import { staffStatsByProfile } from "@/lib/staff-stats";
+import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -53,30 +53,10 @@ export default async function StaffPage() {
   // Team-wide compliance roll-up for the people in view. Managers see their own
   // service, admins the whole organisation, so the summary always matches the
   // list below it.
-  const summary = rows.reduce(
-    (acc, p) => {
-      const s = stats.get(p.id);
-      if (!s) return acc;
-      acc.sopSigned += s.sopSigned;
-      acc.sopTotal += s.sopTotal;
-      acc.policyViewed += s.policyViewed;
-      acc.policyTotal += s.policyTotal;
-      acc.outstanding += s.outstanding;
-      const sopClear = s.sopPct === null || s.sopPct === 100;
-      const policyClear = s.policyPct === null || s.policyPct === 100;
-      if (s.outstanding === 0 && sopClear && policyClear) acc.clear += 1;
-      return acc;
-    },
-    { sopSigned: 0, sopTotal: 0, policyViewed: 0, policyTotal: 0, outstanding: 0, clear: 0 },
+  const summary = summariseTeam(
+    rows.map((p) => p.id),
+    stats,
   );
-  const sopPct =
-    summary.sopTotal > 0
-      ? Math.round((summary.sopSigned / summary.sopTotal) * 100)
-      : null;
-  const policyPct =
-    summary.policyTotal > 0
-      ? Math.round((summary.policyViewed / summary.policyTotal) * 100)
-      : null;
 
   const serviceName = new Map(
     (services ?? []).map((s) => [s.id as string, s.name as string]),
@@ -125,7 +105,7 @@ export default async function StaffPage() {
           />
           <SummaryBox
             label="SOPs signed"
-            value={sopPct === null ? "—" : `${sopPct}%`}
+            value={summary.sopPct === null ? "—" : `${summary.sopPct}%`}
             sub={
               summary.sopTotal > 0
                 ? `${summary.sopSigned} of ${summary.sopTotal}`
@@ -134,7 +114,7 @@ export default async function StaffPage() {
           />
           <SummaryBox
             label="Policies viewed"
-            value={policyPct === null ? "—" : `${policyPct}%`}
+            value={summary.policyPct === null ? "—" : `${summary.policyPct}%`}
             sub={
               summary.policyTotal > 0
                 ? `${summary.policyViewed} of ${summary.policyTotal}`

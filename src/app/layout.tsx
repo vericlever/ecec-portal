@@ -18,6 +18,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const profile = await getProfile();
+  const leader = Boolean(
+    profile && (isManager(profile.access_tier) || profile.hr_verifier),
+  );
 
   // Anyone with a job role is a worker who needs a Worker Register entry.
   let showOnboardingPrompt = false;
@@ -45,9 +48,20 @@ export default async function RootLayout({
           <header className="border-b border-slate-200 bg-white">
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
               <div className="flex items-center gap-4">
-                <Link href="/sops" className="text-sm font-semibold tracking-tight">
+                <Link
+                  href={leader ? "/admin" : "/sops"}
+                  className="text-sm font-semibold tracking-tight"
+                >
                   VeriClever
                 </Link>
+                {leader && (
+                  <Link
+                    href="/admin"
+                    className="text-sm text-slate-500 hover:text-slate-900"
+                  >
+                    Overview
+                  </Link>
+                )}
                 <Link
                   href="/sops"
                   className="text-sm text-slate-500 hover:text-slate-900"

@@ -23,5 +23,16 @@ export async function login(
     return { error: "That email and password did not match." };
   }
 
-  redirect("/sops");
+  // Leaders land on the overview; everyone else on their SOPs.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("access_tier, hr_verifier")
+    .maybeSingle();
+  const leader =
+    profile != null &&
+    (["manager_staff", "manager_policy", "admin"].includes(
+      profile.access_tier,
+    ) ||
+      profile.hr_verifier);
+  redirect(leader ? "/admin" : "/sops");
 }
