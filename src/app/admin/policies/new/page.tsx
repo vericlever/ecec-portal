@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { requireContentEditor } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { policyCategories } from "@/lib/policy-categories";
 import { NewPolicyForm } from "./form";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewPolicyPage() {
   await requireContentEditor();
+  const categories = await policyCategories(createClient());
   return (
     <div className="max-w-2xl">
       <Link
@@ -19,7 +22,7 @@ export default async function NewPolicyPage() {
         Create the policy, then upload its document or paste the text on the next
         screen. To bring in several at once, use bulk upload.
       </p>
-      <NewPolicyForm />
+      <NewPolicyForm categories={categories} />
     </div>
   );
 }

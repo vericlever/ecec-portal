@@ -298,6 +298,10 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 - Screening declarations record the question wording and the date, so a later change to the wording does not rewrite what someone previously answered
 - Two referees with a completed-check date show on the staff record for Admin and HR manager only
 
+### Policy categories (added 2026-09-03, done)
+
+Policies are organised into a per-organisation set of categories, seeded with Parent policies, General policies, HR policies, Manual handling and Other. Many-to-many, a policy can be in more than one. The "Parent policies" category carries the parent-notification meaning, and a trigger keeps `policies.is_parent_facing` in step, so it replaces the standalone parent-facing checkbox. Categories are for organising the library and for linking policies to SOPs, they do not control who sees a policy. The category picker appears on the new-policy form, the bulk upload (applied to newly created policies), and the policy editor. Both the admin policy list and the staff Policies view are grouped by category. Migration `0031`.
+
 ## Explicitly deferred, do not build ahead of schedule
 
 - Comprehension check questions (parked, schema-ready placeholder only)

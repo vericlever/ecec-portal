@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { policyCategories } from "@/lib/policy-categories";
 import { PolicyEditor } from "./policy-editor";
 
 export const dynamic = "force-dynamic";
@@ -23,16 +24,25 @@ export default async function PolicyDetailPage({
 
   if (!policy || policy.organisation_id !== me.organisation_id) notFound();
 
-  const [{ data: sourceDoc }, { data: links }] = await Promise.all([
-    policy.source_document_id
-      ? supabase
-          .from("documents")
-          .select("id, file_name, byte_size, extraction_note, created_at")
-          .eq("id", policy.source_document_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase.from("policy_sop_links").select("sop_id").eq("policy_id", params.id),
-  ]);
+  const [{ data: sourceDoc }, { data: links }, { data: catLinks }, categories] =
+    await Promise.all([
+      policy.source_document_id
+        ? supabase
+            .from("documents")
+            .select("id, file_name, byte_size, extraction_note, created_at")
+            .eq("id", policy.source_document_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("policy_sop_links")
+        .select("sop_id")
+        .eq("policy_id", params.id),
+      supabase
+        .from("policy_category_links")
+        .select("category_id")
+        .eq("policy_id", params.id),
+      policyCategories(supabase),
+    ]);
 
   const linkedSopIds = new Set((links ?? []).map((l) => l.sop_id));
   const sopName = new Map((allSops ?? []).map((s) => [s.id, s.name]));
@@ -50,15 +60,17 @@ export default async function PolicyDetailPage({
         policy={{
           id: policy.id,
           name: policy.name,
-          document_type: policy.document_type,
           is_parent_facing: policy.is_parent_facing,
           service_id: policy.service_id,
-          program: policy.program ?? "",
           body: policy.body ?? "",
           published_body: policy.published_body ?? "",
           published_version: policy.published_version,
           published_at: policy.published_at,
         }}
+        categories={categories}
+        linkedCategoryIds={
+          (catLinks ?? []).map((l) => l.category_id as string)
+        }
         services={(services ?? []) as { id: string; name: string }[]}
         sourceDoc={
           sourceDoc

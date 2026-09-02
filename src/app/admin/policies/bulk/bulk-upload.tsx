@@ -2,19 +2,33 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import type { PolicyCategory } from "@/lib/policy-categories";
 import { bulkImportPolicies, type BulkOutcome } from "../actions";
 
-export function BulkUpload() {
+export function BulkUpload({
+  categories,
+}: {
+  categories: PolicyCategory[];
+}) {
   const [files, setFiles] = useState<File[]>([]);
+  const [categoryIds, setCategoryIds] = useState<string[]>(
+    categories.filter((c) => c.slug === "general").map((c) => c.id),
+  );
   const [outcomes, setOutcomes] = useState<BulkOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const toggle = (id: string) =>
+    setCategoryIds((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+    );
+
   function run() {
     if (files.length === 0) return;
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
+    for (const id of categoryIds) fd.append("categoryIds", id);
     start(async () => {
       setError(null);
       const r = await bulkImportPolicies(fd);
@@ -48,6 +62,25 @@ export function BulkUpload() {
             {files.length} file{files.length === 1 ? "" : "s"} selected
           </p>
         )}
+
+        <fieldset className="mt-3 text-sm">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Categories for the new policies
+          </span>
+          <div className="mt-1 space-y-1">
+            {categories.map((c) => (
+              <label key={c.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={categoryIds.includes(c.id)}
+                  onChange={() => toggle(c.id)}
+                />
+                <span>{c.name}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         <button
           type="button"
           disabled={files.length === 0 || pending}

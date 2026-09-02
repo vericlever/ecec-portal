@@ -2,10 +2,12 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { PolicyCategory } from "@/lib/policy-categories";
 import {
   deletePolicy,
   linkSop,
   publishPolicy,
+  setPolicyCategory,
   unlinkSop,
   unpublishPolicy,
   updatePolicyBody,
@@ -13,20 +15,11 @@ import {
   uploadPolicyDocument,
 } from "../actions";
 
-const DOC_TYPES = [
-  { value: "policy", label: "Policy" },
-  { value: "procedure", label: "Procedure" },
-  { value: "handbook", label: "Handbook" },
-  { value: "disaster_plan", label: "Disaster plan" },
-];
-
 type Policy = {
   id: string;
   name: string;
-  document_type: string;
   is_parent_facing: boolean;
   service_id: string | null;
-  program: string;
   body: string;
   published_body: string;
   published_version: number | null;
@@ -35,12 +28,16 @@ type Policy = {
 
 export function PolicyEditor({
   policy,
+  categories,
+  linkedCategoryIds,
   services,
   sourceDoc,
   allSops,
   linkedSops,
 }: {
   policy: Policy;
+  categories: PolicyCategory[];
+  linkedCategoryIds: string[];
   services: { id: string; name: string }[];
   sourceDoc: {
     id: string;
@@ -57,14 +54,12 @@ export function PolicyEditor({
   const [err, setErr] = useState<string | null>(null);
 
   const [name, setName] = useState(policy.name);
-  const [documentType, setDocumentType] = useState(policy.document_type);
-  const [parentFacing, setParentFacing] = useState(policy.is_parent_facing);
   const [serviceId, setServiceId] = useState(policy.service_id ?? "");
-  const [program, setProgram] = useState(policy.program);
   const [body, setBody] = useState(policy.body);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [sopToAdd, setSopToAdd] = useState("");
+  const linkedCategories = new Set(linkedCategoryIds);
 
   const published = policy.published_version != null;
   const dirty = body !== policy.published_body;
@@ -144,56 +139,20 @@ export function PolicyEditor({
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Type</span>
-              <select
-                value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                {DOC_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Site</span>
-              <select
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="">All sites</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} only
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={parentFacing}
-              onChange={(e) => setParentFacing(e.target.checked)}
-            />
-            <span className="text-slate-700">
-              Parent-facing (carries a parent-notification obligation)
-            </span>
-          </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">
-              Program <span className="font-normal text-slate-400">(optional)</span>
-            </span>
-            <input
-              value={program}
-              onChange={(e) => setProgram(e.target.value)}
+            <span className="font-medium text-slate-700">Site</span>
+            <select
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
+            >
+              <option value="">All sites</option>
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} only
+                </option>
+              ))}
+            </select>
           </label>
           <button
             type="button"
@@ -203,10 +162,7 @@ export function PolicyEditor({
                 () =>
                   updatePolicyMeta(policy.id, {
                     name,
-                    documentType,
-                    isParentFacing: parentFacing,
                     serviceId: serviceId || null,
-                    program,
                   }),
                 "Details saved",
               )
@@ -216,6 +172,48 @@ export function PolicyEditor({
             Save details
           </button>
         </div>
+      </section>
+
+      {/* Categories */}
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Categories
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">
+          How this policy is filed in the library, and used when linking it to
+          SOPs. A policy can be in more than one.
+        </p>
+        <div className="mt-2 space-y-1.5">
+          {categories.map((c) => (
+            <label key={c.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={linkedCategories.has(c.id)}
+                disabled={pending}
+                onChange={(e) =>
+                  act(
+                    () => setPolicyCategory(policy.id, c.id, e.target.checked),
+                    e.target.checked ? "Added to category" : "Removed",
+                  )
+                }
+              />
+              <span>
+                {c.name}
+                {c.is_parent_facing && (
+                  <span className="ml-1 text-xs text-purple-700">
+                    (parents can view these)
+                  </span>
+                )}
+              </span>
+            </label>
+          ))}
+        </div>
+        {policy.is_parent_facing && (
+          <p className="mt-2 text-xs text-purple-700">
+            This policy is parent-facing, so a finalised version triggers a Reg
+            172 parent notification.
+          </p>
+        )}
       </section>
 
       {/* Document */}

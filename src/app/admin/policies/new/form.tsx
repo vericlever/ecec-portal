@@ -2,22 +2,27 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { PolicyCategory } from "@/lib/policy-categories";
 import { createPolicy } from "../actions";
 
-const DOC_TYPES = [
-  { value: "policy", label: "Policy" },
-  { value: "procedure", label: "Procedure" },
-  { value: "handbook", label: "Handbook" },
-  { value: "disaster_plan", label: "Disaster plan" },
-];
-
-export function NewPolicyForm() {
+export function NewPolicyForm({
+  categories,
+}: {
+  categories: PolicyCategory[];
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [documentType, setDocumentType] = useState("policy");
   const [body, setBody] = useState("");
+  const [categoryIds, setCategoryIds] = useState<string[]>(
+    categories.filter((c) => c.slug === "general").map((c) => c.id),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  const toggle = (id: string) =>
+    setCategoryIds((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+    );
 
   return (
     <form
@@ -26,7 +31,7 @@ export function NewPolicyForm() {
         e.preventDefault();
         start(async () => {
           setError(null);
-          const r = await createPolicy({ name, body, documentType });
+          const r = await createPolicy({ name, body, categoryIds });
           if (r.ok && r.id) router.push(`/admin/policies/${r.id}`);
           else if (!r.ok) setError(r.error);
         });
@@ -42,20 +47,28 @@ export function NewPolicyForm() {
         />
       </label>
 
-      <label className="block text-sm">
-        <span className="font-medium text-slate-700">Type</span>
-        <select
-          value={documentType}
-          onChange={(e) => setDocumentType(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          {DOC_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
+      <fieldset className="text-sm">
+        <span className="font-medium text-slate-700">Categories</span>
+        <div className="mt-1 space-y-1">
+          {categories.map((c) => (
+            <label key={c.id} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={categoryIds.includes(c.id)}
+                onChange={() => toggle(c.id)}
+              />
+              <span>
+                {c.name}
+                {c.is_parent_facing && (
+                  <span className="ml-1 text-xs text-purple-700">
+                    (parents can view these)
+                  </span>
+                )}
+              </span>
+            </label>
           ))}
-        </select>
-      </label>
+        </div>
+      </fieldset>
 
       <label className="block text-sm">
         <span className="font-medium text-slate-700">

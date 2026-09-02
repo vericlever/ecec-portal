@@ -8,7 +8,61 @@ import { storeDocument, deleteDocument } from "@/lib/documents/store";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
-const DOC_TYPES = ["policy", "procedure", "handbook", "disaster_plan"];
+// Attach a policy to the given categories (ids validated against the org).
+// When replace is true, any category not in the list is removed. Falls back to
+// the "general" category when nothing valid is given and the policy has none.
+async function applyCategories(
+  admin: ReturnType<typeof createAdminClient>,
+  org: string,
+  policyId: string,
+  categoryIds: string[],
+  opts: { replace: boolean },
+) {
+  const { data: cats } = await admin
+    .from("policy_categories")
+    .select("id, slug")
+    .eq("organisation_id", org);
+  const valid = new Set((cats ?? []).map((c) => c.id as string));
+  let wanted = categoryIds.filter((id) => valid.has(id));
+
+  if (wanted.length === 0) {
+    const { data: existing } = await admin
+      .from("policy_category_links")
+      .select("category_id")
+      .eq("policy_id", policyId);
+    if ((existing ?? []).length === 0) {
+      const general = (cats ?? []).find((c) => c.slug === "general");
+      if (general) wanted = [general.id as string];
+    }
+  }
+
+  const { data: current } = await admin
+    .from("policy_category_links")
+    .select("category_id")
+    .eq("policy_id", policyId);
+  const have = new Set((current ?? []).map((r) => r.category_id as string));
+
+  const toAdd = wanted.filter((id) => !have.has(id));
+  if (toAdd.length) {
+    await admin.from("policy_category_links").insert(
+      toAdd.map((id) => ({
+        organisation_id: org,
+        policy_id: policyId,
+        category_id: id,
+      })),
+    );
+  }
+  if (opts.replace) {
+    const toRemove = [...have].filter((id) => !wanted.includes(id));
+    for (const id of toRemove) {
+      await admin
+        .from("policy_category_links")
+        .delete()
+        .eq("policy_id", policyId)
+        .eq("category_id", id);
+    }
+  }
+}
 
 async function ownedPolicy(id: string) {
   const me = await requireContentEditor();
@@ -25,7 +79,7 @@ async function ownedPolicy(id: string) {
 export async function createPolicy(input: {
   name: string;
   body: string;
-  documentType: string;
+  categoryIds: string[];
 }): Promise<Result> {
   const me = await requireContentEditor();
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
@@ -39,9 +93,6 @@ export async function createPolicy(input: {
       organisation_id: me.organisation_id,
       name,
       status: "in_library",
-      document_type: DOC_TYPES.includes(input.documentType)
-        ? input.documentType
-        : "policy",
       body: input.body.trim() || null,
       updated_by: me.id,
     })
@@ -56,18 +107,48 @@ export async function createPolicy(input: {
         : error.message,
     };
   }
+  await applyCategories(admin, me.organisation_id, data.id, input.categoryIds, {
+    replace: false,
+  });
   revalidatePath("/admin/policies");
   return { ok: true, id: data.id };
+}
+
+export async function setPolicyCategory(
+  policyId: string,
+  categoryId: string,
+  attach: boolean,
+): Promise<Result> {
+  const owned = await ownedPolicy(policyId);
+  if (!owned) return { ok: false, error: "Policy not found." };
+  const admin = createAdminClient();
+
+  if (attach) {
+    await applyCategories(
+      admin,
+      owned.policy.organisation_id,
+      policyId,
+      [categoryId],
+      { replace: false },
+    );
+  } else {
+    await admin
+      .from("policy_category_links")
+      .delete()
+      .eq("policy_id", policyId)
+      .eq("category_id", categoryId);
+  }
+  revalidatePath("/admin/policies");
+  revalidatePath(`/admin/policies/${policyId}`);
+  revalidatePath("/policies");
+  return { ok: true };
 }
 
 export async function updatePolicyMeta(
   id: string,
   input: {
     name: string;
-    documentType: string;
-    isParentFacing: boolean;
     serviceId: string | null;
-    program: string;
   },
 ): Promise<Result> {
   const owned = await ownedPolicy(id);
@@ -80,12 +161,7 @@ export async function updatePolicyMeta(
     .from("policies")
     .update({
       name,
-      document_type: DOC_TYPES.includes(input.documentType)
-        ? input.documentType
-        : "policy",
-      is_parent_facing: input.isParentFacing,
       service_id: input.serviceId,
-      program: input.program.trim() || null,
       updated_by: owned.me.id,
     })
     .eq("id", id);
@@ -295,6 +371,13 @@ export async function bulkImportPolicies(
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
   if (files.length === 0) return { ok: false, error: "No files." };
 
+  // Categories chosen for this batch, applied only to policies this upload
+  // creates, never to ones that matched an existing entry.
+  const categoryIds = formData
+    .getAll("categoryIds")
+    .map((v) => String(v))
+    .filter(Boolean);
+
   const admin = createAdminClient();
   const outcomes: BulkOutcome[] = [];
 
@@ -320,7 +403,6 @@ export async function bulkImportPolicies(
             organisation_id: me.organisation_id,
             name: policyName,
             status: "in_library",
-            document_type: "policy",
             updated_by: me.id,
           })
           .select("id")
@@ -335,6 +417,13 @@ export async function bulkImportPolicies(
           continue;
         }
         policyId = created.id;
+        await applyCategories(
+          admin,
+          me.organisation_id,
+          policyId,
+          categoryIds,
+          { replace: false },
+        );
       }
 
       const bytes = new Uint8Array(await file.arrayBuffer());
