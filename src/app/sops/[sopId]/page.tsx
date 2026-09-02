@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const SIGNOFF_LABELS: Record<string, string> = {
   self: "Self sign-off",
-  supervisor: "Supervisor verified",
+  self_and_manager: "Staff and manager sign-off",
 };
 
 function formatDate(iso: string) {
