@@ -10,6 +10,7 @@ import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
 import { pendingSightingsByProfile } from "@/lib/verification";
 import { expiringCredentials } from "@/lib/credentials";
 import { contractAlerts } from "@/lib/contracts";
+import { unsignedAgreementsByProfile } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,24 @@ export default async function DashboardPage() {
     contractAlerts(supabase),
   ]);
 
+  const { data: unsignedContracts } = await supabase
+    .from("contracts")
+    .select("profile_id")
+    .is("superseded_at", null)
+    .is("signed_at", null);
+
   const activeStaff = (staff ?? []).filter((p) => p.is_active);
+  const unsignedAgreements = await unsignedAgreementsByProfile(
+    supabase,
+    activeStaff,
+  );
+  const activeIds = new Set(activeStaff.map((p) => p.id));
+  const signaturePeople = new Set<string>();
+  for (const c of unsignedContracts ?? [])
+    if (activeIds.has(c.profile_id as string))
+      signaturePeople.add(c.profile_id as string);
+  for (const [id, n] of unsignedAgreements) if (n > 0) signaturePeople.add(id);
+
   const stats = await staffStatsByProfile(supabase, activeStaff, me.id);
   const summary = summariseTeam(
     activeStaff.map((p) => p.id),
@@ -114,6 +132,16 @@ export default async function DashboardPage() {
           ? `${contractExpired} already expired`
           : "within the next 4 weeks",
       alert: contractExpired > 0,
+    },
+    {
+      show: true,
+      href: "/admin/agreements",
+      label: "Staff with an agreement or contract to sign",
+      count: signaturePeople.size,
+      detail:
+        signaturePeople.size === 0
+          ? "Everyone has signed"
+          : "agreements or contract acceptance outstanding",
     },
     {
       show: true,

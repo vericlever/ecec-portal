@@ -229,6 +229,37 @@ export async function uploadContract(
   return { ok: true };
 }
 
+// A staff member reads and accepts their own active contract. Verified in code
+// (the staff member is not in contracts_write RLS) then written with the admin
+// client, recording their name and the time.
+export async function signOwnContract(contractId: string): Promise<Result> {
+  const me = await getProfile();
+  if (!me) return { ok: false, error: "Sign in." };
+  const admin = createAdminClient();
+  const { data: contract } = await admin
+    .from("contracts")
+    .select("id, profile_id, superseded_at, signed_at")
+    .eq("id", contractId)
+    .maybeSingle();
+  if (!contract || contract.profile_id !== me.id) {
+    return { ok: false, error: "Contract not found." };
+  }
+  if (contract.superseded_at) {
+    return { ok: false, error: "This contract has been replaced." };
+  }
+  if (contract.signed_at) return { ok: true };
+
+  const { error } = await admin
+    .from("contracts")
+    .update({ signed_at: new Date().toISOString(), signed_name: me.full_name })
+    .eq("id", contractId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/onboarding");
+  revalidatePath("/admin/staff", "layout");
+  return { ok: true };
+}
+
 export async function deleteContract(contractId: string): Promise<Result> {
   const me = await getProfile();
   if (!me || !isHrManager(me)) {

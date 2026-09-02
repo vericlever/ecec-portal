@@ -269,6 +269,7 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 - Photo ID uploaded by a staff member creates a sighting task for managers at their service
 
 ### Step 17: Agreements and the sign mechanism
+**Status: done (2026-09-02), on branch step-17-agreements.**
 
 - A generic agreement-template concept at organisation level: a named agreement with a body and a published version, the same publish and versioning as SOPs. Seed types: Code of Conduct, Confidentiality Agreement, Uniform Receipt Declaration, Individual Flexibility Agreement, Training Agreement (trainees), plus plain attestations that carry no document (WWCC currency acknowledgement, background and reference check consent, mandatory reporting obligations acknowledgement).
 - One signature row per staff member per agreement version, timestamped, recording the person and the version. Re-publishing an agreement makes prior signatures stale, same as SOPs.

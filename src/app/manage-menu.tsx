@@ -56,6 +56,7 @@ export function ManageMenu({
       items: [
         { href: "/admin/policies", label: "Policies" },
         { href: "/admin/sops", label: "SOPs" },
+        { href: "/admin/agreements", label: "Agreements" },
         { href: "/admin/job-roles", label: "Job roles" },
       ],
     });

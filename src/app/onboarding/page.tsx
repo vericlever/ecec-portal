@@ -7,6 +7,8 @@ import {
   IdentityPanel,
   type IdentityDoc,
 } from "@/app/admin/staff/[profileId]/identity-panel";
+import { ContractPanel } from "@/app/admin/staff/[profileId]/contract-panel";
+import type { ContractRow } from "@/lib/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -74,18 +76,17 @@ export default async function OnboardingPage() {
     supabase
       .from("contracts")
       .select(
-        "id, period_type, start_date, duration_months, expiry_date, document_id, superseded_at",
+        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, created_at",
       )
       .eq("profile_id", profile.id)
-      .is("superseded_at", null)
-      .limit(1),
+      .order("created_at", { ascending: false }),
     supabase
       .from("identity_documents")
       .select("id, kind, label, document_id, sighted_at, sighted_by")
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false }),
   ]);
-  const myContract = (contractRows ?? [])[0] ?? null;
+  const contracts = (contractRows ?? []) as ContractRow[];
   const identityDocs = (identityRows ?? []) as IdentityDoc[];
 
   const initial: OnboardingPayload = {
@@ -194,49 +195,17 @@ export default async function OnboardingPage() {
         />
       </section>
 
-      {myContract && (
+      {contracts.some((c) => !c.superseded_at) && (
         <section className="mt-8">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Your contract
           </h2>
-          <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4 text-sm">
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-0.5">
-              <dt className="text-slate-500">Type</dt>
-              <dd className="text-slate-800">
-                {myContract.period_type === "fixed"
-                  ? "Fixed period"
-                  : "No fixed period"}
-              </dd>
-              <dt className="text-slate-500">Start date</dt>
-              <dd className="text-slate-800">
-                {myContract.start_date
-                  ? new Date(
-                      myContract.start_date + "T00:00:00",
-                    ).toLocaleDateString("en-AU", { dateStyle: "medium" })
-                  : "—"}
-              </dd>
-              {myContract.period_type === "fixed" && (
-                <>
-                  <dt className="text-slate-500">Expiry</dt>
-                  <dd className="text-slate-800">
-                    {myContract.expiry_date
-                      ? new Date(
-                          myContract.expiry_date + "T00:00:00",
-                        ).toLocaleDateString("en-AU", { dateStyle: "medium" })
-                      : "—"}
-                  </dd>
-                </>
-              )}
-            </dl>
-            {myContract.document_id && (
-              <a
-                href={`/api/documents/${myContract.document_id}`}
-                className="mt-2 inline-block text-slate-700 underline hover:text-slate-900"
-              >
-                Download your contract
-              </a>
-            )}
-          </div>
+          <ContractPanel
+            profileId={profile.id}
+            contracts={contracts}
+            canManage={false}
+            canSign
+          />
         </section>
       )}
     </div>

@@ -75,12 +75,20 @@ export default async function RootLayout({
                   Policies
                 </Link>
                 {profile.job_role_id && (
-                  <Link
-                    href="/onboarding"
-                    className="text-sm text-slate-500 hover:text-slate-900"
-                  >
-                    My details
-                  </Link>
+                  <>
+                    <Link
+                      href="/agreements"
+                      className="text-sm text-slate-500 hover:text-slate-900"
+                    >
+                      Agreements
+                    </Link>
+                    <Link
+                      href="/onboarding"
+                      className="text-sm text-slate-500 hover:text-slate-900"
+                    >
+                      My details
+                    </Link>
+                  </>
                 )}
                 {(isManager(profile.access_tier) ||
                   profile.hr_manager ||

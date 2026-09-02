@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
+import { unsignedAgreementsByProfile } from "@/lib/agreements";
 
 type ServerClient = ReturnType<typeof createClient>;
 
@@ -92,6 +93,7 @@ export async function staffStatsByProfile(
     { data: teacherRows },
     { data: trainingRows },
     { data: contractRows },
+    unsignedAgreements,
   ] = await Promise.all([
     supabase
       .from("job_role_sops")
@@ -124,9 +126,9 @@ export async function staffStatsByProfile(
       .not("expiry_date", "is", null),
     supabase
       .from("contracts")
-      .select("profile_id, expiry_date")
-      .is("superseded_at", null)
-      .eq("period_type", "fixed"),
+      .select("profile_id, expiry_date, period_type, signed_at")
+      .is("superseded_at", null),
+    unsignedAgreementsByProfile(supabase, people),
   ]);
 
   // Expired or soon-to-expire credentials per person: latest expiry of each
@@ -166,17 +168,26 @@ export async function staffStatsByProfile(
     );
   }
 
-  // Active fixed-period contracts within four weeks of expiry, or already
-  // expired. Mirrors renewalState() in src/lib/contracts.ts.
-  const contractDueByProfile = new Set<string>();
+  // Contract-related outstanding items per person: a fixed contract within four
+  // weeks of expiry or already expired (mirrors renewalState() in
+  // src/lib/contracts.ts), plus an active contract the staff member has not
+  // signed.
+  const contractItemsByProfile = new Map<string, number>();
+  const bump = (id: string) =>
+    contractItemsByProfile.set(id, (contractItemsByProfile.get(id) ?? 0) + 1);
   const contractCutoff = new Date(today);
   contractCutoff.setDate(contractCutoff.getDate() + 28);
   for (const c of contractRows ?? []) {
+    const pid = c.profile_id as string;
     const expiry = c.expiry_date as string | null;
-    if (!expiry) continue;
-    if (new Date(expiry + "T00:00:00") <= contractCutoff) {
-      contractDueByProfile.add(c.profile_id as string);
+    if (
+      c.period_type === "fixed" &&
+      expiry &&
+      new Date(expiry + "T00:00:00") <= contractCutoff
+    ) {
+      bump(pid);
     }
+    if (!c.signed_at) bump(pid);
   }
 
   // Only published SOPs count. A self_and_manager SOP is not "signed" until the
@@ -257,7 +268,8 @@ export async function staffStatsByProfile(
       (sopTotal - sopSigned) +
       (policyTotal - policyViewed) +
       (credAlertsByProfile.get(p.id) ?? 0) +
-      (contractDueByProfile.has(p.id) ? 1 : 0);
+      (contractItemsByProfile.get(p.id) ?? 0) +
+      (unsignedAgreements.get(p.id) ?? 0);
 
     out.set(p.id, {
       sopSigned,

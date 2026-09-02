@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ContractRow } from "@/lib/contracts";
 import { renewalState } from "@/lib/contracts";
-import { uploadContract, deleteContract } from "./actions";
+import { uploadContract, deleteContract, signOwnContract } from "./actions";
 
 function fmtDate(v: string | null) {
   if (!v) return "—";
@@ -31,10 +31,13 @@ export function ContractPanel({
   profileId,
   contracts,
   canManage,
+  canSign = false,
 }: {
   profileId: string;
   contracts: ContractRow[];
   canManage: boolean;
+  // The contract owner viewing their own record (the onboarding page) can sign.
+  canSign?: boolean;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -65,6 +68,15 @@ export function ContractPanel({
     start(async () => {
       setError(null);
       const r = await deleteContract(id);
+      if (r.ok) router.refresh();
+      else setError(r.error);
+    });
+  };
+
+  const onSign = (id: string) => {
+    start(async () => {
+      setError(null);
+      const r = await signOwnContract(id);
       if (r.ok) router.refresh();
       else setError(r.error);
     });
@@ -101,7 +113,34 @@ export function ContractPanel({
                 <dd className="text-slate-800">{active.notes}</dd>
               </>
             )}
+            <dt className="text-slate-500">Signed by staff member</dt>
+            <dd className="text-slate-800">
+              {active.signed_at
+                ? `${active.signed_name ?? "Yes"} · ${fmtDate(active.signed_at.slice(0, 10))}`
+                : "Not signed yet"}
+            </dd>
           </dl>
+
+          {canSign && !active.signed_at && (
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+              <p className="text-amber-900">
+                Please read your contract and accept it.
+              </p>
+              <label className="mt-2 flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  onChange={(e) => {
+                    if (e.target.checked) onSign(active.id);
+                  }}
+                  disabled={pending}
+                  className="mt-0.5"
+                />
+                <span className="text-amber-900">
+                  I have read this contract and I accept it.
+                </span>
+              </label>
+            </div>
+          )}
           <div className="mt-2 flex items-center gap-3 text-sm">
             {active.document_id ? (
               <a

@@ -20,6 +20,7 @@ import {
   activeContract,
   renewalState,
 } from "@/lib/contracts";
+import { agreementsForProfile } from "@/lib/agreements";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export default async function StaffRecordPage({
     supabase
       .from("contracts")
       .select(
-        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, created_at",
+        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, created_at",
       )
       .eq("profile_id", params.profileId)
       .order("created_at", { ascending: false }),
@@ -95,6 +96,14 @@ export default async function StaffRecordPage({
   const contracts = (contractRows ?? []) as ContractRow[];
   const contract = activeContract(contracts);
   const contractRenewal = renewalState(contract);
+
+  const agreements = await agreementsForProfile(supabase, {
+    id: person.id,
+    job_role_id: person.job_role_id,
+  });
+  const unsignedAgreements = agreements
+    .filter((a) => !a.signed)
+    .map((a) => a.name);
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const jobRoleName = new Map((jobRoles ?? []).map((r) => [r.id, r.name]));
   const hrManager = isHrManager(me);
@@ -327,6 +336,9 @@ export default async function StaffRecordPage({
       `Contract expires ${fmtDate(contract?.expiry_date)} (${contractRenewal.daysLeft} days) — due for renewal`,
     );
   }
+  if (contract && !contract.signed_at) {
+    contractItems.push("Contract not signed by the staff member");
+  }
 
   const outstandingCount =
     (onboardingOutstanding ? 1 : 0) +
@@ -335,7 +347,8 @@ export default async function StaffRecordPage({
     unviewedPolicies.length +
     unsightedDocs.length +
     credentialItems.length +
-    contractItems.length;
+    contractItems.length +
+    unsignedAgreements.length;
 
   return (
     <div>
@@ -439,6 +452,10 @@ export default async function StaffRecordPage({
                 items={credentialItems}
               />
               <OutstandingGroup title="Contract" items={contractItems} />
+              <OutstandingGroup
+                title="Agreements not signed"
+                items={unsignedAgreements}
+              />
               <OutstandingGroup
                 title="Documents a leader has not sighted"
                 items={unsightedDocs.map((d) =>
