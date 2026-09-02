@@ -238,6 +238,63 @@ Depends on Step 6's policy-SOP linking already existing, since this surfaces tho
 - The linked policy opens in view-only mode, regardless of which access tier the staff member holds
 - An SOP with no linked policy simply shows no link, rather than an error or empty state that looks broken
 
+## HR record expansion (Steps 16 to 18)
+
+Added 2 September after reviewing RSG's live onboarding survey against the build. Supersedes the assumption that onboarding was complete at Step 5. The current survey captures next of kin, superannuation, a Tax File Number declaration, banking, work eligibility with visa detail, uniform sizes, roster availability, pre-employment screening declarations, several acknowledgements and two referees, none of which the portal holds yet. These steps close that gap so onboarding produces every record the HR view needs.
+
+Not a new module. The manager side is the existing staff record page, the staff side is the existing `/onboarding` wizard. Both are reorganised into named sections (Personal and contact, Emergency contact, Position and availability, Working rights, Credentials, Payroll, Screening, Agreements, Referees, Other) as these steps land. The cross-staff action queues (`/admin/verification`, `/admin/credentials`, `/admin/contracts`) stay as they are and get grouped under an HR heading in the Manage menu.
+
+Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate this data too.
+
+**Access model.** The `profiles.hr_verifier` flag is renamed `hr_manager` and its scope widens: document verification (as now), contract upload and replace, and visibility of the Payroll and Screening sections. Set per person by an admin, same mechanism as before.
+
+- Standard HR (Personal, Emergency contact, Position and availability, Working rights, Credentials, Agreements, Referees): Admin, both manager tiers, and the staff member for their own record
+- Payroll (Tax File Number declaration, superannuation, banking): Admin and `hr_manager` only, plus the staff member for their own. Not the manager tiers.
+- Screening (child protection and criminal history declarations): Admin and `hr_manager` only, plus the staff member for their own
+- Contract upload and replace: Admin and `hr_manager` only. Manager (policy) keeps view and download but loses upload, changed from Step 11 as built.
+
+### Step 16: HR access model and identity, working rights, and the rest of the personal record
+
+- Rename `profiles.hr_verifier` to `hr_manager` across the schema, RLS helpers and the UI. Tighten the `contracts` write policy to Admin plus `hr_manager` (this lands on the Step 11 branch before it merges).
+- Add to `worker_details`: gender, next of kin name, relationship, address and phone, uniform sizes (hoodie, polo, vest), roster availability (days available, ideal weekly hours, availability notes). Roster availability is captured once and drives no flags or reminders, it is scheduling context not compliance data. Job title is not captured from the staff, it is set by a manager through the existing position and SOP job role fields.
+- Working rights: work eligibility (Australian citizen, permanent resident, or visa), visa number, visa expiry, and an optional supporting document upload. Visa expiry feeds the same expiring and expired flags as WWCC and the contract, through the Step 10 credentials view and the outstanding-items surface. No passport tracking.
+- Photo ID: a single upload that a manager sights, same pattern as the onboarding documents. No expiry.
+- The `/onboarding` wizard gains the new steps. The staff record page and `/onboarding` both move to the sectioned layout.
+
+**Done when**
+- An admin can rename-safe: every existing HR verifier still verifies, and the renamed flag now also gates contracts and the sensitive sections
+- A staff member can enter their gender, next of kin, uniform sizes, availability, work eligibility and visa detail during onboarding, and see them on their own details page
+- A visa with an expiry inside 60 days or already passed shows on `/admin/credentials`, the dashboard and the person's outstanding items, exactly as a WWCC does
+- Photo ID uploaded by a staff member creates a sighting task for managers at their service
+
+### Step 17: Agreements and the sign mechanism
+
+- A generic agreement-template concept at organisation level: a named agreement with a body and a published version, the same publish and versioning as SOPs. Seed types: Code of Conduct, Confidentiality Agreement, Uniform Receipt Declaration, Individual Flexibility Agreement, Training Agreement (trainees), plus plain attestations that carry no document (WWCC currency acknowledgement, background and reference check consent, mandatory reporting obligations acknowledgement).
+- One signature row per staff member per agreement version, timestamped, recording the person and the version. Re-publishing an agreement makes prior signatures stale, same as SOPs.
+- The Child Safety Policy and Code of Conduct acknowledgement links to the actual policy in the library, the staff member opens it and signs.
+- Move the contract onto this mechanism so a staff member reads and signs it in the tool. The contract keeps its start date, period type and calculated expiry from Step 11. Signing is a read-and-accept record against the contract version, the same evidentiary standard as an SOP sign-off, not a witnessed e-signature. DocuSign-grade signing stays out of scope.
+- Unsigned agreements appear in the person's outstanding items, the staff list and dashboard counts, and a manager queue.
+
+**Done when**
+- A staff member sees each agreement they need to sign, opens it, and signs, and the signature is recorded against that version with a timestamp
+- Re-publishing an agreement moves everyone who signed the old version back to unsigned
+- A staff member can read and sign their own contract in the tool, and the signed state and signing date show on the staff record
+- An unsigned agreement counts as an outstanding item on the staff list, the dashboard and the person's record
+
+### Step 18: Payroll and screening
+
+- Tax File Number declaration built as the ATO form: TFN, whether they claim the tax free threshold, HELP or SSL or TSL debt, Financial Supplement debt. Superannuation fund and member number. Banking BSB and account number, with the account name defaulting to the person's name.
+- Screening declarations: child protection investigation, finding or disciplinary history, and criminal charges, convictions or findings relating to children or under-18s. Yes or no with a detail field, recorded against the question wording and the date answered.
+- Referees: two referee records, each with name, organisation, job title, relationship, phone and email, plus a reference-check completed date and by whom, since the check itself may happen outside the portal.
+- Payroll and screening sections are visible only to Admin and `hr_manager`, and to the staff member for their own record. Referees are visible to Admin and `hr_manager`. RLS enforced, not just hidden in the UI.
+- These sections are added to `/onboarding` and to the staff record, shown only to those who may see them.
+
+**Done when**
+- A staff member completes their Tax File Number declaration, superannuation and banking details in onboarding, and a Manager (staff) viewing that person's record cannot see any of it
+- An admin and a designated HR manager can see the payroll and screening sections, no one else can, confirmed against real logins
+- Screening declarations record the question wording and the date, so a later change to the wording does not rewrite what someone previously answered
+- Two referees with a completed-check date show on the staff record for Admin and HR manager only
+
 ## Explicitly deferred, do not build ahead of schedule
 
 - Comprehension check questions (parked, schema-ready placeholder only)
