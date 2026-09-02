@@ -119,9 +119,18 @@ export async function staffStatsByProfile(
       viewed.has(`${pol.id}:${pol.published_version}`),
     ).length;
 
+    // Everything still expected of this person: onboarding questionnaire,
+    // documents a leader has not sighted, SOPs not fully signed (a
+    // self_and_manager SOP counts until the manager countersigns), and
+    // published policies not yet viewed. This is the number the staff record
+    // page breaks down item by item.
     const onboardingOutstanding =
       p.job_role_id && !onboarded.has(p.id) ? 1 : 0;
-    const outstanding = onboardingOutstanding + (pendingSightings.get(p.id) ?? 0);
+    const outstanding =
+      onboardingOutstanding +
+      (pendingSightings.get(p.id) ?? 0) +
+      (sopTotal - sopSigned) +
+      (policyTotal - policyViewed);
 
     out.set(p.id, {
       sopSigned,

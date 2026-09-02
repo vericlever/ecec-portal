@@ -78,6 +78,10 @@ export default async function StaffRecordPage({
   // once a manager has countersigned).
   let sopTotal = 0;
   let sopSigned = 0;
+  // The specific published SOPs this person has not yet fully signed, split
+  // into "not started" and "signed, waiting on a manager to countersign".
+  const unsignedSops: string[] = [];
+  const awaitingCosignSops: string[] = [];
   if (person.job_role_id) {
     const { data: suite } = await supabase
       .from("job_role_sops")
@@ -88,7 +92,7 @@ export default async function StaffRecordPage({
       const [{ data: sopRows }, { data: signRows }] = await Promise.all([
         supabase
           .from("sops")
-          .select("id, published_version, signoff_type")
+          .select("id, name, published_version, signoff_type")
           .in("id", suiteIds)
           .not("published_version", "is", null),
         supabase
@@ -104,11 +108,17 @@ export default async function StaffRecordPage({
       );
       const published = sopRows ?? [];
       sopTotal = published.length;
-      sopSigned = published.filter((s) => {
+      for (const s of published) {
         const verified = signOf.get(`${s.id}:${s.published_version}`);
-        if (verified === undefined) return false;
-        return s.signoff_type === "self_and_manager" ? verified : true;
-      }).length;
+        const needsManager = s.signoff_type === "self_and_manager";
+        if (verified === undefined) {
+          unsignedSops.push(s.name as string);
+        } else if (needsManager && !verified) {
+          awaitingCosignSops.push(s.name as string);
+        } else {
+          sopSigned += 1;
+        }
+      }
     }
   }
 
@@ -125,9 +135,18 @@ export default async function StaffRecordPage({
   const viewedSet = new Set(
     (policyViewRows ?? []).map((v) => `${v.policy_id}:${v.policy_version}`),
   );
-  const policyViewed = (
-    (targetPolicies ?? []) as { id: string; published_version: number }[]
-  ).filter((p) => viewedSet.has(`${p.id}:${p.published_version}`)).length;
+  const targetPolicyRows = (targetPolicies ?? []) as {
+    id: string;
+    published_version: number;
+    name: string;
+    document_type: string;
+  }[];
+  const policyViewed = targetPolicyRows.filter((p) =>
+    viewedSet.has(`${p.id}:${p.published_version}`),
+  ).length;
+  const unviewedPolicies = targetPolicyRows
+    .filter((p) => !viewedSet.has(`${p.id}:${p.published_version}`))
+    .map((p) => p.name);
 
   const documents: {
     label: string;
@@ -204,6 +223,29 @@ export default async function StaffRecordPage({
 
   const anyDocs = documents.some((d) => d.rows.length > 0);
 
+  // Onboarding documents the person has entered that a leader has not sighted.
+  const unsightedDocs = documents.flatMap((d) =>
+    d.rows
+      .filter((r) => !r.sighted_at)
+      .map((r) => ({
+        label: d.label,
+        detail: r.lines.find(([, v]) => v && v !== "—")?.[1] ?? "",
+      })),
+  );
+
+  // A worker (anyone with a job role) who has not finished the onboarding
+  // questionnaire. This matches the count shown against them on the staff list.
+  const onboardingOutstanding = Boolean(
+    person.job_role_id && !wd?.onboarding_completed_at,
+  );
+
+  const outstandingCount =
+    (onboardingOutstanding ? 1 : 0) +
+    unsignedSops.length +
+    awaitingCosignSops.length +
+    unviewedPolicies.length +
+    unsightedDocs.length;
+
   return (
     <div>
       <Link href="/admin/staff" className="text-sm text-slate-500 hover:text-slate-900">
@@ -266,6 +308,49 @@ export default async function StaffRecordPage({
             total={policyTotal}
             emptyNote="No published policies target this person yet."
           />
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Outstanding items
+        </h2>
+        <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4">
+          {outstandingCount === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nothing outstanding. Everything expected of this person is signed,
+              viewed and sighted.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <OutstandingGroup
+                title="Onboarding"
+                items={
+                  onboardingOutstanding
+                    ? ["Onboarding questionnaire not completed"]
+                    : []
+                }
+              />
+              <OutstandingGroup
+                title="SOPs not signed"
+                items={unsignedSops}
+              />
+              <OutstandingGroup
+                title="SOPs waiting on a manager countersignature"
+                items={awaitingCosignSops}
+              />
+              <OutstandingGroup
+                title="Policies not viewed"
+                items={unviewedPolicies}
+              />
+              <OutstandingGroup
+                title="Documents a leader has not sighted"
+                items={unsightedDocs.map((d) =>
+                  d.detail ? `${d.label} — ${d.detail}` : d.label,
+                )}
+              />
+            </div>
+          )}
         </div>
       </section>
 
@@ -382,6 +467,29 @@ function ProgressBar({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function OutstandingGroup({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div className="flex items-baseline gap-2 text-sm">
+        <span className="font-medium text-slate-700">{title}</span>
+        <span className="text-slate-400">({items.length})</span>
+      </div>
+      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
+        {items.map((it, i) => (
+          <li key={i}>{it}</li>
+        ))}
+      </ul>
     </div>
   );
 }

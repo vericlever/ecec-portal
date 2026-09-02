@@ -134,7 +134,7 @@ The priority here is job-role-based SOP suites, not one-off individual assignmen
 - A reminder email sends correctly to a staff member with an outstanding sign-off
 
 ## Step 8: Staff reporting
-**Status: not started**
+**Status: done (2026-09-02, on main)**
 
 - Per-staff report: SOPs completed and policies viewed, shown as a percentage and as a table of outstanding items
 - Manager tiers see this scoped to their site(s), Admin sees it across all staff and sites

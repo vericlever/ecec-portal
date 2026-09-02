@@ -50,6 +50,34 @@ export default async function StaffPage() {
   const rows = (staff ?? []) as StaffRow[];
   const stats = await staffStatsByProfile(supabase, rows, me.id);
 
+  // Team-wide compliance roll-up for the people in view. Managers see their own
+  // service, admins the whole organisation, so the summary always matches the
+  // list below it.
+  const summary = rows.reduce(
+    (acc, p) => {
+      const s = stats.get(p.id);
+      if (!s) return acc;
+      acc.sopSigned += s.sopSigned;
+      acc.sopTotal += s.sopTotal;
+      acc.policyViewed += s.policyViewed;
+      acc.policyTotal += s.policyTotal;
+      acc.outstanding += s.outstanding;
+      const sopClear = s.sopPct === null || s.sopPct === 100;
+      const policyClear = s.policyPct === null || s.policyPct === 100;
+      if (s.outstanding === 0 && sopClear && policyClear) acc.clear += 1;
+      return acc;
+    },
+    { sopSigned: 0, sopTotal: 0, policyViewed: 0, policyTotal: 0, outstanding: 0, clear: 0 },
+  );
+  const sopPct =
+    summary.sopTotal > 0
+      ? Math.round((summary.sopSigned / summary.sopTotal) * 100)
+      : null;
+  const policyPct =
+    summary.policyTotal > 0
+      ? Math.round((summary.policyViewed / summary.policyTotal) * 100)
+      : null;
+
   const serviceName = new Map(
     (services ?? []).map((s) => [s.id as string, s.name as string]),
   );
@@ -88,6 +116,38 @@ export default async function StaffPage() {
           )}
         </div>
       </div>
+
+      {rows.length > 0 && (
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SummaryBox
+            label="Staff fully compliant"
+            value={`${summary.clear} of ${rows.length}`}
+          />
+          <SummaryBox
+            label="SOPs signed"
+            value={sopPct === null ? "—" : `${sopPct}%`}
+            sub={
+              summary.sopTotal > 0
+                ? `${summary.sopSigned} of ${summary.sopTotal}`
+                : "none assigned"
+            }
+          />
+          <SummaryBox
+            label="Policies viewed"
+            value={policyPct === null ? "—" : `${policyPct}%`}
+            sub={
+              summary.policyTotal > 0
+                ? `${summary.policyViewed} of ${summary.policyTotal}`
+                : "none published"
+            }
+          />
+          <SummaryBox
+            label="Outstanding items"
+            value={String(summary.outstanding)}
+            alert={summary.outstanding > 0}
+          />
+        </div>
+      )}
 
       <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
         {rows.map((p) => {
@@ -151,6 +211,34 @@ export default async function StaffPage() {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+function SummaryBox({
+  label,
+  value,
+  sub,
+  alert = false,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  alert?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+        {label}
+      </div>
+      <div
+        className={`mt-1 text-2xl font-semibold leading-none ${
+          alert ? "text-amber-700" : "text-slate-900"
+        }`}
+      >
+        {value}
+      </div>
+      {sub && <div className="mt-1 text-xs text-slate-400">{sub}</div>}
     </div>
   );
 }
