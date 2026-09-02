@@ -5,7 +5,8 @@ type ServerClient = ReturnType<typeof createClient>;
 export type CredentialKind =
   | "WWCC"
   | "Teacher registration"
-  | "Training";
+  | "Training"
+  | "Working rights";
 
 export type CredentialStatus = "expired" | "expiring";
 
@@ -35,7 +36,7 @@ export async function expiringCredentials(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [{ data: wwcc }, { data: teacher }, { data: training }] =
+  const [{ data: wwcc }, { data: teacher }, { data: training }, { data: visa }] =
     await Promise.all([
       supabase
         .from("wwcc_checks")
@@ -49,6 +50,10 @@ export async function expiringCredentials(
         .from("training_records")
         .select("profile_id, training_type, other_description, expiry_date")
         .not("expiry_date", "is", null),
+      supabase
+        .from("worker_details")
+        .select("profile_id, visa_expiry")
+        .not("visa_expiry", "is", null),
     ]);
 
   // key -> latest expiry row for that (person, kind[, training type])
@@ -103,6 +108,15 @@ export async function expiringCredentials(
       r.expiry_date as string | null,
     );
   }
+  for (const r of visa ?? []) {
+    consider(
+      `${r.profile_id}|visa`,
+      r.profile_id as string,
+      "Working rights",
+      "Visa",
+      r.visa_expiry as string | null,
+    );
+  }
 
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() + withinDays);
@@ -141,6 +155,7 @@ export function classifyPersonCredentials(
       other_description: string | null;
       expiry_date: string | null;
     }[];
+    visaExpiry?: string | null;
   },
   opts: { withinDays?: number } = {},
 ): Omit<CredentialAlert, "profileId">[] {
@@ -176,6 +191,7 @@ export function classifyPersonCredentials(
     const label = type === "Other" && r.other_description ? r.other_description : type;
     consider(`training|${type}|${r.other_description ?? ""}`, "Training", label, r.expiry_date);
   }
+  consider("visa", "Working rights", "Visa", input.visaExpiry ?? null);
 
   const out: Omit<CredentialAlert, "profileId">[] = [];
   for (const row of latest.values()) {

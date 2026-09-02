@@ -106,7 +106,9 @@ export async function staffStatsByProfile(
       .select("user_id, sop_id, sop_version, verified_at"),
     supabase.rpc("org_published_policies"),
     supabase.from("policy_views").select("user_id, policy_id, policy_version"),
-    supabase.from("worker_details").select("profile_id, onboarding_completed_at"),
+    supabase
+      .from("worker_details")
+      .select("profile_id, onboarding_completed_at, visa_expiry"),
     pendingSightingsByProfile(supabase, currentProfileId),
     supabase
       .from("wwcc_checks")
@@ -152,6 +154,8 @@ export async function staffStatsByProfile(
       `training|${r.training_type}|${r.other_description ?? ""}`,
       r.expiry_date as string | null,
     );
+  for (const w of workerDetails ?? [])
+    noteExpiry(w.profile_id as string, "visa", w.visa_expiry as string | null);
   const credAlertsByProfile = new Map<string, number>();
   for (const [k, expiry] of latestExpiry) {
     if (new Date(expiry + "T00:00:00") > credCutoff) continue;

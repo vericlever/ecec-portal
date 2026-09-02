@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProfile, isHrManager, isAdmin } from "@/lib/auth";
+import { getProfile, isHrManager, isAdmin, isManager } from "@/lib/auth";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { calcExpiry } from "@/lib/contracts";
 
@@ -13,13 +13,15 @@ type VerifiableTable =
   | "wwcc_checks"
   | "teacher_registrations"
   | "qualifications"
-  | "training_records";
+  | "training_records"
+  | "identity_documents";
 
 const VERIFIABLE: VerifiableTable[] = [
   "wwcc_checks",
   "teacher_registrations",
   "qualifications",
   "training_records",
+  "identity_documents",
 ];
 
 function today(): string {
@@ -264,6 +266,123 @@ export async function deleteContract(contractId: string): Promise<Result> {
 
   revalidatePath("/admin/staff", "layout");
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+const IDENTITY_KINDS = ["photo_id", "visa", "other"] as const;
+
+// Upload a Photo ID or visa document. A staff member may upload their own; a
+// manager or HR manager may upload for staff at their service. The row and the
+// stored file are re-checked by identity_documents RLS and the documents route.
+export async function uploadIdentityDocument(
+  profileId: string,
+  formData: FormData,
+): Promise<Result> {
+  const me = await getProfile();
+  if (!me) return { ok: false, error: "Sign in." };
+
+  const kind = String(formData.get("kind") ?? "");
+  if (!IDENTITY_KINDS.includes(kind as (typeof IDENTITY_KINDS)[number])) {
+    return { ok: false, error: "Choose a document type." };
+  }
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Choose a file to upload." };
+  }
+  const label = String(formData.get("label") ?? "").trim() || null;
+
+  const supabase = createClient();
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("organisation_id, service_id")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!target) return { ok: false, error: "Staff member not found." };
+
+  const mine = profileId === me.id;
+  const canManageOthers =
+    isAdmin(me.access_tier) ||
+    ((isManager(me.access_tier) || isHrManager(me)) &&
+      target.service_id != null &&
+      target.service_id === me.service_id);
+  if (!mine && !canManageOthers) {
+    return { ok: false, error: "You cannot add documents for this person." };
+  }
+
+  // Create the row first so the stored file can be keyed to it.
+  const { data: row, error } = await supabase
+    .from("identity_documents")
+    .insert({
+      organisation_id: target.organisation_id,
+      profile_id: profileId,
+      kind,
+      label,
+    })
+    .select("id")
+    .single();
+  if (error || !row) {
+    return { ok: false, error: error?.message ?? "Could not save the record." };
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const stored = await storeDocument({
+    organisationId: target.organisation_id as string,
+    ownerType: "identity",
+    ownerId: row.id,
+    fileName: file.name,
+    mimeType: file.type || null,
+    bytes,
+    uploadedBy: me.id,
+  });
+  if (!stored.ok) {
+    await createAdminClient().from("identity_documents").delete().eq("id", row.id);
+    return { ok: false, error: stored.error };
+  }
+  await supabase
+    .from("identity_documents")
+    .update({ document_id: stored.document.id })
+    .eq("id", row.id);
+
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/admin/verification");
+  revalidatePath("/onboarding");
+  return { ok: true };
+}
+
+export async function deleteIdentityDocument(id: string): Promise<Result> {
+  const me = await getProfile();
+  if (!me) return { ok: false, error: "Sign in." };
+  const admin = createAdminClient();
+  const { data: row } = await admin
+    .from("identity_documents")
+    .select("id, profile_id, organisation_id, document_id, sighted_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row || row.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Not found." };
+  }
+  // A sighted document is history and only an HR manager may remove it.
+  if (row.sighted_at && !isHrManager(me)) {
+    return { ok: false, error: "That document has been sighted and is locked." };
+  }
+  if (row.profile_id !== me.id && !isHrManager(me)) {
+    // fall through to worker managers at the same service
+    const { data: target } = await admin
+      .from("profiles")
+      .select("service_id")
+      .eq("id", row.profile_id)
+      .maybeSingle();
+    if (!target || target.service_id !== me.service_id) {
+      return { ok: false, error: "You cannot remove this document." };
+    }
+  }
+
+  if (row.document_id) await deleteDocument(row.document_id);
+  await admin.from("identity_documents").delete().eq("id", id);
+
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/admin/verification");
+  revalidatePath("/onboarding");
   return { ok: true };
 }
 

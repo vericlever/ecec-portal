@@ -14,7 +14,8 @@ type Table =
   | "wwcc_checks"
   | "teacher_registrations"
   | "qualifications"
-  | "training_records";
+  | "training_records"
+  | "identity_documents";
 
 export function SightingControl({
   table,

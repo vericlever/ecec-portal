@@ -63,8 +63,8 @@ export default async function CredentialsPage() {
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Expiring credentials</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Working with Children Checks, teacher registrations and training that
-        have expired or expire within 60 days, for{" "}
+        Working with Children Checks, teacher registrations, training and visas
+        that have expired or expire within 60 days, for{" "}
         {isAdmin(me.access_tier)
           ? "staff across your organisation"
           : "staff at your service"}

@@ -23,7 +23,7 @@ function safeName(name: string): string {
 // already have checked the user is allowed to do this.
 export async function storeDocument(opts: {
   organisationId: string;
-  ownerType: "policy" | "sop" | "contract" | "credential";
+  ownerType: "policy" | "sop" | "contract" | "credential" | "identity";
   ownerId: string;
   fileName: string;
   mimeType: string | null;

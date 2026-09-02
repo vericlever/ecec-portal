@@ -37,11 +37,12 @@ export async function GET(
         return new NextResponse("Not found", { status: 404 });
       }
     }
-  } else if (doc.owner_type === "contract") {
-    // The staff member sees their own contract; a manager or admin sees it via
-    // the contracts_select RLS on the owning row.
+  } else if (doc.owner_type === "contract" || doc.owner_type === "identity") {
+    // The staff member sees their own; a manager or HR manager sees it via the
+    // RLS on the owning row (contracts_select / identity_documents_rw).
+    const table = doc.owner_type === "contract" ? "contracts" : "identity_documents";
     const { data: owner } = await supabase
-      .from("contracts")
+      .from(table)
       .select("id")
       .eq("id", doc.owner_id)
       .maybeSingle();

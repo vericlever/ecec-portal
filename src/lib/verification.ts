@@ -8,6 +8,7 @@ const SIGHTABLE_TABLES = [
   "teacher_registrations",
   "qualifications",
   "training_records",
+  "identity_documents",
 ] as const;
 
 // How many unsighted documents are waiting, per staff member. RLS already limits

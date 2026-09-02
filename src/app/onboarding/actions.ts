@@ -17,8 +17,14 @@ export type OnboardingPayload = {
   previously_known_as: string;
   other_names: string;
   date_of_birth: string;
+  gender: string;
   phone: string;
   mobile: string;
+  // emergency contact / next of kin
+  nok_name: string;
+  nok_relationship: string;
+  nok_phone: string;
+  nok_address: string;
   // home address
   home_line1: string;
   home_line2: string;
@@ -37,6 +43,17 @@ export type OnboardingPayload = {
   non_educator_role: string;
   start_date: string;
   employment_nature: string;
+  // uniform and availability
+  uniform_hoodie: string;
+  uniform_polo: string;
+  uniform_vest: string;
+  available_days: string[];
+  ideal_weekly_hours: string;
+  availability_notes: string;
+  // work eligibility
+  work_eligibility: string;
+  visa_number: string;
+  visa_expiry: string;
   // wwcc
   wwcc_exempt: "" | "yes" | "no";
   wwcc_exemption_reason: string;
@@ -100,8 +117,13 @@ async function persist(
       previously_known_as: s(payload.previously_known_as),
       other_names: s(payload.other_names),
       date_of_birth: d(payload.date_of_birth),
+      gender: s(payload.gender),
       phone: s(payload.phone),
       mobile: s(payload.mobile),
+      nok_name: s(payload.nok_name),
+      nok_relationship: s(payload.nok_relationship),
+      nok_phone: s(payload.nok_phone),
+      nok_address: s(payload.nok_address),
       home_line1: s(payload.home_line1),
       home_line2: s(payload.home_line2),
       home_suburb: s(payload.home_suburb),
@@ -121,6 +143,23 @@ async function persist(
           ? s(payload.non_educator_role)
           : null,
       employment_nature: s(payload.employment_nature),
+      uniform_hoodie: s(payload.uniform_hoodie),
+      uniform_polo: s(payload.uniform_polo),
+      uniform_vest: s(payload.uniform_vest),
+      available_days:
+        payload.available_days && payload.available_days.length > 0
+          ? payload.available_days
+          : null,
+      ideal_weekly_hours:
+        payload.ideal_weekly_hours.trim() === ""
+          ? null
+          : Number(payload.ideal_weekly_hours),
+      availability_notes: s(payload.availability_notes),
+      work_eligibility: s(payload.work_eligibility),
+      visa_number:
+        payload.work_eligibility === "visa" ? s(payload.visa_number) : null,
+      visa_expiry:
+        payload.work_eligibility === "visa" ? d(payload.visa_expiry) : null,
       wwcc_exempt: payload.wwcc_exempt === "yes",
       wwcc_exemption_reason:
         payload.wwcc_exempt === "yes" ? s(payload.wwcc_exemption_reason) : null,

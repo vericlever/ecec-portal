@@ -13,6 +13,7 @@ import {
   SightingControl,
 } from "./record-controls";
 import { ContractPanel } from "./contract-panel";
+import { IdentityPanel, type IdentityDoc } from "./identity-panel";
 import { classifyPersonCredentials } from "@/lib/credentials";
 import {
   type ContractRow,
@@ -21,6 +22,13 @@ import {
 } from "@/lib/contracts";
 
 export const dynamic = "force-dynamic";
+
+const WORK_ELIGIBILITY_LABEL = {
+  citizen: "Australian citizen",
+  permanent_resident: "Permanent resident",
+  visa: "Visa",
+  other: "Other",
+} as const;
 
 function fmtDate(v: string | null | undefined) {
   if (!v) return "—";
@@ -69,13 +77,21 @@ export default async function StaffRecordPage({
 
   if (!person) notFound();
 
-  const { data: contractRows } = await supabase
-    .from("contracts")
-    .select(
-      "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, created_at",
-    )
-    .eq("profile_id", params.profileId)
-    .order("created_at", { ascending: false });
+  const [{ data: contractRows }, { data: identityRows }] = await Promise.all([
+    supabase
+      .from("contracts")
+      .select(
+        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, created_at",
+      )
+      .eq("profile_id", params.profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("identity_documents")
+      .select("id, kind, label, document_id, sighted_at, sighted_by")
+      .eq("profile_id", params.profileId)
+      .order("created_at", { ascending: false }),
+  ]);
+  const identityDocs = (identityRows ?? []) as IdentityDoc[];
   const contracts = (contractRows ?? []) as ContractRow[];
   const contract = activeContract(contracts);
   const contractRenewal = renewalState(contract);
@@ -88,7 +104,7 @@ export default async function StaffRecordPage({
     (isAdmin(me.access_tier) || me.service_id === person.service_id);
 
   // Onboarding documents this person has entered that a leader has not sighted.
-  const pendingSightings = [wwcc, teacher, quals, training].reduce(
+  const pendingSightings = [wwcc, teacher, quals, training, identityRows].reduce(
     (n, list) => n + (list ?? []).filter((r) => !r.sighted_at).length,
     0,
   );
@@ -245,14 +261,27 @@ export default async function StaffRecordPage({
   const anyDocs = documents.some((d) => d.rows.length > 0);
 
   // Onboarding documents the person has entered that a leader has not sighted.
-  const unsightedDocs = documents.flatMap((d) =>
-    d.rows
-      .filter((r) => !r.sighted_at)
-      .map((r) => ({
-        label: d.label,
-        detail: r.lines.find(([, v]) => v && v !== "—")?.[1] ?? "",
+  const unsightedDocs = [
+    ...documents.flatMap((d) =>
+      d.rows
+        .filter((r) => !r.sighted_at)
+        .map((r) => ({
+          label: d.label,
+          detail: r.lines.find(([, v]) => v && v !== "—")?.[1] ?? "",
+        })),
+    ),
+    ...identityDocs
+      .filter((d) => !d.sighted_at)
+      .map((d) => ({
+        label:
+          d.kind === "photo_id"
+            ? "Photo ID"
+            : d.kind === "visa"
+              ? "Visa document"
+              : "Identity document",
+        detail: d.label ?? "",
       })),
-  );
+  ];
 
   // A worker (anyone with a job role) who has not finished the onboarding
   // questionnaire. This matches the count shown against them on the staff list.
@@ -270,6 +299,7 @@ export default async function StaffRecordPage({
       other_description: string | null;
       expiry_date: string | null;
     }[],
+    visaExpiry: wd?.visa_expiry ?? null,
   });
   const credentialItems = credentialAlerts.map((a) => {
     const when =
@@ -280,6 +310,12 @@ export default async function StaffRecordPage({
           : `expires in ${a.daysLeft} ${a.daysLeft === 1 ? "day" : "days"}`;
     return `${a.label} — ${fmtDate(a.expiryDate)} (${when})`;
   });
+  const visaAlertObj = credentialAlerts.find((a) => a.kind === "Working rights");
+  const visaAlert = visaAlertObj
+    ? visaAlertObj.daysLeft < 0
+      ? `expired ${Math.abs(visaAlertObj.daysLeft)} days ago`
+      : `expires in ${visaAlertObj.daysLeft} days`
+    : null;
 
   const contractItems: string[] = [];
   if (contractRenewal.bucket === "expired") {
@@ -427,10 +463,36 @@ export default async function StaffRecordPage({
             <Row k="Home address">
               {[wd.home_line1, wd.home_suburb, wd.home_state, wd.home_postcode].filter(Boolean).join(", ") || "—"}
             </Row>
+            <Row k="Gender">{wd.gender ?? "—"}</Row>
             <Row k="Position (Worker Register)">{wd.nqaits_position ?? "—"}</Row>
             <Row k="Nature of employment">{wd.employment_nature ?? "—"}</Row>
             <Row k="Start date">{fmtDate(wd.start_date)}</Row>
             <Row k="WWCC exemption">{wd.wwcc_exempt ? `Yes — ${wd.wwcc_exemption_reason ?? ""}` : "No"}</Row>
+            <Row k="Emergency contact">
+              {wd.nok_name
+                ? `${wd.nok_name}${wd.nok_relationship ? ` (${wd.nok_relationship})` : ""}${wd.nok_phone ? ` · ${wd.nok_phone}` : ""}`
+                : "—"}
+            </Row>
+            <Row k="Uniform (hoodie / polo / vest)">
+              {[wd.uniform_hoodie, wd.uniform_polo, wd.uniform_vest]
+                .map((s) => s || "—")
+                .join(" / ")}
+            </Row>
+            <Row k="Availability">
+              {[
+                wd.available_days?.length
+                  ? (wd.available_days as string[]).join(", ")
+                  : null,
+                wd.ideal_weekly_hours != null
+                  ? `${wd.ideal_weekly_hours} h/week ideal`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "—"}
+            </Row>
+            {wd.availability_notes && (
+              <Row k="Availability notes">{wd.availability_notes}</Row>
+            )}
           </dl>
         ) : (
           <p className="mt-2 text-sm text-slate-500">
@@ -451,6 +513,39 @@ export default async function StaffRecordPage({
             canEdit={hrManager}
           />
         </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Identity and working rights
+        </h2>
+        <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-sm">
+            <Row k="Work eligibility">
+              {wd?.work_eligibility
+                ? WORK_ELIGIBILITY_LABEL[
+                    wd.work_eligibility as keyof typeof WORK_ELIGIBILITY_LABEL
+                  ]
+                : "—"}
+            </Row>
+            {wd?.work_eligibility === "visa" && (
+              <>
+                <Row k="Visa number">{wd?.visa_number ?? "—"}</Row>
+                <Row k="Visa expiry">
+                  {fmtDate(wd?.visa_expiry)}
+                  {visaAlert && (
+                    <span className="ml-2 text-amber-700">({visaAlert})</span>
+                  )}
+                </Row>
+              </>
+            )}
+          </dl>
+        </div>
+        <IdentityPanel
+          profileId={person.id}
+          docs={identityDocs}
+          canSight={hrManager}
+        />
       </section>
 
       <section className="mt-6">

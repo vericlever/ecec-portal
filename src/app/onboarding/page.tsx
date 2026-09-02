@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { CORE_TRAINING_TYPES } from "@/lib/nqaits";
 import { OnboardingForm } from "./onboarding-form";
 import type { OnboardingPayload } from "./actions";
+import {
+  IdentityPanel,
+  type IdentityDoc,
+} from "@/app/admin/staff/[profileId]/identity-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -66,15 +70,23 @@ export default async function OnboardingPage() {
     };
   }
 
-  const { data: contractRows } = await supabase
-    .from("contracts")
-    .select(
-      "id, period_type, start_date, duration_months, expiry_date, document_id, superseded_at",
-    )
-    .eq("profile_id", profile.id)
-    .is("superseded_at", null)
-    .limit(1);
+  const [{ data: contractRows }, { data: identityRows }] = await Promise.all([
+    supabase
+      .from("contracts")
+      .select(
+        "id, period_type, start_date, duration_months, expiry_date, document_id, superseded_at",
+      )
+      .eq("profile_id", profile.id)
+      .is("superseded_at", null)
+      .limit(1),
+    supabase
+      .from("identity_documents")
+      .select("id, kind, label, document_id, sighted_at, sighted_by")
+      .eq("profile_id", profile.id)
+      .order("created_at", { ascending: false }),
+  ]);
   const myContract = (contractRows ?? [])[0] ?? null;
+  const identityDocs = (identityRows ?? []) as IdentityDoc[];
 
   const initial: OnboardingPayload = {
     ref_number: str(wd?.ref_number),
@@ -85,8 +97,13 @@ export default async function OnboardingPage() {
     previously_known_as: str(wd?.previously_known_as),
     other_names: str(wd?.other_names),
     date_of_birth: str(wd?.date_of_birth),
+    gender: str(wd?.gender),
     phone: str(wd?.phone),
     mobile: str(wd?.mobile),
+    nok_name: str(wd?.nok_name),
+    nok_relationship: str(wd?.nok_relationship),
+    nok_phone: str(wd?.nok_phone),
+    nok_address: str(wd?.nok_address),
     home_line1: str(wd?.home_line1),
     home_line2: str(wd?.home_line2),
     home_suburb: str(wd?.home_suburb),
@@ -102,6 +119,17 @@ export default async function OnboardingPage() {
     non_educator_role: str(wd?.non_educator_role),
     start_date: str(wd?.start_date),
     employment_nature: str(wd?.employment_nature),
+    uniform_hoodie: str(wd?.uniform_hoodie),
+    uniform_polo: str(wd?.uniform_polo),
+    uniform_vest: str(wd?.uniform_vest),
+    available_days: Array.isArray(wd?.available_days)
+      ? (wd?.available_days as string[])
+      : [],
+    ideal_weekly_hours: str(wd?.ideal_weekly_hours),
+    availability_notes: str(wd?.availability_notes),
+    work_eligibility: str(wd?.work_eligibility),
+    visa_number: str(wd?.visa_number),
+    visa_expiry: str(wd?.visa_expiry),
     wwcc_exempt: ynStr(wd?.wwcc_exempt),
     wwcc_exemption_reason: str(wd?.wwcc_exemption_reason),
     wwcc_check_number: str(wwcc.forForm?.check_number),
@@ -150,6 +178,21 @@ export default async function OnboardingPage() {
         wwccLocked={lockedCheck(wwcc.locked)}
         teacherLocked={lockedCheck(teacher.locked)}
       />
+
+      <section className="mt-8">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Your documents
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Upload a copy of your Photo ID and, if you are on a visa, your visa
+          document. A leader will sight the originals with you.
+        </p>
+        <IdentityPanel
+          profileId={profile.id}
+          docs={identityDocs}
+          canSight={false}
+        />
+      </section>
 
       {myContract && (
         <section className="mt-8">

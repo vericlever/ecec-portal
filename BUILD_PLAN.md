@@ -254,6 +254,7 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 - Contract upload and replace: Admin and `hr_manager` only. Manager (policy) keeps view and download but loses upload, changed from Step 11 as built.
 
 ### Step 16: HR access model and identity, working rights, and the rest of the personal record
+**Status: done (2026-09-02). The rename and contract tightening are on main (merged with Step 11). The identity, working rights and personal-record fields are on branch step-16-hr-identity.**
 
 - Rename `profiles.hr_verifier` to `hr_manager` across the schema, RLS helpers and the UI. Tighten the `contracts` write policy to Admin plus `hr_manager` (this lands on the Step 11 branch before it merges).
 - Add to `worker_details`: gender, next of kin name, relationship, address and phone, uniform sizes (hoodie, polo, vest), roster availability (days available, ideal weekly hours, availability notes). Roster availability is captured once and drives no flags or reminders, it is scheduling context not compliance data. Job title is not captured from the staff, it is set by a manager through the existing position and SOP job role fields.

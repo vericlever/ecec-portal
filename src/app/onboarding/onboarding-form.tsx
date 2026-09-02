@@ -18,6 +18,23 @@ import {
 
 type FieldKey = keyof OnboardingPayload;
 
+const GENDERS = ["Female", "Male", "Non-binary", "Prefer not to say", "Other"];
+const WEEK_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+const WORK_ELIGIBILITY_OPTIONS = [
+  { value: "citizen", label: "Australian citizen" },
+  { value: "permanent_resident", label: "Permanent resident" },
+  { value: "visa", label: "Working visa" },
+  { value: "other", label: "Other" },
+];
+
 export type LockedCheck = {
   check_number: string;
   expiry_date: string;
@@ -62,9 +79,12 @@ export function OnboardingForm({
     () =>
       [
         { key: "personal", title: "Personal and contact details" },
+        { key: "emergency", title: "Emergency contact" },
         { key: "home", title: "Home address" },
         { key: "postal", title: "Postal address" },
         { key: "position", title: "Position" },
+        { key: "uniform", title: "Uniform and availability" },
+        { key: "eligibility", title: "Work eligibility" },
         { key: "wwcc", title: "Working with Children Check" },
         isEct ? { key: "teacher", title: "Teacher registration" } : null,
         { key: "qualifications", title: "Qualifications" },
@@ -166,11 +186,28 @@ export function OnboardingForm({
               </div>
               <Text label="Names previously known as" value={data.previously_known_as} onChange={(v) => set("previously_known_as", v)} />
               <Text label="Alias / other names known by" value={data.other_names} onChange={(v) => set("other_names", v)} />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <DateField label="Date of birth" value={data.date_of_birth} onChange={(v) => set("date_of_birth", v)} />
+                <Select label="Gender" value={data.gender} onChange={(v) => set("gender", v)} options={GENDERS} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <Text label="Phone number" value={data.phone} onChange={(v) => set("phone", v)} />
                 <Text label="Mobile number" value={data.mobile} onChange={(v) => set("mobile", v)} />
               </div>
+            </>
+          )}
+
+          {step.key === "emergency" && (
+            <>
+              <p className="text-xs text-slate-500">
+                Who we should contact in an emergency.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <Text label="Name" value={data.nok_name} onChange={(v) => set("nok_name", v)} />
+                <Text label="Relationship to you" value={data.nok_relationship} onChange={(v) => set("nok_relationship", v)} />
+              </div>
+              <Text label="Telephone number" value={data.nok_phone} onChange={(v) => set("nok_phone", v)} />
+              <Text label="Address" value={data.nok_address} onChange={(v) => set("nok_address", v)} />
             </>
           )}
 
@@ -221,6 +258,102 @@ export function OnboardingForm({
                   options={EMPLOYMENT_NATURES}
                 />
               </div>
+            </>
+          )}
+
+          {step.key === "uniform" && (
+            <>
+              <p className="text-xs text-slate-500">
+                Uniform sizes. Ladies or men&apos;s sizing is available, note
+                whichever you want.
+              </p>
+              <div className="grid grid-cols-3 gap-4">
+                <Text label="Hoodie" value={data.uniform_hoodie} onChange={(v) => set("uniform_hoodie", v)} />
+                <Text label="Polo" value={data.uniform_polo} onChange={(v) => set("uniform_polo", v)} />
+                <Text label="Vest" value={data.uniform_vest} onChange={(v) => set("uniform_vest", v)} />
+              </div>
+              <div className="text-sm">
+                <span className="font-medium text-slate-700">
+                  Which days are you available to work?
+                </span>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                  {WEEK_DAYS.map((day) => (
+                    <label key={day} className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={data.available_days.includes(day)}
+                        onChange={(e) =>
+                          set(
+                            "available_days",
+                            e.target.checked
+                              ? [...data.available_days, day]
+                              : data.available_days.filter((d) => d !== day),
+                          )
+                        }
+                      />
+                      {day}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <Text
+                label="Ideal hours per week"
+                value={data.ideal_weekly_hours}
+                onChange={(v) => set("ideal_weekly_hours", v)}
+              />
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">
+                  Anything else about your availability?
+                </span>
+                <textarea
+                  value={data.availability_notes}
+                  onChange={(e) => set("availability_notes", e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Relief availability, days you are not available, other commitments, planned leave"
+                />
+              </label>
+            </>
+          )}
+
+          {step.key === "eligibility" && (
+            <>
+              <div className="text-sm">
+                <span className="font-medium text-slate-700">
+                  What is your eligibility to work in Australia?
+                </span>
+                <div className="mt-1 flex flex-col gap-1">
+                  {WORK_ELIGIBILITY_OPTIONS.map((opt) => (
+                    <label key={opt.value} className="flex items-center gap-1.5">
+                      <input
+                        type="radio"
+                        checked={data.work_eligibility === opt.value}
+                        onChange={() => set("work_eligibility", opt.value)}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {data.work_eligibility === "visa" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <Text
+                    label="Visa number"
+                    value={data.visa_number}
+                    onChange={(v) => set("visa_number", v)}
+                  />
+                  <DateField
+                    label="Visa expiry date"
+                    value={data.visa_expiry}
+                    onChange={(v) => set("visa_expiry", v)}
+                  />
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                You can upload a copy of your visa or photo ID under &ldquo;Your
+                documents&rdquo; once your details are saved. A leader will sight
+                the originals with you.
+              </p>
             </>
           )}
 
