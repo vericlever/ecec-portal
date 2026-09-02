@@ -103,12 +103,12 @@ export default async function RootLayout({
                 )}
               </div>
               <div className="flex items-center gap-3 text-right text-xs text-slate-500">
-                <div>
-                  <div className="font-medium text-slate-700">
+                <Link href="/account" className="group">
+                  <div className="font-medium text-slate-700 group-hover:text-slate-900 group-hover:underline">
                     {profile.full_name}
                   </div>
                   <div>{TIER_LABELS[profile.access_tier]}</div>
-                </div>
+                </Link>
                 <form action="/logout" method="post">
                   <button
                     type="submit"
