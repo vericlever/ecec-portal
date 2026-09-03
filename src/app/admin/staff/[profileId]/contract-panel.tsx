@@ -230,8 +230,12 @@ export function ContractPanel({
               type="file"
               name="file"
               required
+              accept=".pdf,.doc,.docx,.txt,image/*"
               className="mt-1 block w-full text-sm"
             />
+            <span className="mt-1 block text-xs text-slate-400">
+              A PDF or Word file, or a photo of the signed pages.
+            </span>
           </label>
           <label className="block">
             <span className="text-slate-600">Start date</span>

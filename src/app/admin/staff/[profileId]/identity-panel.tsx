@@ -146,8 +146,17 @@ export function IdentityPanel({
             />
           </label>
           <label className="block">
-            <span className="text-slate-600">File</span>
-            <input type="file" name="file" required className="mt-1 block w-full text-sm" />
+            <span className="text-slate-600">File or photo</span>
+            <input
+              type="file"
+              name="file"
+              required
+              accept="image/*,application/pdf"
+              className="mt-1 block w-full text-sm"
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              On a phone you can take a photo of the document.
+            </span>
           </label>
           <div className="flex items-center gap-3">
             <button

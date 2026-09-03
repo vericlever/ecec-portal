@@ -58,7 +58,7 @@ export default async function AgreementsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Agreements</h1>
         <Link
           href="/admin/agreements/new"

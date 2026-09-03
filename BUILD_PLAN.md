@@ -201,7 +201,9 @@ Full detail in `CONTRACT_MANAGEMENT.md`, summarised here.
 - Uploading a new executed contract closes the flag, starts a new period, and the prior contract remains visible as history
 
 ## Step 12: Mobile capture and installable app
-**Status: not started. Replaces the cut webhook receiver (see "Explicitly deferred").**
+**Status: done, on branch `step-12-mobile`. Camera capture on the Photo ID, visa and contract uploads. A hamburger nav on phones (the inline nav was six items wide and overflowed). Header action buttons wrap instead of overlapping the heading. A web app manifest, an SVG icon set, and a small service worker (network-first pages, cached build assets, an offline fallback page), registered in production only. Native app stays out of scope. A wider mobile polish pass across every screen and a tablet layout for the sign-off queues are still worth doing.**
+
+**Replaces the cut webhook receiver (see "Explicitly deferred").**
 
 The portal is already mobile-responsive. This step makes it work well in the two places it is actually used: an educator's phone, and a shared tablet in the room. Cut in three sizes, do the cheap ones first.
 

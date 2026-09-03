@@ -1,15 +1,23 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { getProfile, isManager, canEditContent, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
-import { ManageMenu } from "./manage-menu";
+import { SiteNav } from "./site-nav";
+import { RegisterServiceWorker } from "./register-sw";
 
 export const metadata: Metadata = {
   title: "VeriClever",
   description:
     "Staff compliance and training for early childhood education and care",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "VeriClever", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
 };
 
 export default async function RootLayout({
@@ -44,81 +52,20 @@ export default async function RootLayout({
   return (
     <html lang="en-AU">
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+        <RegisterServiceWorker />
         {profile && (
-          <header className="border-b border-slate-200 bg-white">
-            <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
-              <div className="flex items-center gap-4">
-                <Link
-                  href={leader ? "/admin" : "/sops"}
-                  className="text-sm font-semibold tracking-tight"
-                >
-                  VeriClever
-                </Link>
-                {leader && (
-                  <Link
-                    href="/admin"
-                    className="text-sm text-slate-500 hover:text-slate-900"
-                  >
-                    Overview
-                  </Link>
-                )}
-                <Link
-                  href="/sops"
-                  className="text-sm text-slate-500 hover:text-slate-900"
-                >
-                  SOPs
-                </Link>
-                <Link
-                  href="/policies"
-                  className="text-sm text-slate-500 hover:text-slate-900"
-                >
-                  Policies
-                </Link>
-                {profile.job_role_id && (
-                  <>
-                    <Link
-                      href="/agreements"
-                      className="text-sm text-slate-500 hover:text-slate-900"
-                    >
-                      Agreements
-                    </Link>
-                    <Link
-                      href="/onboarding"
-                      className="text-sm text-slate-500 hover:text-slate-900"
-                    >
-                      My details
-                    </Link>
-                  </>
-                )}
-                {(isManager(profile.access_tier) ||
-                  profile.hr_manager ||
-                  canEditContent(profile.access_tier)) && (
-                  <ManageMenu
-                    canManageStaff={
-                      isManager(profile.access_tier) || profile.hr_manager
-                    }
-                    canCountersign={isManager(profile.access_tier)}
-                    canEditContent={canEditContent(profile.access_tier)}
-                  />
-                )}
-              </div>
-              <div className="flex items-center gap-3 text-right text-xs text-slate-500">
-                <Link href="/account" className="group">
-                  <div className="font-medium text-slate-700 group-hover:text-slate-900 group-hover:underline">
-                    {profile.full_name}
-                  </div>
-                  <div>{TIER_LABELS[profile.access_tier]}</div>
-                </Link>
-                <form action="/logout" method="post">
-                  <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  >
-                    Sign out
-                  </button>
-                </form>
-              </div>
-            </div>
+          <header className="relative border-b border-slate-200 bg-white">
+            <SiteNav
+              fullName={profile.full_name}
+              tierLabel={TIER_LABELS[profile.access_tier]}
+              isLeader={leader}
+              isWorker={Boolean(profile.job_role_id)}
+              canManageStaff={
+                isManager(profile.access_tier) || profile.hr_manager
+              }
+              canCountersign={isManager(profile.access_tier)}
+              canEditContent={canEditContent(profile.access_tier)}
+            />
           </header>
         )}
         {showOnboardingPrompt && (

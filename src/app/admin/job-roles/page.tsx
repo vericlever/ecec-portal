@@ -27,7 +27,7 @@ export default async function JobRolesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Job roles</h1>
       </div>
       <p className="mt-1 max-w-prose text-sm text-slate-500">

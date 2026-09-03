@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VeriClever — offline</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+        display: flex;
+        min-height: 100vh;
+        margin: 0;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 1.5rem;
+      }
+      .box {
+        max-width: 22rem;
+      }
+      h1 {
+        font-size: 1.1rem;
+      }
+      p {
+        color: #64748b;
+        font-size: 0.9rem;
+      }
+      button {
+        margin-top: 1rem;
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        border-radius: 0.5rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h1>You are offline</h1>
+      <p>
+        VeriClever needs a connection to load this page. Check your signal and
+        try again.
+      </p>
+      <button onclick="location.reload()">Try again</button>
+    </div>
+  </body>
+</html>
