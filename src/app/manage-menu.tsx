@@ -37,6 +37,7 @@ export function ManageMenu({
   }, []);
 
   const groups: { label: string | null; items: Item[] }[] = [];
+  groups.push({ label: null, items: [{ href: "/account", label: "My details" }] });
   if (canManageStaff || canCountersign) {
     const items: Item[] = [];
     if (canManageStaff) {

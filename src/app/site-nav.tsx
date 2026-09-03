@@ -54,6 +54,12 @@ export function SiteNav(props: SiteNavProps) {
   ];
 
   const manageGroups: { label: string; items: Item[] }[] = [];
+  if (canManageStaff || canCountersign || canEditContent) {
+    manageGroups.push({
+      label: "",
+      items: [{ href: "/account", label: "My details" }],
+    });
+  }
   if (canManageStaff || canCountersign) {
     const items: Item[] = [];
     if (canManageStaff) {
@@ -178,9 +184,11 @@ export function SiteNav(props: SiteNavProps) {
 
             {manageGroups.map((g) => (
               <div key={g.label} className="mt-2 border-t border-slate-100 pt-2">
-                <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  {g.label}
-                </div>
+                {g.label && (
+                  <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    {g.label}
+                  </div>
+                )}
                 {g.items.map((it) => (
                   <Link
                     key={it.href}
