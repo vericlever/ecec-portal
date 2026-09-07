@@ -354,7 +354,9 @@ The deferred email half of Steps 7, 9 and 11. A scheduled job (Vercel Cron) that
 - Publishing several policies in a week produces one combined parent email
 
 ### Step 20: SOP review cycle and reminder
-**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 16".**
+**Status: built on branch `step-20-review-cycle` 2026-09-07, not merged. Migration 0036 (sop_history) applied to live DB. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 16".**
+
+Built: `sop_history` event log (edit / period_change / review), written by the SOP editor actions. `src/lib/sop-review.ts` `reviewState()` (none / ok / soon / overdue from `next_review_date`). SOP editor Review cycle section: status, cadence + next date (`updateSopReview`), "Mark as reviewed now" (`markSopReviewed`, moves the date to the cadence from today), and a Review history list. An out-of-sequence text edit prompts "reset the review clock?" on save, not automatic; the edit event records the choice. SOP list shows an overdue / due-soon badge and header count. Policy editor gets the same cadence / next date / mark-reviewed controls, no history log. Step 19's digest already consumes `next_review_date`.
 
 `review_period` on every SOP (3 / 6 / 12 months, default 6, fixed options). High-risk SOPs may override, reusing the existing high-risk tag. Computed review due date (last review plus period), overdue flag, reminder ahead of due via Step 19. A single per-SOP history log, `event_type` of `edit` / `period_change` / `review`. An out-of-sequence content edit offers the editor a choice to reset the review clock, not automatic.
 

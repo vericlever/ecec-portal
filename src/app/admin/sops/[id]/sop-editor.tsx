@@ -2,14 +2,27 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { SOP_TIER_LABELS, SOP_TIER_ORDER } from "@/lib/constants";
+import {
+  REVIEW_PERIODS,
+  REVIEW_PERIOD_LABELS,
+  SOP_TIER_LABELS,
+  SOP_TIER_ORDER,
+} from "@/lib/constants";
+import {
+  fmtReviewDate,
+  HISTORY_EVENT_LABELS,
+  reviewDateFromNow,
+  reviewState,
+} from "@/lib/sop-review";
 import {
   deleteSop,
+  markSopReviewed,
   publishSop,
   setJobRole,
   unpublishSop,
   updateSopBody,
   updateSopMeta,
+  updateSopReview,
   uploadSopDocument,
 } from "../actions";
 
@@ -25,6 +38,16 @@ type Sop = {
   published_body: string;
   published_version: number | null;
   published_at: string | null;
+  review_period_months: number;
+  next_review_date: string | null;
+};
+
+type HistoryRow = {
+  id: string;
+  eventType: string;
+  note: string;
+  at: string;
+  actor: string;
 };
 
 export function SopEditor({
@@ -34,6 +57,7 @@ export function SopEditor({
   linkedRoleIds,
   signOffCount,
   sourceDoc,
+  history,
 }: {
   sop: Sop;
   services: { id: string; name: string }[];
@@ -46,6 +70,7 @@ export function SopEditor({
     byte_size: number | null;
     extraction_note: string | null;
   } | null;
+  history: HistoryRow[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -59,6 +84,19 @@ export function SopEditor({
   const [notes, setNotes] = useState(sop.notes);
   const [serviceId, setServiceId] = useState(sop.service_id ?? "");
   const [body, setBody] = useState(sop.body);
+
+  const [reviewPeriod, setReviewPeriod] = useState(sop.review_period_months);
+  const [nextReviewDate, setNextReviewDate] = useState(
+    sop.next_review_date ?? "",
+  );
+  // When the body has been edited and a future review date exists, ask whether
+  // to reset the review clock as part of saving.
+  const [askResetClock, setAskResetClock] = useState(false);
+
+  const review = reviewState(sop.next_review_date);
+  const reviewDirty =
+    reviewPeriod !== sop.review_period_months ||
+    nextReviewDate !== (sop.next_review_date ?? "");
 
   const fileRef = useRef<HTMLInputElement>(null);
   const linked = new Set(linkedRoleIds);
@@ -302,14 +340,181 @@ export function SopEditor({
           rows={16}
           className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
         />
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => act(() => updateSopBody(sop.id, body), "Text saved")}
-          className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+        {!askResetClock ? (
+          <button
+            type="button"
+            disabled={pending || body === sop.body}
+            onClick={() => {
+              // An edit made while a review is still scheduled (not overdue) is
+              // out of sequence: ask whether to reset the clock.
+              if (sop.next_review_date && review.status !== "overdue") {
+                setAskResetClock(true);
+              } else {
+                act(() => updateSopBody(sop.id, body, false), "Text saved");
+              }
+            }}
+            className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+          >
+            Save text
+          </button>
+        ) : (
+          <div className="mt-3 space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <p>
+              This edit is outside the review schedule (next review{" "}
+              {review.dueDate ? fmtReviewDate(review.dueDate) : ""}). Reset the review clock?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setAskResetClock(false);
+                  act(
+                    () => updateSopBody(sop.id, body, true),
+                    "Text saved, review clock reset",
+                  );
+                }}
+                className="rounded-md bg-amber-900 px-3 py-1.5 font-medium text-white disabled:opacity-40"
+              >
+                Save & reset review to{" "}
+                {reviewDateFromNow(sop.review_period_months)}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setAskResetClock(false);
+                  act(
+                    () => updateSopBody(sop.id, body, false),
+                    "Text saved",
+                  );
+                }}
+                className="rounded-md border border-amber-300 px-3 py-1.5 font-medium text-amber-900 disabled:opacity-40"
+              >
+                Save, keep {review.dueDate ? fmtReviewDate(review.dueDate) : ""}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAskResetClock(false)}
+                className="px-2 py-1.5 text-amber-700 underline"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Review cycle */}
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Review cycle
+        </h2>
+        <p
+          className={`mt-2 text-sm font-medium ${
+            review.status === "overdue"
+              ? "text-red-700"
+              : review.status === "soon"
+                ? "text-amber-700"
+                : "text-slate-700"
+          }`}
         >
-          Save text
-        </button>
+          {review.label}
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Review every</span>
+            <select
+              value={reviewPeriod}
+              onChange={(e) => setReviewPeriod(Number(e.target.value))}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              {REVIEW_PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {REVIEW_PERIOD_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Next review date</span>
+            <input
+              type="date"
+              value={nextReviewDate}
+              onChange={(e) => setNextReviewDate(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={pending || !reviewDirty}
+            onClick={() =>
+              act(
+                () =>
+                  updateSopReview(sop.id, {
+                    reviewPeriod,
+                    nextReviewDate,
+                  }),
+                "Review schedule saved",
+              )
+            }
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+          >
+            Save review schedule
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (
+                !confirm(
+                  `Mark this SOP as reviewed now? The next review moves to ${reviewDateFromNow(sop.review_period_months)}.`,
+                )
+              )
+                return;
+              act(() => markSopReviewed(sop.id), "Marked as reviewed");
+            }}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+          >
+            Mark as reviewed now
+          </button>
+        </div>
+      </section>
+
+      {/* Review history */}
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Review history
+        </h2>
+        {history.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">
+            No edits, schedule changes or reviews recorded yet.
+          </p>
+        ) : (
+          <ul className="mt-2 divide-y divide-slate-100 text-sm">
+            {history.map((h) => (
+              <li key={h.id} className="py-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium text-slate-700">
+                    {HISTORY_EVENT_LABELS[h.eventType] ?? h.eventType}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {new Date(h.at).toLocaleString("en-AU", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}{" "}
+                    · {h.actor}
+                  </span>
+                </div>
+                {h.note && (
+                  <p className="mt-0.5 text-xs text-slate-500">{h.note}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Job roles */}
