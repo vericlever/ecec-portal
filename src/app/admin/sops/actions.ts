@@ -260,7 +260,13 @@ export async function markSopReviewed(
   const admin = createAdminClient();
   const { error } = await admin
     .from("sops")
-    .update({ next_review_date: newDue, updated_by: owned.me.id })
+    // Recording a review also clears any needs-review flag a practice
+    // observation raised (Step 21).
+    .update({
+      next_review_date: newDue,
+      needs_review: false,
+      updated_by: owned.me.id,
+    })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
@@ -300,6 +306,8 @@ export async function publishSop(id: string): Promise<Result> {
       published_at: new Date().toISOString(),
       published_by: owned.me.id,
       current_version: next,
+      // A fresh published version resolves any needs-review flag (Step 21).
+      needs_review: false,
     })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };

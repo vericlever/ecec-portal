@@ -366,7 +366,9 @@ Built: `sop_history` event log (edit / period_change / review), written by the S
 - Every edit, period change and review writes one entry to the SOP history log
 
 ### Step 21: SOP practice observation record
-**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 17".**
+**Status: built on branch `step-21-observations` 2026-09-07, not merged. Migration 0037 (sop_observations + sops.needs_review) applied to live DB. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 17".**
+
+Built: `sop_observations` (evidence, outcome needs_review / continue_as_is, review_clock_reset, observer, service) + `sops.needs_review` flag. `/admin/observations` (any manager tier via a new page, not just content editors - Zeke's call) lists published SOPs, high-risk (manager co-sign) first, with observation counts and the needs-review flag; `/admin/observations/[sopId]` shows the current procedure text, the observation history and a form. On save a popup asks whether to reset the review clock (default yes, SOP's period, respected regardless of outcome tag). A needs_review outcome raises a red banner in the SOP editor and a badge on the SOP list; the SOP stays live for staff; `publishSop` and `markSopReviewed` clear the flag. Every observation writes a review entry to the Step 20 history log. "Practice observations" added to the Manage menu for all manager tiers. Verified end to end.
 
 An evidence log per SOP per review cycle: free-text evidence plus an outcome tag (needs-review / continue-as-is). On save, a popup asks whether to reset the review clock (default yes, using the SOP's existing period), respected regardless of the tag. Any manager tier and Admin can log an observation, not plain Staff. A needs-review flag routes into the existing SOP edit and approval pipeline and feeds the Step 27 heatmap.
 
