@@ -12,6 +12,7 @@ import {
   AccessTierControl,
   HrManagerToggle,
   JobRoleControl,
+  PasswordResetControl,
   ProbationControl,
   RefereeCheckControl,
   SightingControl,
@@ -391,6 +392,21 @@ export default async function StaffRecordPage({
     contractItems.length +
     unsignedAgreements.length;
 
+  // Most recent password reset for this person, for the audit line.
+  const { data: lastResetRow } = await supabase
+    .from("password_reset_requests")
+    .select("created_at, source")
+    .eq("target_profile_id", person.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const lastReset = lastResetRow
+    ? {
+        at: lastResetRow.created_at as string,
+        source: lastResetRow.source as "self" | "admin",
+      }
+    : null;
+
   return (
     <div>
       <Link href="/admin/staff" className="text-sm text-slate-500 hover:text-slate-900">
@@ -444,6 +460,11 @@ export default async function StaffRecordPage({
           {isAdmin(me.access_tier) && (
             <HrManagerToggle profileId={person.id} value={person.hr_manager} />
           )}
+          <PasswordResetControl
+            profileId={person.id}
+            email={person.email}
+            lastReset={lastReset}
+          />
         </section>
       )}
 

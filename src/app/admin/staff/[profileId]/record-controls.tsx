@@ -7,6 +7,7 @@ import {
   clearSighting,
   recordSighting,
   recordRefereeCheck,
+  sendPasswordResetForStaff,
   setHrManager,
   setProbation,
   setStaffAccessTier,
@@ -402,6 +403,64 @@ export function AccessTierControl({
         {msg && <span className="text-xs text-green-700">{msg}</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
+    </div>
+  );
+}
+
+export function PasswordResetControl({
+  profileId,
+  email,
+  lastReset,
+}: {
+  profileId: string;
+  email: string;
+  lastReset: { at: string; source: "self" | "admin" } | null;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Password</span>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Sends {email} a link to set a new password. You never see or set it.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            if (!confirm(`Send a password reset email to ${email}?`)) return;
+            start(async () => {
+              setError(null);
+              setMsg(null);
+              const r = await sendPasswordResetForStaff(profileId);
+              if (r.ok) {
+                setMsg("Reset email sent.");
+                router.refresh();
+              } else {
+                setError(r.error);
+              }
+            });
+          }}
+          className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 disabled:opacity-40"
+        >
+          {pending ? "Sending…" : "Send password reset email"}
+        </button>
+        {msg && <span className="text-xs text-green-700">{msg}</span>}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+      {lastReset && (
+        <p className="mt-1 text-xs text-slate-400">
+          Last reset{" "}
+          {new Date(lastReset.at).toLocaleDateString("en-AU", {
+            dateStyle: "medium",
+          })}{" "}
+          ({lastReset.source === "admin" ? "sent by a leader" : "self-service"})
+        </p>
+      )}
     </div>
   );
 }

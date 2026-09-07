@@ -384,7 +384,9 @@ An optional "suggested evidence" hint field per SOP, pre-filled for template SOP
 - Uploaded evidence has RLS parity with existing tenant isolation
 
 ### Step 23: Password reset and login trouble
-**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 20". Needs Step 19.**
+**Status: built on branch `step-23-password-reset` 2026-09-07, not merged. Migration 0035 (password_reset_requests) applied to live DB. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 20". Needs Step 19.**
+
+Built: self-service `/forgot-password` (public route, no account enumeration - same neutral response either way, dev shows the link on screen when email is not sending); a "Forgot your password?" link on `/login`; `sendPasswordResetForStaff` on the staff record page (a "Password" control in the Role and access section) for Admin or an HR manager for staff at their own service, which triggers the email without the leader ever seeing the link; `password_reset_requests` audit table (source self/admin, who, when, whether the email sent) with a "Last reset" line on the record. Reuses Supabase Auth's recovery token via the existing `/auth/confirm` route and `generatePasswordResetLink`. Verified end to end on localhost: self-service link set a password and signed in; admin trigger emailed the Resend account owner and recorded the row; sandbox rejections for other addresses are recorded with email_sent false.
 
 Self-service forgot-password using Supabase Auth's built-in reset token, emails via Resend. Plus an admin-triggered reset: a permitted role triggers the reset email for a staff member without seeing or setting the password. Rate limiting, token expiry and brute-force protection are Supabase's, not rebuilt. An audit trail records who requested, when, self versus admin-triggered.
 

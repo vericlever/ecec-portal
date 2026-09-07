@@ -94,3 +94,41 @@ export async function sendStaffInvite(opts: {
 
   return send({ to: opts.to, subject, html, text });
 }
+
+export async function sendPasswordReset(opts: {
+  to: string;
+  fullName: string;
+  link: string;
+  triggeredByLeader: boolean;
+}): Promise<SendResult> {
+  const firstName = opts.fullName.trim().split(/\s+/)[0] || "there";
+  const subject = "Reset your VeriClever password";
+
+  const reason = opts.triggeredByLeader
+    ? "Your administrator has started a password reset for your VeriClever account."
+    : "We received a request to reset the password for your VeriClever account.";
+
+  const text = [
+    `Hi ${firstName},`,
+    ``,
+    reason,
+    ``,
+    `Set a new password:`,
+    opts.link,
+    ``,
+    `If you did not expect this, you can ignore this email. The link expires`,
+    `after a short time and can only be used once.`,
+  ].join("\n");
+
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.5;color:#0f172a">
+  <p>Hi ${esc(firstName)},</p>
+  <p>${esc(reason)}</p>
+  <p style="margin:24px 0">
+    <a href="${esc(opts.link)}" style="background:#0f172a;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">Set a new password</a>
+  </p>
+  <p style="font-size:13px;color:#64748b">If the button does not work, copy this link into your browser:<br>${esc(opts.link)}</p>
+  <p style="font-size:13px;color:#64748b">If you did not expect this, you can ignore this email. The link expires after a short time and can only be used once.</p>
+</div>`;
+
+  return send({ to: opts.to, subject, html, text });
+}

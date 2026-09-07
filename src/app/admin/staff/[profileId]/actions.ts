@@ -7,6 +7,8 @@ import { getProfile, isHrManager, isAdmin, isManager } from "@/lib/auth";
 import { type AccessTier, ASSIGNABLE_TIERS } from "@/lib/roles";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { calcExpiry } from "@/lib/contracts";
+import { generatePasswordResetLink } from "@/lib/invite";
+import { emailEnabled, sendPasswordReset } from "@/lib/email";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -565,5 +567,70 @@ export async function setStaffAccessTier(
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/staff", "layout");
+  return { ok: true };
+}
+
+// Trigger a password reset email for a staff member. Admin anywhere in the
+// organisation, or an HR manager for staff at their own service. The person who
+// triggers it never sees or sets the password - Supabase mints the token and
+// the staff member follows the emailed link.
+export async function sendPasswordResetForStaff(
+  profileId: string,
+): Promise<Result> {
+  const me = await getProfile();
+  if (!me) return { ok: false, error: "Sign in." };
+  const admin = createAdminClient();
+
+  const { data: person } = await admin
+    .from("profiles")
+    .select("id, organisation_id, service_id, full_name, email")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!person || person.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Staff member not found." };
+  }
+  const allowed =
+    isAdmin(me.access_tier) ||
+    (isHrManager(me) && person.service_id === me.service_id);
+  if (!allowed) {
+    return { ok: false, error: "You cannot reset this person's password." };
+  }
+  if (!person.email) {
+    return { ok: false, error: "This account has no email address." };
+  }
+
+  const link = await generatePasswordResetLink(person.email as string);
+  if (!link.ok) return { ok: false, error: link.error };
+
+  let emailSent = false;
+  let sendError: string | null = null;
+  if (emailEnabled()) {
+    const sent = await sendPasswordReset({
+      to: person.email as string,
+      fullName: (person.full_name as string) ?? "",
+      link: link.link,
+      triggeredByLeader: true,
+    });
+    emailSent = sent.ok;
+    if (!sent.ok) sendError = sent.error;
+  }
+
+  // Record the attempt either way, so the audit trail shows it was triggered.
+  await admin.from("password_reset_requests").insert({
+    organisation_id: person.organisation_id,
+    target_email: person.email,
+    target_profile_id: person.id,
+    requested_by_profile_id: me.id,
+    source: "admin",
+    email_sent: emailSent,
+  });
+  revalidatePath(`/admin/staff/${profileId}`);
+
+  if (emailEnabled() && !emailSent) {
+    return {
+      ok: false,
+      error: `Recorded, but the email did not send: ${sendError ?? "unknown error"}`,
+    };
+  }
   return { ok: true };
 }
