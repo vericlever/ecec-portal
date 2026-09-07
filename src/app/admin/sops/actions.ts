@@ -5,6 +5,7 @@ import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
+import { cleanReviewPeriod } from "@/lib/constants";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -283,6 +284,8 @@ export async function setJobRole(
 export type SopBulkOutcome = {
   fileName: string;
   sopName: string;
+  sopId?: string;
+  hasText?: boolean;
   outcome: "created" | "attached" | "error";
   detail?: string;
 };
@@ -391,7 +394,9 @@ export async function bulkImportSops(
         updated_by: me.id,
       };
       const currentBody = existing?.body as string | null | undefined;
-      if ((!currentBody || !currentBody.trim()) && stored.document.extracted_text) {
+      const hadBody = !!(currentBody && currentBody.trim());
+      const gotText = !!(stored.document.extracted_text && stored.document.extracted_text.trim());
+      if (!hadBody && gotText) {
         patch.body = stored.document.extracted_text;
       }
       await admin.from("sops").update(patch).eq("id", sopId);
@@ -399,6 +404,8 @@ export async function bulkImportSops(
       outcomes.push({
         fileName: file.name,
         sopName,
+        sopId,
+        hasText: hadBody || gotText,
         outcome: attached ? "attached" : "created",
         detail: stored.document.extraction_note ?? undefined,
       });
@@ -427,4 +434,162 @@ export async function bulkImportSops(
   revalidatePath("/admin/sops");
   revalidatePath("/admin/job-roles");
   return { ok: true, outcomes };
+}
+
+// Page two of the bulk wizard. One call sets the job roles (which decide staff
+// visibility), the review period and next review date, and the policy links for
+// every uploaded SOP, then publishes the ones marked to publish that have text.
+// A SOP with no text stays an unpublished draft.
+export type SopBulkFinishItem = {
+  sopId: string;
+  jobRoleIds: string[];
+  reviewPeriod: number;
+  nextReviewDate: string;
+  linkedPolicyIds: string[];
+  publish: boolean;
+};
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function finishBulkSops(
+  items: SopBulkFinishItem[],
+): Promise<
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      published: number;
+      drafted: number;
+      failed: { name: string; error: string }[];
+    }
+> {
+  const me = await requireContentEditor();
+  if (!me.organisation_id) return { ok: false, error: "No organisation." };
+  if (items.length === 0) return { ok: false, error: "Nothing to publish." };
+
+  const admin = createAdminClient();
+  const ids = items.map((i) => i.sopId);
+  const { data: rows } = await admin
+    .from("sops")
+    .select("id, name, organisation_id, body, published_version")
+    .in("id", ids);
+  const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
+
+  const { data: policies } = await admin
+    .from("policies")
+    .select("id")
+    .eq("organisation_id", me.organisation_id);
+  const validPolicy = new Set((policies ?? []).map((p) => p.id as string));
+
+  const { data: roles } = await admin
+    .from("job_roles")
+    .select("id")
+    .eq("organisation_id", me.organisation_id);
+  const validRole = new Set((roles ?? []).map((r) => r.id as string));
+
+  const { data: currentLinks } = await admin
+    .from("job_role_sops")
+    .select("sop_id, job_role_id")
+    .in("sop_id", ids);
+  const rolesBySop = new Map<string, Set<string>>();
+  for (const l of currentLinks ?? []) {
+    const set = rolesBySop.get(l.sop_id as string) ?? new Set<string>();
+    set.add(l.job_role_id as string);
+    rolesBySop.set(l.sop_id as string, set);
+  }
+
+  const touchedRoles = new Set<string>();
+  let published = 0;
+  let drafted = 0;
+  const failed: { name: string; error: string }[] = [];
+
+  for (const item of items) {
+    const sop = byId.get(item.sopId);
+    if (!sop || sop.organisation_id !== me.organisation_id) continue;
+
+    const update: Record<string, unknown> = {
+      review_period_months: cleanReviewPeriod(item.reviewPeriod),
+      next_review_date: ISO_DATE.test(item.nextReviewDate)
+        ? item.nextReviewDate
+        : null,
+      updated_by: me.id,
+    };
+
+    const hasBody = !!(sop.body && String(sop.body).trim());
+    const doPublish = item.publish && hasBody;
+    if (doPublish) {
+      const next = ((sop.published_version as number | null) ?? 0) + 1;
+      update.published_version = next;
+      update.published_body = sop.body;
+      update.published_at = new Date().toISOString();
+      update.published_by = me.id;
+      update.current_version = next;
+    }
+
+    const { error } = await admin
+      .from("sops")
+      .update(update)
+      .eq("id", item.sopId);
+    if (error) {
+      failed.push({ name: sop.name as string, error: error.message });
+      continue;
+    }
+
+    // Sync job role attachment to the choices on page two.
+    const want = new Set(item.jobRoleIds.filter((r) => validRole.has(r)));
+    const have = rolesBySop.get(item.sopId) ?? new Set<string>();
+    for (const roleId of want) {
+      if (!have.has(roleId)) {
+        await admin.from("job_role_sops").insert({
+          organisation_id: me.organisation_id,
+          job_role_id: roleId,
+          sop_id: item.sopId,
+        });
+        touchedRoles.add(roleId);
+      }
+    }
+    for (const roleId of have) {
+      if (!want.has(roleId)) {
+        await admin
+          .from("job_role_sops")
+          .delete()
+          .eq("sop_id", item.sopId)
+          .eq("job_role_id", roleId);
+        touchedRoles.add(roleId);
+      }
+    }
+
+    for (const pid of item.linkedPolicyIds) {
+      if (!validPolicy.has(pid)) continue;
+      const { error: linkErr } = await admin.from("policy_sop_links").insert({
+        organisation_id: me.organisation_id,
+        policy_id: pid,
+        sop_id: item.sopId,
+      });
+      if (linkErr && !linkErr.message.includes("duplicate")) {
+        failed.push({ name: sop.name as string, error: linkErr.message });
+      }
+    }
+
+    if (doPublish) published += 1;
+    else drafted += 1;
+  }
+
+  // A role that gained or lost SOPs may no longer (or now) be a placeholder.
+  for (const roleId of touchedRoles) {
+    const { count } = await admin
+      .from("job_role_sops")
+      .select("sop_id", { count: "exact", head: true })
+      .eq("job_role_id", roleId);
+    await admin
+      .from("job_roles")
+      .update({ is_placeholder: (count ?? 0) === 0 })
+      .eq("id", roleId);
+  }
+
+  revalidatePath("/admin/sops");
+  revalidatePath("/admin/job-roles");
+  revalidatePath("/admin/policies");
+  revalidatePath("/sops");
+  revalidatePath("/policies");
+  return { ok: true, published, drafted, failed };
 }

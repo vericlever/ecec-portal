@@ -19,12 +19,12 @@ export default async function BulkPolicyUploadPage() {
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Bulk upload policies</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Select several policy documents at once. Each becomes a draft with its
-        name taken from the file name and its text pulled out automatically.
-        Word (.docx), PDF, plain text and HTML are read; a file whose name
-        matches an existing policy is attached to it rather than duplicated.
-        Nothing is shown to staff until you publish it. The categories you pick
-        below are applied to the new policies this upload creates.
+        Select several policy documents at once. Each takes its name from the
+        file name and has its text pulled out automatically. Word (.docx), PDF,
+        plain text and HTML are read; a file whose name matches an existing
+        policy is attached to it rather than duplicated. The next page lists
+        everything ready to publish in one step; a file with no readable text
+        stays a draft.
       </p>
       <BulkUpload categories={categories} />
     </div>

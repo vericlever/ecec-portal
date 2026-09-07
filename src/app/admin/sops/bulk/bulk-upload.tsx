@@ -1,18 +1,18 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
-import { bulkImportSops, type SopBulkOutcome } from "../actions";
+import { useRouter } from "next/navigation";
+import { bulkImportSops } from "../actions";
 
 export function SopBulkUpload({
   jobRoles,
 }: {
   jobRoles: { id: string; name: string }[];
 }) {
+  const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [signoffType, setSignoffType] = useState("self");
-  const [outcomes, setOutcomes] = useState<SopBulkOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,23 +26,34 @@ export function SopBulkUpload({
     start(async () => {
       setError(null);
       const r = await bulkImportSops(fd);
-      if (r.ok) {
-        setOutcomes(r.outcomes);
-        setFiles([]);
-        if (inputRef.current) inputRef.current.value = "";
-      } else {
+      if (!r.ok) {
         setError(r.error);
+        return;
       }
+      const ids = r.outcomes
+        .filter((o) => o.outcome !== "error" && o.sopId)
+        .map((o) => o.sopId as string);
+      const errs = r.outcomes.filter((o) => o.outcome === "error");
+      if (ids.length === 0) {
+        setError(
+          errs.length
+            ? `No files could be uploaded. ${errs[0].detail ?? ""}`
+            : "No files were uploaded.",
+        );
+        return;
+      }
+      const q = new URLSearchParams({ ids: ids.join(",") });
+      if (errs.length) q.set("failed", String(errs.length));
+      router.push(`/admin/sops/bulk/review?${q.toString()}`);
     });
   }
-
-  const created = outcomes?.filter((o) => o.outcome === "created").length ?? 0;
-  const attached = outcomes?.filter((o) => o.outcome === "attached").length ?? 0;
-  const failed = outcomes?.filter((o) => o.outcome === "error").length ?? 0;
 
   return (
     <div className="mt-6">
       <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <p className="mb-3 text-xs font-medium text-slate-500">
+          Step 1 of 2 &middot; Select files and set the defaults
+        </p>
         <input
           ref={inputRef}
           type="file"
@@ -58,15 +69,15 @@ export function SopBulkUpload({
         )}
 
         <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
-          <p className="text-xs text-slate-500">
-            These apply only to files that do <span className="font-medium">not</span>{" "}
-            match an existing SOP. A file that matches keeps that SOP&apos;s
-            current job roles and sign-off type.
-          </p>
           <div>
             <span className="text-sm font-medium text-slate-700">
-              Attach new SOPs to job roles
+              Job roles for the new SOPs
             </span>
+            <p className="text-xs text-slate-500">
+              This is what decides which staff see the SOP. You can change it per
+              SOP on the next page. A file that matches an existing SOP keeps
+              that SOP&apos;s current job roles.
+            </p>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
               {jobRoles.map((r) => (
                 <label key={r.id} className="flex items-center gap-1.5 text-sm">
@@ -93,10 +104,12 @@ export function SopBulkUpload({
             <select
               value={signoffType}
               onChange={(e) => setSignoffType(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm"
             >
               <option value="self">Staff sign-off</option>
-              <option value="self_and_manager">Staff and manager sign-off</option>
+              <option value="self_and_manager">
+                Staff and manager sign-off
+              </option>
             </select>
           </label>
         </div>
@@ -109,7 +122,7 @@ export function SopBulkUpload({
         >
           {pending
             ? "Uploading…"
-            : `Import ${files.length || ""} ${files.length === 1 ? "file" : "files"}`.trim()}
+            : `Upload ${files.length || ""} ${files.length === 1 ? "file" : "files"} and review`.trim()}
         </button>
       </div>
 
@@ -117,52 +130,6 @@ export function SopBulkUpload({
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </p>
-      )}
-
-      {outcomes && (
-        <div className="mt-4">
-          <p className="text-sm">
-            {created} created · {attached} attached to existing
-            {failed > 0 && (
-              <>
-                {" · "}
-                <span className="font-medium text-red-700">{failed}</span> failed
-              </>
-            )}
-          </p>
-          <ul className="mt-3 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white text-sm">
-            {outcomes.map((o, i) => (
-              <li key={i} className="px-4 py-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate">
-                    <span className="font-medium">{o.sopName}</span>{" "}
-                    <span className="text-slate-400">· {o.fileName}</span>
-                  </span>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      o.outcome === "error"
-                        ? "bg-red-100 text-red-700"
-                        : o.outcome === "attached"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {o.outcome === "attached" ? "Attached" : o.outcome === "created" ? "Created" : "Failed"}
-                  </span>
-                </div>
-                {o.detail && <p className="mt-1 text-xs text-slate-500">{o.detail}</p>}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-sm">
-            <Link
-              href="/admin/sops"
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700"
-            >
-              Back to SOPs to review and publish
-            </Link>
-          </p>
-        </div>
       )}
     </div>
   );
