@@ -219,7 +219,7 @@ A true native app in the app stores stays out of scope. It is a separate project
 - The portal installs to a phone or tablet home screen and opens as its own full-screen app
 
 ## Step 13: Compliance heatmap
-**Status: not started, confirmed in scope for v1.0. The dashboard at `/admin` already carries a "needs attention" list; this is the site-by-category grid on top.**
+**Status: SUPERSEDED by Step 27. The heatmap is now one section of the admin overview page (Step 27), not a standalone surface. Kept here so the change of scope is visible.**
 
 Aggregates the data from Steps 8, 10, 11, 16 and 17, staff sign-off completion, credential and visa status, contract renewal status, and agreement and contract signing, into one grid.
 
@@ -327,6 +327,122 @@ Recommended before Steps 13 to 15, since the heatmap in Step 13 should aggregate
 ### Policy categories (added 2026-09-03, done)
 
 Policies are organised into a per-organisation set of categories, seeded with Parent policies, General policies, HR policies, OHS policies and Other (OHS kept separate as a WorkSafe / OHS Act matter, distinct from the education and care National Law). Many-to-many, a policy can be in more than one. The "Parent policies" category carries the parent-notification meaning, and a trigger keeps `policies.is_parent_facing` in step, so it replaces the standalone parent-facing checkbox. Categories are for organising the library and for linking policies to SOPs, they do not control who sees a policy. The category picker appears on the new-policy form, the bulk upload (applied to newly created policies), and the policy editor. Both the admin policy list and the staff Policies view are grouped by category. Migration `0031`.
+
+## Revision, September 2026: SOP review cycle and admin command centre (Steps 19 to 27)
+
+Companion spec: `REVISION_SOP_REVIEW_CYCLE.md`, which holds the detail. This is new scope. It adds a recurring review cycle to every SOP, a practice-observation record for high-risk SOPs, optional outcome-evidence capture, a password reset flow, a two-page bulk upload wizard that publishes on review rather than leaving drafts, an itemised outstanding-items list on the staff profile, staff record editors for job role and access tier, and a single admin overview page that folds in the old Step 13 heatmap.
+
+The spec was written against an older step numbering (its "16 to 18" and "19" do not match this file). Its steps are renumbered here as 19 to 27. Its resolved decisions are carried in, plus these from Zeke on 2026-09-07:
+
+- **Password reset:** both self-service and an admin-triggered reset (admin never sees or sets the password, only triggers the email).
+- **Bulk import guard:** non-empty text check only, no minimum word count.
+- **Itemised outstanding list:** comprehensive. Every flag a staff member has anywhere (overdue SOPs, unsigned contract, unsigned agreements, credential expiries, contract renewal) is itemised on their profile.
+- **Bulk upload shape:** two pages. Page one selects files and sets the category. Page two lists every uploaded document pre-set to publish, where the category can be adjusted, the review date is set manually, and SOPs are linked to policies (or the reverse) via a dropdown. One "publish all" action. Nothing lands as a draft to be opened individually. This merges the spec's Step 21 and Step 24.
+- **Approval model:** the portal recognises Admin and Manager tiers only. "Approved provider" is not a role, just a label on a sign-off for display. Policy publishing is single approval, no dual gate.
+- **Admin overview vs staff list:** separate surfaces, shared query logic.
+
+### Step 19: Reminder engine
+**Status: not started. Prerequisite for Steps 20, 22, 23. The domain (`vericlever.site`) is now live so this is unblocked.**
+
+The deferred email half of Steps 7, 9 and 11. A scheduled job (Vercel Cron) that sends, via Resend from the verified `vericlever.site` domain: SOP-incomplete reminders, SOP and policy review reminders (Step 20), credential-expiry reminders, contract renewal alerts (4/3/2/1 week), and the Reg 172 parent digest. `notification_rules` table if not already present. Each email type respects the tier rules already written into Steps 7, 9 and 11.
+
+**Done when**
+- A staff member with an overdue SOP receives a reminder email from a `@vericlever.site` address
+- Contract renewal alerts fire at 4, 3, 2 and 1 week for Admin and Manager (policy)
+- Publishing several policies in a week produces one combined parent email
+
+### Step 20: SOP review cycle and reminder
+**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 16".**
+
+`review_period` on every SOP (3 / 6 / 12 months, default 6, fixed options). High-risk SOPs may override, reusing the existing high-risk tag. Computed review due date (last review plus period), overdue flag, reminder ahead of due via Step 19. A single per-SOP history log, `event_type` of `edit` / `period_change` / `review`. An out-of-sequence content edit offers the editor a choice to reset the review clock, not automatic.
+
+**Done when**
+- Every SOP has a computed due date and overdue SOPs surface a flag
+- A reminder fires ahead of the due date via Step 19
+- Every edit, period change and review writes one entry to the SOP history log
+
+### Step 21: SOP practice observation record
+**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 17".**
+
+An evidence log per SOP per review cycle: free-text evidence plus an outcome tag (needs-review / continue-as-is). On save, a popup asks whether to reset the review clock (default yes, using the SOP's existing period), respected regardless of the tag. Any manager tier and Admin can log an observation, not plain Staff. A needs-review flag routes into the existing SOP edit and approval pipeline and feeds the Step 27 heatmap.
+
+**Done when**
+- A manager can log an observation against any SOP
+- needs-review is visible on the SOP and feeds the Step 27 heatmap
+- The reset-clock popup on save is offered and its choice respected
+
+### Step 22: SOP outcome evidence capture
+**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 18". Introduces a new storage surface, include in the security review.**
+
+An optional "suggested evidence" hint field per SOP, pre-filled for template SOPs, editable or removable. A manager-entered evidence field at review time: free text plus file upload. New Supabase storage bucket with RLS parity to existing tenant isolation. No metrics registry, no live data integration.
+
+**Done when**
+- A SOP can carry a suggested-evidence hint
+- The review cycle captures a manager-entered evidence field with optional file upload
+- Uploaded evidence has RLS parity with existing tenant isolation
+
+### Step 23: Password reset and login trouble
+**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 20". Needs Step 19.**
+
+Self-service forgot-password using Supabase Auth's built-in reset token, emails via Resend. Plus an admin-triggered reset: a permitted role triggers the reset email for a staff member without seeing or setting the password. Rate limiting, token expiry and brute-force protection are Supabase's, not rebuilt. An audit trail records who requested, when, self versus admin-triggered.
+
+**Done when**
+- A staff member can request and complete a password reset by email
+- Admin (and Manager policy) can trigger a reset for another user without seeing or setting the password
+- An audit trail exists
+
+### Step 24: Bulk upload wizard, two pages
+**Status: not started. Merges spec "Step 21" and "Step 24". Trial-relevant.**
+
+Page one: select files (SOPs and/or policies), set a category. Page two: every uploaded document listed, each pre-set to publish, with the extracted-text status shown, the category adjustable, a review period set manually, and a dropdown to link SOPs to policies or policies to SOPs (reusing the Step 6 many-to-many model). One "publish all" action publishes everything through each document type's normal single-approval path. A document whose text extraction returned nothing stays a flagged draft and is excluded from the bulk publish. Job-role attachment is ticked on page one and is what actually controls staff visibility.
+
+**Done when**
+- An uploaded SOP with successful extraction is visible on a staff member's list immediately after the page-two publish, no per-document step, provided its job role was ticked
+- SOPs and policies with failed extraction remain flagged drafts
+- Policy-SOP links can be set from page two
+- Review period is set from page two for both document types
+
+### Step 25: Itemised outstanding items on the staff profile
+**Status: partly done. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 22". The staff record page already has an "Outstanding items" section from Step 8; this repositions and completes it.**
+
+Move the itemised list to sit directly under the identity line (email, role, service), above the HR manager control and training progress, so it is the first thing an admin sees. Include a count that matches the "Outstanding" figure on the staff list row. Itemise every flag that person carries: overdue SOPs (named), SOPs awaiting countersign, unviewed policies, unsigned contract, unsigned agreements (including code of conduct), unsighted documents, credential expiries, contract renewal. Code of conduct is an agreement (Step 17), not a new record type.
+
+**Done when**
+- The staff profile shows a named itemised list under the identity line, before any other section
+- The list total matches the "Outstanding" figure on the staff list row
+
+### Step 26: Staff record editors for job role and access tier, plus job-role assignment picker
+**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 23", resolved as option B. Trial blocker, build first.**
+
+**a.** Staff record page gets a job role editor: a dropdown of the organisation's job roles plus "No job role", and Save. New action `setStaffJobRole`. Who: Admin anywhere in the organisation, or an HR manager for staff at their own service. Changing the role swaps the SOP suite; old sign-offs stay as history but stop counting.
+
+**b.** Staff record page gets an access tier editor: Staff / Manager (staff) / Manager (staff, policy and procedures) / Admin, and Save. New action `setStaffAccessTier`. Who: Admin only. Guards: cannot change your own, and the last admin in an organisation cannot be demoted.
+
+**c.** Job roles page (`/admin/job-roles/[id]`) gets a staff assignment picker in the "Staff in this role" section: a searchable list of staff not in this role with Assign, and Remove next to each listed person. New actions `assignStaffToRole`, `removeStaffFromRole`. Who: Admin, or an HR manager for staff at their own service.
+
+Option B resolved: the job roles pages stay content-editor only. HR managers use route (a) from the staff record page. Content editors and Admin have both routes.
+
+**Done when**
+- An Admin or HR manager (own service) can change a job role from the staff record page and the SOP suite updates immediately
+- An Admin can change access tier with both guards enforced
+- An Admin or HR manager (own service) can assign or remove staff from a role via the job roles picker
+- HR managers cannot reach `/admin/job-roles/[id]`
+
+### Step 27: Admin overview page
+**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 25". Supersedes Step 13 and the old Step 19 report scope. Extends the existing `/admin` dashboard, does not replace it with a new page next to it.**
+
+Four sections, top to bottom, ordered by urgency:
+
+1. **Action queue** — overdue and needs-attention items first: SOP and policy review reminders (due and overdue, from Step 20), and unresolved needs-review flags from Step 21. Extends the existing "needs attention" list on `/admin`.
+2. **Structural integrity** — orphan SOPs (no policy link), orphan policies (no SOP link), and the link map, reusing the Step 6 linking model and the Step 24 linking dropdown.
+3. **Compliance heatmap** — the old Step 13 scope. Sites as rows, categories as columns, red/amber/green. Depends on Steps 8, 10, 11 and the Step 21 needs-review flags.
+4. **Review history log** — reads the Step 20 history log. Collapsed by default or reached by drill-down, not rendered in full on load.
+
+Separate from Step 25 (per-staff), but shares the same "outstanding" query logic where data overlaps.
+
+**Done when**
+- One admin page shows the action queue, structural integrity, heatmap, and a drill-down review history
+- All four sections read existing data (Step 20 log, Step 6 links, Step 21 flags, Steps 8/10/11 heatmap inputs), not a duplicated dataset
 
 ## Before RSG staff can use the portal
 
