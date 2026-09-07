@@ -309,9 +309,6 @@ export async function bulkImportSops(
   const newSignoff = SIGNOFF_TYPES.includes(String(formData.get("newSignoffType")))
     ? String(formData.get("newSignoffType"))
     : "self";
-  const newCategory = CATEGORIES.includes(String(formData.get("newCategory")))
-    ? String(formData.get("newCategory"))
-    : null;
 
   const admin = createAdminClient();
 
@@ -351,7 +348,7 @@ export async function bulkImportSops(
             name: sopName,
             status: null,
             signoff_type: newSignoff,
-            target_tier: newCategory,
+            target_tier: null,
             updated_by: me.id,
           })
           .select("id")
@@ -439,16 +436,20 @@ export async function bulkImportSops(
   return { ok: true, outcomes };
 }
 
-// Page two of the bulk wizard. One call sets the category, review period and
-// policy links for every uploaded SOP and publishes the ones marked to publish
-// that have text. A SOP with no text stays an unpublished draft.
+// Page two of the bulk wizard. One call sets the job roles (which decide staff
+// visibility), the review period and next review date, and the policy links for
+// every uploaded SOP, then publishes the ones marked to publish that have text.
+// A SOP with no text stays an unpublished draft.
 export type SopBulkFinishItem = {
   sopId: string;
-  category: string;
+  jobRoleIds: string[];
   reviewPeriod: number;
+  nextReviewDate: string;
   linkedPolicyIds: string[];
   publish: boolean;
 };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function finishBulkSops(
   items: SopBulkFinishItem[],
@@ -479,6 +480,24 @@ export async function finishBulkSops(
     .eq("organisation_id", me.organisation_id);
   const validPolicy = new Set((policies ?? []).map((p) => p.id as string));
 
+  const { data: roles } = await admin
+    .from("job_roles")
+    .select("id")
+    .eq("organisation_id", me.organisation_id);
+  const validRole = new Set((roles ?? []).map((r) => r.id as string));
+
+  const { data: currentLinks } = await admin
+    .from("job_role_sops")
+    .select("sop_id, job_role_id")
+    .in("sop_id", ids);
+  const rolesBySop = new Map<string, Set<string>>();
+  for (const l of currentLinks ?? []) {
+    const set = rolesBySop.get(l.sop_id as string) ?? new Set<string>();
+    set.add(l.job_role_id as string);
+    rolesBySop.set(l.sop_id as string, set);
+  }
+
+  const touchedRoles = new Set<string>();
   let published = 0;
   let drafted = 0;
   const failed: { name: string; error: string }[] = [];
@@ -487,10 +506,11 @@ export async function finishBulkSops(
     const sop = byId.get(item.sopId);
     if (!sop || sop.organisation_id !== me.organisation_id) continue;
 
-    const category = CATEGORIES.includes(item.category) ? item.category : null;
     const update: Record<string, unknown> = {
-      target_tier: category,
       review_period_months: cleanReviewPeriod(item.reviewPeriod),
+      next_review_date: ISO_DATE.test(item.nextReviewDate)
+        ? item.nextReviewDate
+        : null,
       updated_by: me.id,
     };
 
@@ -514,6 +534,30 @@ export async function finishBulkSops(
       continue;
     }
 
+    // Sync job role attachment to the choices on page two.
+    const want = new Set(item.jobRoleIds.filter((r) => validRole.has(r)));
+    const have = rolesBySop.get(item.sopId) ?? new Set<string>();
+    for (const roleId of want) {
+      if (!have.has(roleId)) {
+        await admin.from("job_role_sops").insert({
+          organisation_id: me.organisation_id,
+          job_role_id: roleId,
+          sop_id: item.sopId,
+        });
+        touchedRoles.add(roleId);
+      }
+    }
+    for (const roleId of have) {
+      if (!want.has(roleId)) {
+        await admin
+          .from("job_role_sops")
+          .delete()
+          .eq("sop_id", item.sopId)
+          .eq("job_role_id", roleId);
+        touchedRoles.add(roleId);
+      }
+    }
+
     for (const pid of item.linkedPolicyIds) {
       if (!validPolicy.has(pid)) continue;
       const { error: linkErr } = await admin.from("policy_sop_links").insert({
@@ -530,7 +574,20 @@ export async function finishBulkSops(
     else drafted += 1;
   }
 
+  // A role that gained or lost SOPs may no longer (or now) be a placeholder.
+  for (const roleId of touchedRoles) {
+    const { count } = await admin
+      .from("job_role_sops")
+      .select("sop_id", { count: "exact", head: true })
+      .eq("job_role_id", roleId);
+    await admin
+      .from("job_roles")
+      .update({ is_placeholder: (count ?? 0) === 0 })
+      .eq("id", roleId);
+  }
+
   revalidatePath("/admin/sops");
+  revalidatePath("/admin/job-roles");
   revalidatePath("/admin/policies");
   revalidatePath("/sops");
   revalidatePath("/policies");

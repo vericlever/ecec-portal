@@ -492,9 +492,12 @@ export type PolicyBulkFinishItem = {
   policyId: string;
   categoryIds: string[];
   reviewPeriod: number;
+  nextReviewDate: string;
   linkedSopIds: string[];
   publish: boolean;
 };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function finishBulkPolicies(
   items: PolicyBulkFinishItem[],
@@ -543,6 +546,9 @@ export async function finishBulkPolicies(
 
     const update: Record<string, unknown> = {
       review_period_months: cleanReviewPeriod(item.reviewPeriod),
+      next_review_date: ISO_DATE.test(item.nextReviewDate)
+        ? item.nextReviewDate
+        : null,
       updated_by: me.id,
     };
 

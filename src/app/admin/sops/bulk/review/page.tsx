@@ -34,22 +34,32 @@ export default async function SopBulkReviewPage({
     );
   }
 
-  const [{ data: sops }, { data: policies }, { data: links }, { data: roleLinks }] =
-    await Promise.all([
-      supabase
-        .from("sops")
-        .select(
-          "id, name, organisation_id, body, target_tier, review_period_months, published_version",
-        )
-        .in("id", ids),
-      supabase
-        .from("policies")
-        .select("id, name")
-        .eq("organisation_id", me.organisation_id)
-        .order("name"),
-      supabase.from("policy_sop_links").select("sop_id, policy_id").in("sop_id", ids),
-      supabase.from("job_role_sops").select("sop_id").in("sop_id", ids),
-    ]);
+  const [
+    { data: sops },
+    { data: policies },
+    { data: links },
+    { data: roleLinks },
+    { data: jobRoles },
+  ] = await Promise.all([
+    supabase
+      .from("sops")
+      .select(
+        "id, name, organisation_id, body, review_period_months, next_review_date, published_version",
+      )
+      .in("id", ids),
+    supabase
+      .from("policies")
+      .select("id, name")
+      .eq("organisation_id", me.organisation_id)
+      .order("name"),
+    supabase.from("policy_sop_links").select("sop_id, policy_id").in("sop_id", ids),
+    supabase.from("job_role_sops").select("sop_id, job_role_id").in("sop_id", ids),
+    supabase
+      .from("job_roles")
+      .select("id, name")
+      .eq("organisation_id", me.organisation_id)
+      .order("name"),
+  ]);
 
   const linkedBySop = new Map<string, string[]>();
   for (const l of links ?? []) {
@@ -57,9 +67,11 @@ export default async function SopBulkReviewPage({
     list.push(l.policy_id as string);
     linkedBySop.set(l.sop_id as string, list);
   }
-  const roleCount = new Map<string, number>();
-  for (const r of roleLinks ?? []) {
-    roleCount.set(r.sop_id as string, (roleCount.get(r.sop_id as string) ?? 0) + 1);
+  const rolesBySop = new Map<string, string[]>();
+  for (const l of roleLinks ?? []) {
+    const list = rolesBySop.get(l.sop_id as string) ?? [];
+    list.push(l.job_role_id as string);
+    rolesBySop.set(l.sop_id as string, list);
   }
 
   const rows = (sops ?? [])
@@ -70,10 +82,10 @@ export default async function SopBulkReviewPage({
       name: s.name as string,
       hasText: !!(s.body && String(s.body).trim()),
       alreadyPublished: (s.published_version as number | null) != null,
-      category: (s.target_tier as string | null) ?? "",
       reviewPeriod: (s.review_period_months as number | null) ?? 6,
+      nextReviewDate: (s.next_review_date as string | null) ?? null,
       linkedPolicyIds: linkedBySop.get(s.id as string) ?? [],
-      roleCount: roleCount.get(s.id as string) ?? 0,
+      jobRoleIds: rolesBySop.get(s.id as string) ?? [],
     }));
 
   const failed = Number(searchParams.failed ?? 0);
@@ -88,9 +100,10 @@ export default async function SopBulkReviewPage({
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Review and publish</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Step 2 of 2. Everything with readable text is set to publish. Adjust the
-        category, review period and any policy links, then publish the lot in
-        one step. A SOP with no readable text stays a draft for you to fix.
+        Step 2 of 2. Everything with readable text is set to publish. Check the
+        job roles, the next review date and any policy links, then publish the
+        lot in one step. A SOP with no readable text stays a draft for you to
+        fix.
       </p>
       {failed > 0 && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -102,6 +115,7 @@ export default async function SopBulkReviewPage({
       <SopBulkReview
         rows={rows}
         policies={(policies ?? []) as { id: string; name: string }[]}
+        jobRoles={(jobRoles ?? []) as { id: string; name: string }[]}
       />
     </div>
   );

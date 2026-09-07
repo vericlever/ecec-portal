@@ -14,15 +14,26 @@ type Row = {
   alreadyPublished: boolean;
   categoryIds: string[];
   reviewPeriod: number;
+  nextReviewDate: string | null;
   linkedSopIds: string[];
 };
 
 type State = {
   categoryIds: string[];
   reviewPeriod: number;
+  nextReviewDate: string;
   publish: boolean;
   linkedSopIds: string[];
 };
+
+function isoInDays(days: number): string {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
 
 export function PolicyBulkReview({
   rows,
@@ -44,13 +55,14 @@ export function PolicyBulkReview({
 
   const [state, setState] = useState<Record<string, State>>(() =>
     Object.fromEntries(
-      rows.map((r) => [
+      rows.map((r, i) => [
         r.id,
         {
           categoryIds: r.categoryIds,
           reviewPeriod: REVIEW_PERIODS.includes(r.reviewPeriod as 3 | 6 | 12)
             ? r.reviewPeriod
             : 6,
+          nextReviewDate: r.nextReviewDate ?? isoInDays(i * 7),
           publish: r.hasText,
           linkedSopIds: r.linkedSopIds,
         },
@@ -67,6 +79,28 @@ export function PolicyBulkReview({
     setState((cur) => ({ ...cur, [id]: { ...cur[id], ...next } }));
   }
 
+  function spreadFromHere(id: string) {
+    const idx = rows.findIndex((r) => r.id === id);
+    if (idx < 0) return;
+    const startVal = state[id].nextReviewDate;
+    const base = /^\d{4}-\d{2}-\d{2}$/.test(startVal)
+      ? new Date(startVal)
+      : new Date();
+    setState((cur) => {
+      const nextState = { ...cur };
+      rows.forEach((r, i) => {
+        if (i < idx) return;
+        const d = new Date(base);
+        d.setDate(d.getDate() + (i - idx) * 7);
+        nextState[r.id] = {
+          ...nextState[r.id],
+          nextReviewDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        };
+      });
+      return nextState;
+    });
+  }
+
   const publishCount = rows.filter(
     (r) => state[r.id]?.publish && r.hasText,
   ).length;
@@ -78,6 +112,7 @@ export function PolicyBulkReview({
         policyId: r.id,
         categoryIds: state[r.id].categoryIds,
         reviewPeriod: state[r.id].reviewPeriod,
+        nextReviewDate: state[r.id].nextReviewDate,
         linkedSopIds: state[r.id].linkedSopIds,
         publish: state[r.id].publish && r.hasText,
       }));
@@ -202,24 +237,49 @@ export function PolicyBulkReview({
                   ))}
                 </div>
               </div>
-              <label className="block text-sm">
-                <span className="text-xs font-medium text-slate-500">
-                  Review period
-                </span>
-                <select
-                  value={s.reviewPeriod}
-                  onChange={(e) =>
-                    patch(r.id, { reviewPeriod: Number(e.target.value) })
-                  }
-                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-                >
-                  {REVIEW_PERIODS.map((p) => (
-                    <option key={p} value={p}>
-                      {REVIEW_PERIOD_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-xs font-medium text-slate-500">
+                    Next review date
+                  </span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={s.nextReviewDate}
+                      onChange={(e) =>
+                        patch(r.id, { nextReviewDate: e.target.value })
+                      }
+                      className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => spreadFromHere(r.id)}
+                      className="text-xs text-slate-500 underline hover:text-slate-800"
+                      title="Set this date here and step every policy below it a week later"
+                    >
+                      Spread from here
+                    </button>
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500">
+                    Then review every
+                  </span>
+                  <select
+                    value={s.reviewPeriod}
+                    onChange={(e) =>
+                      patch(r.id, { reviewPeriod: Number(e.target.value) })
+                    }
+                    className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  >
+                    {REVIEW_PERIODS.map((p) => (
+                      <option key={p} value={p}>
+                        {REVIEW_PERIOD_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div className="mt-3 text-sm">

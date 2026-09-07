@@ -42,7 +42,7 @@ export default async function PolicyBulkReviewPage({
       supabase
         .from("policies")
         .select(
-          "id, name, organisation_id, body, review_period_months, published_version",
+          "id, name, organisation_id, body, review_period_months, next_review_date, published_version",
         )
         .in("id", ids),
       supabase
@@ -83,6 +83,7 @@ export default async function PolicyBulkReviewPage({
       alreadyPublished: (p.published_version as number | null) != null,
       categoryIds: catsByPolicy.get(p.id as string) ?? [],
       reviewPeriod: (p.review_period_months as number | null) ?? 6,
+      nextReviewDate: (p.next_review_date as string | null) ?? null,
       linkedSopIds: sopsByPolicy.get(p.id as string) ?? [],
     }));
 
@@ -98,9 +99,9 @@ export default async function PolicyBulkReviewPage({
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Review and publish</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Step 2 of 2. Everything with readable text is set to publish. Adjust the
-        categories, review period and any SOP links, then publish the lot in one
-        step. A policy with no readable text stays a draft for you to fix.
+        Step 2 of 2. Everything with readable text is set to publish. Check the
+        categories, the next review date and any SOP links, then publish the lot
+        in one step. A policy with no readable text stays a draft for you to fix.
       </p>
       {failed > 0 && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">

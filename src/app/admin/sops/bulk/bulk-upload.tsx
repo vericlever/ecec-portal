@@ -2,7 +2,6 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { SOP_TIER_LABELS, SOP_TIER_ORDER } from "@/lib/constants";
 import { bulkImportSops } from "../actions";
 
 export function SopBulkUpload({
@@ -14,7 +13,6 @@ export function SopBulkUpload({
   const [files, setFiles] = useState<File[]>([]);
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [signoffType, setSignoffType] = useState("self");
-  const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +23,6 @@ export function SopBulkUpload({
     for (const f of files) fd.append("files", f);
     for (const r of roleIds) fd.append("newRoleIds", r);
     fd.append("newSignoffType", signoffType);
-    if (category) fd.append("newCategory", category);
     start(async () => {
       setError(null);
       const r = await bulkImportSops(fd);
@@ -72,19 +69,14 @@ export function SopBulkUpload({
         )}
 
         <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
-          <p className="text-xs text-slate-500">
-            The job roles and sign-off type apply only to files that do{" "}
-            <span className="font-medium">not</span> match an existing SOP. A
-            file that matches keeps that SOP&apos;s current job roles and
-            sign-off type. You can change the category and review period per SOP
-            on the next page.
-          </p>
           <div>
             <span className="text-sm font-medium text-slate-700">
-              Attach new SOPs to job roles
+              Job roles for the new SOPs
             </span>
             <p className="text-xs text-slate-500">
-              This is what decides whether staff see the SOP.
+              This is what decides which staff see the SOP. You can change it per
+              SOP on the next page. A file that matches an existing SOP keeps
+              that SOP&apos;s current job roles.
             </p>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
               {jobRoles.map((r) => (
@@ -105,40 +97,21 @@ export function SopBulkUpload({
               ))}
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">
-                Sign-off type for new SOPs
-              </span>
-              <select
-                value={signoffType}
-                onChange={(e) => setSignoffType(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="self">Staff sign-off</option>
-                <option value="self_and_manager">
-                  Staff and manager sign-off
-                </option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">
-                Default category
-              </span>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="">No category</option>
-                {SOP_TIER_ORDER.map((t) => (
-                  <option key={t} value={t}>
-                    {SOP_TIER_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">
+              Sign-off type for new SOPs
+            </span>
+            <select
+              value={signoffType}
+              onChange={(e) => setSignoffType(e.target.value)}
+              className="mt-1 w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="self">Staff sign-off</option>
+              <option value="self_and_manager">
+                Staff and manager sign-off
+              </option>
+            </select>
+          </label>
         </div>
 
         <button
