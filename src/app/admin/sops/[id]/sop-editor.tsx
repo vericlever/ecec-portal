@@ -23,6 +23,7 @@ import {
   updateSopBody,
   updateSopMeta,
   updateSopReview,
+  updateSopSuggestedEvidence,
   uploadSopDocument,
 } from "../actions";
 
@@ -41,6 +42,7 @@ type Sop = {
   review_period_months: number;
   next_review_date: string | null;
   needs_review: boolean;
+  suggested_evidence: string;
 };
 
 type HistoryRow = {
@@ -89,6 +91,9 @@ export function SopEditor({
   const [reviewPeriod, setReviewPeriod] = useState(sop.review_period_months);
   const [nextReviewDate, setNextReviewDate] = useState(
     sop.next_review_date ?? "",
+  );
+  const [suggestedEvidence, setSuggestedEvidence] = useState(
+    sop.suggested_evidence,
   );
   // When the body has been edited and a future review date exists, ask whether
   // to reset the review clock as part of saving.
@@ -487,6 +492,37 @@ export function SopEditor({
             className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
           >
             Mark as reviewed now
+          </button>
+        </div>
+
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">
+              Suggested review evidence
+            </span>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Shown to a manager when they log a practice observation: what would
+              show this procedure is working (photos, rosters, records).
+            </p>
+            <textarea
+              value={suggestedEvidence}
+              onChange={(e) => setSuggestedEvidence(e.target.value)}
+              rows={2}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={pending || suggestedEvidence === sop.suggested_evidence}
+            onClick={() =>
+              act(
+                () => updateSopSuggestedEvidence(sop.id, suggestedEvidence),
+                "Saved",
+              )
+            }
+            className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+          >
+            Save suggested evidence
           </button>
         </div>
       </section>

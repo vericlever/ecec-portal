@@ -19,7 +19,7 @@ export default async function ObservationDetailPage({
   const { data: sop } = await supabase
     .from("sops")
     .select(
-      "id, name, organisation_id, signoff_type, needs_review, review_period_months, next_review_date, published_version, published_body",
+      "id, name, organisation_id, signoff_type, needs_review, suggested_evidence, review_period_months, next_review_date, published_version, published_body",
     )
     .eq("id", params.sopId)
     .maybeSingle();
@@ -27,7 +27,9 @@ export default async function ObservationDetailPage({
 
   const { data: observations } = await supabase
     .from("sop_observations")
-    .select("id, evidence, outcome, review_clock_reset, created_at, observed_by_profile_id")
+    .select(
+      "id, evidence, outcome, review_clock_reset, created_at, observed_by_profile_id, evidence_document_id",
+    )
     .eq("sop_id", params.sopId)
     .order("created_at", { ascending: false });
 
@@ -83,6 +85,7 @@ export default async function ObservationDetailPage({
           sopId={sop.id as string}
           resetDate={reviewDateFromNow(period)}
           keepDate={review.dueDate}
+          suggestedEvidence={(sop.suggested_evidence as string | null) ?? null}
         />
       </section>
 
@@ -122,6 +125,16 @@ export default async function ObservationDetailPage({
                 <p className="mt-1 whitespace-pre-wrap text-slate-700">
                   {o.evidence as string}
                 </p>
+                {o.evidence_document_id && (
+                  <p className="mt-1 text-xs">
+                    <a
+                      href={`/api/documents/${o.evidence_document_id}`}
+                      className="text-slate-600 underline"
+                    >
+                      Evidence file
+                    </a>
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-slate-400">
                   {o.review_clock_reset
                     ? "Review clock was reset"

@@ -378,7 +378,11 @@ An evidence log per SOP per review cycle: free-text evidence plus an outcome tag
 - The reset-clock popup on save is offered and its choice respected
 
 ### Step 22: SOP outcome evidence capture
-**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 18". Introduces a new storage surface, include in the security review.**
+**Status: built on branch `step-22-outcome-evidence` 2026-09-08, not merged. Migration 0038 (evidence schema + RLS review fixes) applied to live DB.**
+
+Built: `sops.suggested_evidence` (a hint a content editor sets in the SOP editor Review cycle section, shown to a manager at observation time); `sop_observations.evidence_document_id` (an optional file per observation). The observation form shows the hint and takes a file, stored in the existing `documents` store as `owner_type = 'sop_evidence'` (manager-only) rather than a second bucket. The download route gates `sop_evidence` on any manager tier.
+
+**Comprehensive RLS review done alongside** (`scripts/rls-check.mjs`, `SECURITY_REVIEW_2026-09.md`): cross-tenant isolation verified clean across all 38 tables and six identities; five write-escalation probes all rejected or no-op. Migration 0038 also fixed within-org over-exposure: `documents_select` was org-wide for every owner_type (exposing contract / identity document metadata to all staff) - now scoped to the owning record; `sign_offs_insert` and `policy_views_insert` allowed a manager to forge a staff member's record - restricted to self; `credentials` and `notification_rules` (schema-ready, no UI) tightened.
 
 An optional "suggested evidence" hint field per SOP, pre-filled for template SOPs, editable or removable. A manager-entered evidence field at review time: free text plus file upload. New Supabase storage bucket with RLS parity to existing tenant isolation. No metrics registry, no live data integration.
 

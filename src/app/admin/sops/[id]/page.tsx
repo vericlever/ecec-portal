@@ -90,6 +90,7 @@ export default async function SopDetailPage({
           review_period_months: sop.review_period_months ?? 6,
           next_review_date: sop.next_review_date ?? null,
           needs_review: Boolean(sop.needs_review),
+          suggested_evidence: sop.suggested_evidence ?? "",
         }}
         history={historyRows}
         services={(services ?? []) as { id: string; name: string }[]}
