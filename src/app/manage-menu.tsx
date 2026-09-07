@@ -48,6 +48,7 @@ export function ManageMenu({
     }
     if (canCountersign) {
       items.push({ href: "/admin/countersign", label: "SOP countersigning" });
+      items.push({ href: "/admin/observations", label: "Practice observations" });
     }
     groups.push({ label: "Staff", items });
   }

@@ -70,6 +70,7 @@ export function SiteNav(props: SiteNavProps) {
     }
     if (canCountersign) {
       items.push({ href: "/admin/countersign", label: "SOP countersigning" });
+      items.push({ href: "/admin/observations", label: "Practice observations" });
     }
     manageGroups.push({ label: "Staff", items });
   }

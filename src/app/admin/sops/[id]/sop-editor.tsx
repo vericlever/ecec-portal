@@ -40,6 +40,7 @@ type Sop = {
   published_at: string | null;
   review_period_months: number;
   next_review_date: string | null;
+  needs_review: boolean;
 };
 
 type HistoryRow = {
@@ -165,6 +166,13 @@ export function SopEditor({
         <p className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
           Publishing changes bumps the version. Every staff member who signed the
           old version has to read and sign again.
+        </p>
+      )}
+      {sop.needs_review && (
+        <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
+          A practice observation flagged this SOP for review. Publishing a new
+          version or marking it reviewed in the Review cycle section clears this
+          flag.
         </p>
       )}
       {msg && <p className="text-sm text-green-700">{msg}</p>}

@@ -1,0 +1,98 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { getProfile, isManager } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { cleanReviewPeriod } from "@/lib/constants";
+import { reviewDateFromNow } from "@/lib/sop-review";
+
+type Result = { ok: true } | { ok: false; error: string };
+
+// A manager records what they saw when a procedure was carried out. A
+// needs-review outcome raises the flag on the SOP; the reset-clock choice is
+// made by the manager on save and respected regardless of the outcome tag.
+export async function logSopObservation(
+  sopId: string,
+  input: {
+    evidence: string;
+    outcome: "needs_review" | "continue_as_is";
+    resetClock: boolean;
+  },
+): Promise<Result> {
+  const me = await getProfile();
+  if (!me || !me.organisation_id || !isManager(me.access_tier)) {
+    return {
+      ok: false,
+      error: "Only a manager can log a practice observation.",
+    };
+  }
+  const evidence = input.evidence.trim();
+  if (!evidence) return { ok: false, error: "Describe what you observed." };
+  if (input.outcome !== "needs_review" && input.outcome !== "continue_as_is") {
+    return { ok: false, error: "Choose an outcome." };
+  }
+
+  const admin = createAdminClient();
+  const { data: sop } = await admin
+    .from("sops")
+    .select(
+      "id, organisation_id, name, review_period_months, next_review_date, published_version",
+    )
+    .eq("id", sopId)
+    .maybeSingle();
+  if (!sop || sop.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "SOP not found." };
+  }
+  if (sop.published_version == null) {
+    return { ok: false, error: "This SOP is not published yet." };
+  }
+
+  const period = cleanReviewPeriod(sop.review_period_months);
+  const newDue = input.resetClock ? reviewDateFromNow(period) : null;
+
+  const { error: obsErr } = await admin.from("sop_observations").insert({
+    organisation_id: me.organisation_id,
+    sop_id: sopId,
+    observed_by_profile_id: me.id,
+    service_id: me.service_id,
+    evidence,
+    outcome: input.outcome,
+    review_clock_reset: input.resetClock,
+  });
+  if (obsErr) return { ok: false, error: obsErr.message };
+
+  const sopPatch: Record<string, unknown> = { updated_by: me.id };
+  if (input.outcome === "needs_review") sopPatch.needs_review = true;
+  if (newDue) sopPatch.next_review_date = newDue;
+  await admin.from("sops").update(sopPatch).eq("id", sopId);
+
+  // Every observation writes one entry to the single per-SOP history log.
+  const excerpt =
+    evidence.length > 120 ? evidence.slice(0, 117) + "…" : evidence;
+  await admin.from("sop_history").insert({
+    organisation_id: me.organisation_id,
+    sop_id: sopId,
+    event_type: "review",
+    actor_profile_id: me.id,
+    note:
+      `Practice observation — ${
+        input.outcome === "needs_review" ? "needs review" : "continue as is"
+      }. ${excerpt}` +
+      (newDue
+        ? ` Review clock reset to ${newDue}.`
+        : " Review clock unchanged."),
+    detail: {
+      observation: true,
+      outcome: input.outcome,
+      review_clock_reset: input.resetClock,
+      new_due: newDue,
+    },
+  });
+
+  revalidatePath("/admin/observations");
+  revalidatePath(`/admin/observations/${sopId}`);
+  revalidatePath("/admin/sops");
+  revalidatePath(`/admin/sops/${sopId}`);
+  revalidatePath("/admin");
+  return { ok: true };
+}
