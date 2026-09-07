@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { fmtReviewDate } from "@/lib/sop-review";
 import { logSopObservation } from "../actions";
@@ -9,10 +9,12 @@ export function ObservationForm({
   sopId,
   resetDate,
   keepDate,
+  suggestedEvidence,
 }: {
   sopId: string;
   resetDate: string;
   keepDate: string | null;
+  suggestedEvidence: string | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -23,20 +25,24 @@ export function ObservationForm({
   const [askClock, setAskClock] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function submit(resetClock: boolean) {
     start(async () => {
       setErr(null);
-      const r = await logSopObservation(sopId, {
-        evidence,
-        outcome: outcome as "needs_review" | "continue_as_is",
-        resetClock,
-      });
+      const fd = new FormData();
+      fd.append("evidence", evidence);
+      fd.append("outcome", outcome);
+      fd.append("resetClock", resetClock ? "1" : "0");
+      const f = fileRef.current?.files?.[0];
+      if (f) fd.append("file", f);
+      const r = await logSopObservation(sopId, fd);
       if (r.ok) {
         setDone(true);
         setEvidence("");
         setOutcome("");
         setAskClock(false);
+        if (fileRef.current) fileRef.current.value = "";
         router.refresh();
       } else {
         setErr(r.error);
@@ -62,6 +68,15 @@ export function ObservationForm({
 
   return (
     <div className="mt-3 space-y-3">
+      {suggestedEvidence && (
+        <p className="rounded-md border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">
+          <span className="font-medium text-slate-700">
+            Suggested evidence:
+          </span>{" "}
+          {suggestedEvidence}
+        </p>
+      )}
+
       <label className="block text-sm">
         <span className="font-medium text-slate-700">What did you observe?</span>
         <textarea
@@ -70,6 +85,19 @@ export function ObservationForm({
           rows={4}
           placeholder="What you saw, who was involved, anything that did or did not match the procedure."
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </label>
+
+      <label className="block text-sm">
+        <span className="font-medium text-slate-700">
+          Evidence file{" "}
+          <span className="font-normal text-slate-400">(optional)</span>
+        </span>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,image/*"
+          className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-slate-50 file:px-3 file:py-1.5 file:text-xs file:font-medium"
         />
       </label>
 
@@ -136,7 +164,9 @@ export function ObservationForm({
               onClick={() => submit(true)}
               className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
             >
-              Save & reset to {fmtReviewDate(resetDate)}
+              {pending
+                ? "Saving…"
+                : `Save & reset to ${fmtReviewDate(resetDate)}`}
             </button>
             <button
               type="button"

@@ -145,6 +145,24 @@ export async function updateSopMeta(
   return { ok: true };
 }
 
+// The per-SOP "suggested evidence" hint a manager sees at review time (Step 22).
+export async function updateSopSuggestedEvidence(
+  id: string,
+  text: string,
+): Promise<Result> {
+  const owned = await ownedSop(id);
+  if (!owned) return { ok: false, error: "SOP not found." };
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("sops")
+    .update({ suggested_evidence: text.trim() || null, updated_by: owned.me.id })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/sops/${id}`);
+  revalidatePath(`/admin/observations/${id}`);
+  return { ok: true };
+}
+
 export async function updateSopBody(
   id: string,
   body: string,

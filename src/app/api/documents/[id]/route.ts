@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getProfile } from "@/lib/auth";
-import { canEditContent } from "@/lib/roles";
+import { canEditContent, isManager } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { signedDocumentUrl } from "@/lib/documents/store";
 
@@ -47,6 +47,11 @@ export async function GET(
       .eq("id", doc.owner_id)
       .maybeSingle();
     if (!owner) return new NextResponse("Not found", { status: 404 });
+  } else if (doc.owner_type === "sop_evidence") {
+    // Practice-observation evidence: any manager tier in the organisation.
+    if (!isManager(me.access_tier)) {
+      return new NextResponse("Not found", { status: 404 });
+    }
   } else if (!canEditContent(me.access_tier)) {
     return new NextResponse("Not found", { status: 404 });
   }
