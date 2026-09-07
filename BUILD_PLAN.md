@@ -392,7 +392,7 @@ Self-service forgot-password using Supabase Auth's built-in reset token, emails 
 - An audit trail exists
 
 ### Step 24: Bulk upload wizard, two pages
-**Status: not started. Merges spec "Step 21" and "Step 24". Trial-relevant.**
+**Status: built on branch `step-24-bulk-wizard` 2026-09-07, not merged. Migration 0032 (review_period_months on sops and policies) applied to live DB. Merges spec "Step 21" and "Step 24". Trial-relevant.**
 
 Page one: select files (SOPs and/or policies), set a category. Page two: every uploaded document listed, each pre-set to publish, with the extracted-text status shown, the category adjustable, a review period set manually, and a dropdown to link SOPs to policies or policies to SOPs (reusing the Step 6 many-to-many model). One "publish all" action publishes everything through each document type's normal single-approval path. A document whose text extraction returned nothing stays a flagged draft and is excluded from the bulk publish. Job-role attachment is ticked on page one and is what actually controls staff visibility.
 

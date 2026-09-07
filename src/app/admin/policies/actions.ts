@@ -5,6 +5,7 @@ import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
+import { cleanReviewPeriod } from "@/lib/constants";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -353,6 +354,8 @@ export async function unlinkSop(policyId: string, sopId: string): Promise<Result
 export type BulkOutcome = {
   fileName: string;
   policyName: string;
+  policyId?: string;
+  hasText?: boolean;
   outcome: "created" | "attached" | "error";
   detail?: string;
 };
@@ -451,7 +454,11 @@ export async function bulkImportPolicies(
         updated_by: me.id,
       };
       const currentBody = existing?.body as string | null | undefined;
-      if ((!currentBody || !currentBody.trim()) && stored.document.extracted_text) {
+      const hadBody = !!(currentBody && currentBody.trim());
+      const gotText = !!(
+        stored.document.extracted_text && stored.document.extracted_text.trim()
+      );
+      if (!hadBody && gotText) {
         patch.body = stored.document.extracted_text;
       }
       await admin.from("policies").update(patch).eq("id", policyId);
@@ -459,6 +466,8 @@ export async function bulkImportPolicies(
       outcomes.push({
         fileName: file.name,
         policyName,
+        policyId,
+        hasText: hadBody || gotText,
         outcome: attached ? "attached" : "created",
         detail: stored.document.extraction_note ?? undefined,
       });
@@ -474,4 +483,107 @@ export async function bulkImportPolicies(
 
   revalidatePath("/admin/policies");
   return { ok: true, outcomes };
+}
+
+// Page two of the bulk wizard. Sets categories, review period and SOP links for
+// every uploaded policy and publishes the ones marked to publish that have
+// text. A policy with no text stays an unpublished draft.
+export type PolicyBulkFinishItem = {
+  policyId: string;
+  categoryIds: string[];
+  reviewPeriod: number;
+  linkedSopIds: string[];
+  publish: boolean;
+};
+
+export async function finishBulkPolicies(
+  items: PolicyBulkFinishItem[],
+): Promise<
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      published: number;
+      drafted: number;
+      failed: { name: string; error: string }[];
+    }
+> {
+  const me = await requireContentEditor();
+  if (!me.organisation_id) return { ok: false, error: "No organisation." };
+  if (items.length === 0) return { ok: false, error: "Nothing to publish." };
+
+  const admin = createAdminClient();
+  const ids = items.map((i) => i.policyId);
+  const { data: rows } = await admin
+    .from("policies")
+    .select("id, name, organisation_id, body, published_version")
+    .in("id", ids);
+  const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
+
+  const { data: sops } = await admin
+    .from("sops")
+    .select("id")
+    .eq("organisation_id", me.organisation_id);
+  const validSop = new Set((sops ?? []).map((s) => s.id as string));
+
+  let published = 0;
+  let drafted = 0;
+  const failed: { name: string; error: string }[] = [];
+
+  for (const item of items) {
+    const policy = byId.get(item.policyId);
+    if (!policy || policy.organisation_id !== me.organisation_id) continue;
+
+    await applyCategories(
+      admin,
+      me.organisation_id,
+      item.policyId,
+      item.categoryIds,
+      { replace: true },
+    );
+
+    const update: Record<string, unknown> = {
+      review_period_months: cleanReviewPeriod(item.reviewPeriod),
+      updated_by: me.id,
+    };
+
+    const hasBody = !!(policy.body && String(policy.body).trim());
+    const doPublish = item.publish && hasBody;
+    if (doPublish) {
+      const next = ((policy.published_version as number | null) ?? 0) + 1;
+      update.published_version = next;
+      update.published_body = policy.body;
+      update.published_at = new Date().toISOString();
+      update.published_by = me.id;
+      update.current_version = next;
+    }
+
+    const { error } = await admin
+      .from("policies")
+      .update(update)
+      .eq("id", item.policyId);
+    if (error) {
+      failed.push({ name: policy.name as string, error: error.message });
+      continue;
+    }
+
+    for (const sid of item.linkedSopIds) {
+      if (!validSop.has(sid)) continue;
+      const { error: linkErr } = await admin.from("policy_sop_links").insert({
+        organisation_id: me.organisation_id,
+        policy_id: item.policyId,
+        sop_id: sid,
+      });
+      if (linkErr && !linkErr.message.includes("duplicate")) {
+        failed.push({ name: policy.name as string, error: linkErr.message });
+      }
+    }
+
+    if (doPublish) published += 1;
+    else drafted += 1;
+  }
+
+  revalidatePath("/admin/policies");
+  revalidatePath("/admin/sops");
+  revalidatePath("/policies");
+  return { ok: true, published, drafted, failed };
 }

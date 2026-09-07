@@ -20,11 +20,11 @@ export default async function BulkSopUploadPage() {
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Bulk upload SOPs</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Select several SOP documents at once. Each becomes a draft with its name
-        from the file name and its text pulled out automatically. A file whose
-        name matches an existing SOP is attached to it and fills its empty
-        content, rather than duplicating. Nothing is shown to staff until you
-        publish it.
+        Select several SOP documents at once. Each takes its name from the file
+        name and has its text pulled out automatically. A file whose name
+        matches an existing SOP is attached to it and fills its empty content,
+        rather than duplicating. The next page lists everything ready to
+        publish in one step; a file with no readable text stays a draft.
       </p>
       <SopBulkUpload
         jobRoles={(jobRoles ?? []) as { id: string; name: string }[]}
