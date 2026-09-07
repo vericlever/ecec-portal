@@ -443,7 +443,9 @@ Option B resolved: the job roles pages stay content-editor only. HR managers use
 - HR managers cannot reach `/admin/job-roles/[id]`
 
 ### Step 27: Admin overview page
-**Status: not started. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 25". Supersedes Step 13 and the old Step 19 report scope. Extends the existing `/admin` dashboard, does not replace it with a new page next to it.**
+**Status: built on branch `step-27-admin-overview` 2026-09-08, not merged. No migration. Extends `/admin/page.tsx`.**
+
+The `/admin` dashboard now runs, top to bottom: the stat cards; an **Action queue** (the old "needs attention" list, plus "SOPs and policies due for review" with an overdue count for content editors, and "SOPs flagged by a practice observation" for managers), with a collapsible "Review cycle detail" listing each due/overdue SOP and policy and each flagged SOP; a **Structural integrity** block for content editors (published SOPs with no policy link, published policies with no SOP link, each named and linked, plus a link-count summary); a **Compliance heatmap** table (one row per service, columns Staff / Fully compliant / SOPs signed / Policies read / Outstanding, the percentages colour-coded green/amber/red); and a collapsible **Review history log** for content editors reading `sop_history` (last 20 events). All sections read existing data. Verified as admin and as a manager_staff (editor-only sections correctly hidden).
 
 Four sections, top to bottom, ordered by urgency:
 
