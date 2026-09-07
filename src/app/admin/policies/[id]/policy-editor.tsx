@@ -3,15 +3,19 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { PolicyCategory } from "@/lib/policy-categories";
+import { REVIEW_PERIODS, REVIEW_PERIOD_LABELS } from "@/lib/constants";
+import { fmtReviewDate, reviewDateFromNow, reviewState } from "@/lib/sop-review";
 import {
   deletePolicy,
   linkSop,
+  markPolicyReviewed,
   publishPolicy,
   setPolicyCategory,
   unlinkSop,
   unpublishPolicy,
   updatePolicyBody,
   updatePolicyMeta,
+  updatePolicyReview,
   uploadPolicyDocument,
 } from "../actions";
 
@@ -24,6 +28,8 @@ type Policy = {
   published_body: string;
   published_version: number | null;
   published_at: string | null;
+  review_period_months: number;
+  next_review_date: string | null;
 };
 
 export function PolicyEditor({
@@ -56,6 +62,15 @@ export function PolicyEditor({
   const [name, setName] = useState(policy.name);
   const [serviceId, setServiceId] = useState(policy.service_id ?? "");
   const [body, setBody] = useState(policy.body);
+
+  const [reviewPeriod, setReviewPeriod] = useState(policy.review_period_months);
+  const [nextReviewDate, setNextReviewDate] = useState(
+    policy.next_review_date ?? "",
+  );
+  const review = reviewState(policy.next_review_date);
+  const reviewDirty =
+    reviewPeriod !== policy.review_period_months ||
+    nextReviewDate !== (policy.next_review_date ?? "");
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [sopToAdd, setSopToAdd] = useState("");
@@ -297,6 +312,81 @@ export function PolicyEditor({
               Publish to make these changes visible to staff.
             </span>
           )}
+        </div>
+      </section>
+
+      {/* Review cycle */}
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Review cycle
+        </h2>
+        <p
+          className={`mt-2 text-sm font-medium ${
+            review.status === "overdue"
+              ? "text-red-700"
+              : review.status === "soon"
+                ? "text-amber-700"
+                : "text-slate-700"
+          }`}
+        >
+          {review.label}
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Review every</span>
+            <select
+              value={reviewPeriod}
+              onChange={(e) => setReviewPeriod(Number(e.target.value))}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              {REVIEW_PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {REVIEW_PERIOD_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Next review date</span>
+            <input
+              type="date"
+              value={nextReviewDate}
+              onChange={(e) => setNextReviewDate(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={pending || !reviewDirty}
+            onClick={() =>
+              act(
+                () =>
+                  updatePolicyReview(policy.id, { reviewPeriod, nextReviewDate }),
+                "Review schedule saved",
+              )
+            }
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+          >
+            Save review schedule
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (
+                !confirm(
+                  `Mark this policy as reviewed now? The next review moves to ${fmtReviewDate(reviewDateFromNow(policy.review_period_months))}.`,
+                )
+              )
+                return;
+              act(() => markPolicyReviewed(policy.id), "Marked as reviewed");
+            }}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+          >
+            Mark as reviewed now
+          </button>
         </div>
       </section>
 

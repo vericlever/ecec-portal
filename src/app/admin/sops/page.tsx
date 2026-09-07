@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SOP_TIER_LABELS } from "@/lib/constants";
+import { reviewState } from "@/lib/sop-review";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ type SopRow = {
   published_body: string | null;
   published_version: number | null;
   service_id: string | null;
+  next_review_date: string | null;
 };
 
 function statusOf(s: SopRow): { label: string; tone: "grey" | "amber" | "green" | "blue" } {
@@ -43,7 +45,7 @@ export default async function AdminSopsPage() {
       supabase
         .from("sops")
         .select(
-          "id, name, target_tier, signoff_type, priority, body, published_body, published_version, service_id",
+          "id, name, target_tier, signoff_type, priority, body, published_body, published_version, service_id, next_review_date",
         )
         .order("name"),
       supabase.from("services").select("id, name"),
@@ -58,6 +60,9 @@ export default async function AdminSopsPage() {
   const rows = (sops ?? []) as SopRow[];
   const publishedCount = rows.filter((s) => s.published_version).length;
   const needsContent = rows.filter((s) => statusOf(s).label === "Needs content").length;
+  const reviewOverdue = rows.filter(
+    (s) => s.published_version && reviewState(s.next_review_date).status === "overdue",
+  ).length;
 
   return (
     <div>
@@ -82,12 +87,21 @@ export default async function AdminSopsPage() {
       <p className="mt-1 text-sm text-slate-500">
         {rows.length} SOPs · {publishedCount} published
         {needsContent > 0 && ` · ${needsContent} still need content`}
+        {reviewOverdue > 0 && (
+          <span className="text-red-700">
+            {" "}
+            · {reviewOverdue} overdue for review
+          </span>
+        )}
       </p>
 
       <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
         {rows.map((s) => {
           const st = statusOf(s);
           const roles = roleCount.get(s.id) ?? 0;
+          const rev = s.published_version
+            ? reviewState(s.next_review_date)
+            : null;
           return (
             <li key={s.id}>
               <Link
@@ -115,11 +129,24 @@ export default async function AdminSopsPage() {
                       : " · not in any role"}
                   </div>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TONE[st.tone]}`}
-                >
-                  {st.label}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {rev && (rev.status === "overdue" || rev.status === "soon") && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        rev.status === "overdue"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {rev.status === "overdue" ? "Review overdue" : "Review due"}
+                    </span>
+                  )}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${TONE[st.tone]}`}
+                  >
+                    {st.label}
+                  </span>
+                </div>
               </Link>
             </li>
           );

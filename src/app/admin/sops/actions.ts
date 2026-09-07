@@ -6,8 +6,32 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { cleanReviewPeriod } from "@/lib/constants";
+import { reviewDateFromNow } from "@/lib/sop-review";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
+
+type SopEvent = "edit" | "period_change" | "review";
+
+async function logSopEvent(
+  admin: ReturnType<typeof createAdminClient>,
+  opts: {
+    organisationId: string;
+    sopId: string;
+    eventType: SopEvent;
+    actorId: string;
+    note?: string;
+    detail?: Record<string, unknown>;
+  },
+) {
+  await admin.from("sop_history").insert({
+    organisation_id: opts.organisationId,
+    sop_id: opts.sopId,
+    event_type: opts.eventType,
+    actor_profile_id: opts.actorId,
+    note: opts.note ?? null,
+    detail: opts.detail ?? null,
+  });
+}
 
 const CATEGORIES = [
   "educator",
@@ -23,7 +47,9 @@ async function ownedSop(id: string) {
   const supabase = createClient();
   const { data } = await supabase
     .from("sops")
-    .select("id, organisation_id, name, body, published_body, published_version")
+    .select(
+      "id, organisation_id, name, body, published_body, published_version, review_period_months, next_review_date",
+    )
     .eq("id", id)
     .maybeSingle();
   if (!data || data.organisation_id !== me.organisation_id) return null;
@@ -119,16 +145,142 @@ export async function updateSopMeta(
   return { ok: true };
 }
 
-export async function updateSopBody(id: string, body: string): Promise<Result> {
+export async function updateSopBody(
+  id: string,
+  body: string,
+  resetReviewClock = false,
+): Promise<Result> {
   const owned = await ownedSop(id);
   if (!owned) return { ok: false, error: "SOP not found." };
   const admin = createAdminClient();
+
+  const patch: Record<string, unknown> = {
+    body: body.trim() || null,
+    updated_by: owned.me.id,
+  };
+  const period = cleanReviewPeriod(owned.sop.review_period_months);
+  let newDue: string | null = null;
+  if (resetReviewClock) {
+    newDue = reviewDateFromNow(period);
+    patch.next_review_date = newDue;
+  }
+
+  const { error } = await admin.from("sops").update(patch).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  await logSopEvent(admin, {
+    organisationId: owned.sop.organisation_id,
+    sopId: id,
+    eventType: "edit",
+    actorId: owned.me.id,
+    note: resetReviewClock
+      ? `Content edited; review clock reset to ${newDue}`
+      : "Content edited",
+    detail: resetReviewClock
+      ? {
+          review_clock_reset: true,
+          previous_due: owned.sop.next_review_date,
+          new_due: newDue,
+        }
+      : { review_clock_reset: false },
+  });
+
+  revalidatePath(`/admin/sops/${id}`);
+  revalidatePath("/admin/sops");
+  return { ok: true };
+}
+
+// Save the review schedule: the cadence and the explicit next date. Any change
+// to either writes one period_change event so the history shows the schedule
+// moving.
+export async function updateSopReview(
+  id: string,
+  input: { reviewPeriod: number; nextReviewDate: string },
+): Promise<Result> {
+  const owned = await ownedSop(id);
+  if (!owned) return { ok: false, error: "SOP not found." };
+
+  const period = cleanReviewPeriod(input.reviewPeriod);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(input.nextReviewDate)
+    ? input.nextReviewDate
+    : null;
+
+  const prevPeriod = cleanReviewPeriod(owned.sop.review_period_months);
+  const prevDate = (owned.sop.next_review_date as string | null) ?? null;
+  if (period === prevPeriod && date === prevDate) return { ok: true };
+
+  const admin = createAdminClient();
   const { error } = await admin
     .from("sops")
-    .update({ body: body.trim() || null, updated_by: owned.me.id })
+    .update({
+      review_period_months: period,
+      next_review_date: date,
+      updated_by: owned.me.id,
+    })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  const parts: string[] = [];
+  if (period !== prevPeriod)
+    parts.push(`cadence ${prevPeriod} → ${period} months`);
+  if (date !== prevDate)
+    parts.push(`next review ${prevDate ?? "unset"} → ${date ?? "unset"}`);
+
+  await logSopEvent(admin, {
+    organisationId: owned.sop.organisation_id,
+    sopId: id,
+    eventType: "period_change",
+    actorId: owned.me.id,
+    note: `Review schedule changed: ${parts.join(", ")}`,
+    detail: {
+      from_period: prevPeriod,
+      to_period: period,
+      from_date: prevDate,
+      to_date: date,
+    },
+  });
+
   revalidatePath(`/admin/sops/${id}`);
+  revalidatePath("/admin/sops");
+  return { ok: true };
+}
+
+// Record that a review happened now: the next review date moves to the SOP's
+// cadence from today, and a review event is logged.
+export async function markSopReviewed(
+  id: string,
+  note?: string,
+): Promise<Result> {
+  const owned = await ownedSop(id);
+  if (!owned) return { ok: false, error: "SOP not found." };
+
+  const period = cleanReviewPeriod(owned.sop.review_period_months);
+  const newDue = reviewDateFromNow(period);
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("sops")
+    .update({ next_review_date: newDue, updated_by: owned.me.id })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  await logSopEvent(admin, {
+    organisationId: owned.sop.organisation_id,
+    sopId: id,
+    eventType: "review",
+    actorId: owned.me.id,
+    note: note?.trim()
+      ? `Reviewed. ${note.trim()}`
+      : `Reviewed. Next review ${newDue}.`,
+    detail: {
+      previous_due: owned.sop.next_review_date,
+      new_due: newDue,
+      period_months: period,
+    },
+  });
+
+  revalidatePath(`/admin/sops/${id}`);
+  revalidatePath("/admin/sops");
   return { ok: true };
 }
 

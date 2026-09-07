@@ -23,7 +23,7 @@ export default async function SopDetailPage({
 
   if (!sop || sop.organisation_id !== me.organisation_id) notFound();
 
-  const [{ data: sourceDoc }, { data: links }, { count: signCount }] =
+  const [{ data: sourceDoc }, { data: links }, { count: signCount }, { data: history }] =
     await Promise.all([
       sop.source_document_id
         ? supabase
@@ -37,7 +37,34 @@ export default async function SopDetailPage({
         .from("sign_offs")
         .select("id", { count: "exact", head: true })
         .eq("sop_id", params.id),
+      supabase
+        .from("sop_history")
+        .select("id, event_type, note, created_at, actor_profile_id")
+        .eq("sop_id", params.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
+
+  const actorIds = [
+    ...new Set(
+      (history ?? []).map((h) => h.actor_profile_id).filter(Boolean),
+    ),
+  ] as string[];
+  const { data: actors } = actorIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", actorIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const actorName = new Map(
+    (actors ?? []).map((a) => [a.id as string, a.full_name as string]),
+  );
+  const historyRows = (history ?? []).map((h) => ({
+    id: h.id as string,
+    eventType: h.event_type as string,
+    note: (h.note as string | null) ?? "",
+    at: h.created_at as string,
+    actor: h.actor_profile_id
+      ? (actorName.get(h.actor_profile_id as string) ?? "Someone")
+      : "System",
+  }));
 
   const linkedRoleIds = new Set((links ?? []).map((l) => l.job_role_id));
 
@@ -60,7 +87,10 @@ export default async function SopDetailPage({
           published_body: sop.published_body ?? "",
           published_version: sop.published_version,
           published_at: sop.published_at,
+          review_period_months: sop.review_period_months ?? 6,
+          next_review_date: sop.next_review_date ?? null,
         }}
+        history={historyRows}
         services={(services ?? []) as { id: string; name: string }[]}
         jobRoles={
           (jobRoles ?? []) as {

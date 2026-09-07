@@ -66,6 +66,8 @@ export default async function PolicyDetailPage({
           published_body: policy.published_body ?? "",
           published_version: policy.published_version,
           published_at: policy.published_at,
+          review_period_months: policy.review_period_months ?? 6,
+          next_review_date: policy.next_review_date ?? null,
         }}
         categories={categories}
         linkedCategoryIds={
