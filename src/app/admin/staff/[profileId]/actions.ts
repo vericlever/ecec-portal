@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile, isHrManager, isAdmin, isManager } from "@/lib/auth";
+import { type AccessTier, ASSIGNABLE_TIERS } from "@/lib/roles";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { calcExpiry } from "@/lib/contracts";
 
@@ -461,6 +462,108 @@ export async function setHrManager(
     .update({ hr_manager: value })
     .eq("id", profileId);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/staff", "layout");
+  return { ok: true };
+}
+
+// Change a staff member's job role. Admin anywhere in the organisation, or an
+// HR manager for staff at their own service. Changing the role swaps the SOP
+// suite; existing sign_offs stay in the record but no longer count.
+export async function setStaffJobRole(
+  profileId: string,
+  jobRoleId: string | null,
+): Promise<Result> {
+  const me = await getProfile();
+  if (!me) return { ok: false, error: "Sign in." };
+  const admin = createAdminClient();
+
+  const { data: person } = await admin
+    .from("profiles")
+    .select("id, organisation_id, service_id")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!person || person.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Staff member not found." };
+  }
+  const allowed =
+    isAdmin(me.access_tier) ||
+    (isHrManager(me) && person.service_id === me.service_id);
+  if (!allowed) {
+    return { ok: false, error: "You cannot change this person's job role." };
+  }
+
+  if (jobRoleId) {
+    const { data: role } = await admin
+      .from("job_roles")
+      .select("id, organisation_id")
+      .eq("id", jobRoleId)
+      .maybeSingle();
+    if (!role || role.organisation_id !== me.organisation_id) {
+      return { ok: false, error: "That job role is not in your organisation." };
+    }
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ job_role_id: jobRoleId })
+    .eq("id", profileId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/admin/job-roles", "layout");
+  revalidatePath("/sops");
+  return { ok: true };
+}
+
+// Change a staff member's access tier. Admin only. Cannot change your own, and
+// the last admin in an organisation cannot be demoted.
+export async function setStaffAccessTier(
+  profileId: string,
+  tier: string,
+): Promise<Result> {
+  const me = await getProfile();
+  if (!isAdmin(me?.access_tier) || !me) {
+    return { ok: false, error: "Only an admin can change access levels." };
+  }
+  if (!ASSIGNABLE_TIERS.some((t) => t.value === tier)) {
+    return { ok: false, error: "Unknown access level." };
+  }
+  if (profileId === me.id) {
+    return { ok: false, error: "You cannot change your own access level." };
+  }
+
+  const admin = createAdminClient();
+  const { data: person } = await admin
+    .from("profiles")
+    .select("id, organisation_id, access_tier")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!person || person.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Staff member not found." };
+  }
+  if (person.access_tier === tier) return { ok: true };
+
+  // Demoting the last admin would lock the organisation out.
+  if (person.access_tier === "admin" && tier !== "admin") {
+    const { count } = await admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("organisation_id", me.organisation_id)
+      .eq("access_tier", "admin");
+    if ((count ?? 0) <= 1) {
+      return {
+        ok: false,
+        error: "This is the only admin. Promote someone else first.",
+      };
+    }
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ access_tier: tier as AccessTier })
+    .eq("id", profileId);
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/admin/staff", "layout");
   return { ok: true };
 }

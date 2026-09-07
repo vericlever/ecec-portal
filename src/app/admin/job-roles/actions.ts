@@ -1,7 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireContentEditor } from "@/lib/auth";
+import {
+  getProfile,
+  requireContentEditor,
+  isAdmin,
+  isHrManager,
+  canEditContent,
+} from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -129,6 +135,82 @@ export async function setSopInRole(
   revalidatePath(`/admin/job-roles/${roleId}`);
   revalidatePath("/admin/job-roles");
   revalidatePath("/admin/sops");
+  return { ok: true };
+}
+
+// Assign a staff member to this role (moving them off whatever role they had),
+// or remove them from it (leaving them with no job role). Admin, a content
+// editor, or an HR manager for staff at their own service.
+async function canAssignRoles(personServiceId: string | null) {
+  const me = await getProfile();
+  if (!me) return null;
+  const ok =
+    isAdmin(me.access_tier) ||
+    canEditContent(me.access_tier) ||
+    (isHrManager(me) && personServiceId === me.service_id);
+  return ok ? me : null;
+}
+
+export async function assignStaffToRole(
+  roleId: string,
+  profileId: string,
+): Promise<Result> {
+  const admin = createAdminClient();
+  const [{ data: role }, { data: person }] = await Promise.all([
+    admin.from("job_roles").select("id, organisation_id").eq("id", roleId).maybeSingle(),
+    admin
+      .from("profiles")
+      .select("id, organisation_id, service_id")
+      .eq("id", profileId)
+      .maybeSingle(),
+  ]);
+  if (!role || !person || role.organisation_id !== person.organisation_id) {
+    return { ok: false, error: "Not found." };
+  }
+  const me = await canAssignRoles(person.service_id as string | null);
+  if (!me || me.organisation_id !== role.organisation_id) {
+    return { ok: false, error: "You cannot assign staff to this role." };
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ job_role_id: roleId })
+    .eq("id", profileId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/job-roles/${roleId}`);
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/sops");
+  return { ok: true };
+}
+
+export async function removeStaffFromRole(
+  roleId: string,
+  profileId: string,
+): Promise<Result> {
+  const admin = createAdminClient();
+  const { data: person } = await admin
+    .from("profiles")
+    .select("id, organisation_id, service_id, job_role_id")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!person || person.job_role_id !== roleId) {
+    return { ok: false, error: "That person is not in this role." };
+  }
+  const me = await canAssignRoles(person.service_id as string | null);
+  if (!me || me.organisation_id !== person.organisation_id) {
+    return { ok: false, error: "You cannot change this person's role." };
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ job_role_id: null })
+    .eq("id", profileId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/job-roles/${roleId}`);
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/sops");
   return { ok: true };
 }
 

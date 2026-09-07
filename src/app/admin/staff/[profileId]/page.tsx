@@ -7,8 +7,11 @@ import {
   isAdmin,
   TIER_LABELS,
 } from "@/lib/auth";
+import { ASSIGNABLE_TIERS } from "@/lib/roles";
 import {
+  AccessTierControl,
   HrManagerToggle,
+  JobRoleControl,
   ProbationControl,
   RefereeCheckControl,
   SightingControl,
@@ -420,13 +423,28 @@ export default async function StaffRecordPage({
         </div>
       )}
 
-      {isAdmin(me.access_tier) && (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-          <HrManagerToggle
+      {(isAdmin(me.access_tier) ||
+        (hrManager && me.service_id === person.service_id)) && (
+        <section className="mt-4 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Role and access
+          </h2>
+          <JobRoleControl
             profileId={person.id}
-            value={person.hr_manager}
+            value={person.job_role_id}
+            jobRoles={(jobRoles ?? []) as { id: string; name: string }[]}
           />
-        </div>
+          {isAdmin(me.access_tier) && person.id !== me.id && (
+            <AccessTierControl
+              profileId={person.id}
+              value={person.access_tier}
+              tiers={ASSIGNABLE_TIERS}
+            />
+          )}
+          {isAdmin(me.access_tier) && (
+            <HrManagerToggle profileId={person.id} value={person.hr_manager} />
+          )}
+        </section>
       )}
 
       <section className="mt-6">

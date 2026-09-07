@@ -9,6 +9,8 @@ import {
   recordRefereeCheck,
   setHrManager,
   setProbation,
+  setStaffAccessTier,
+  setStaffJobRole,
 } from "./actions";
 
 type Table =
@@ -270,6 +272,136 @@ export function RefereeCheckControl({
         {pending ? "Saving…" : "Save"}
       </button>
       {error && <span className="text-red-600">{error}</span>}
+    </div>
+  );
+}
+
+export function JobRoleControl({
+  profileId,
+  value,
+  jobRoles,
+}: {
+  profileId: string;
+  value: string | null;
+  jobRoles: { id: string; name: string }[];
+}) {
+  const router = useRouter();
+  const [choice, setChoice] = useState(value ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  const dirty = choice !== (value ?? "");
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Job role</span>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Sets which SOP suite this person must complete. Changing it swaps the
+        suite straight away. Sign-offs on the old role stay in the record but
+        stop counting.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <select
+          value={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          disabled={pending}
+          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+        >
+          <option value="">No job role</option>
+          {jobRoles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={!dirty || pending}
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              setMsg(null);
+              const r = await setStaffJobRole(profileId, choice || null);
+              if (r.ok) {
+                setMsg("Saved");
+                router.refresh();
+              } else {
+                setError(r.error);
+              }
+            })
+          }
+          className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+        {msg && <span className="text-xs text-green-700">{msg}</span>}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+export function AccessTierControl({
+  profileId,
+  value,
+  tiers,
+}: {
+  profileId: string;
+  value: string;
+  tiers: { value: string; label: string }[];
+}) {
+  const router = useRouter();
+  const [choice, setChoice] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  const dirty = choice !== value;
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Access level</span>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Portal permissions. Promoting to a manager tier grants those abilities
+        immediately; demoting a Manager (policy) removes content editing.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <select
+          value={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          disabled={pending}
+          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+        >
+          {tiers.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={!dirty || pending}
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              setMsg(null);
+              const r = await setStaffAccessTier(profileId, choice);
+              if (r.ok) {
+                setMsg("Saved");
+                router.refresh();
+              } else {
+                setError(r.error);
+              }
+            })
+          }
+          className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+        {msg && <span className="text-xs text-green-700">{msg}</span>}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
     </div>
   );
 }

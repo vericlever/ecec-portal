@@ -3,18 +3,26 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteJobRole, renameJobRole, setSopInRole } from "../actions";
+import {
+  assignStaffToRole,
+  deleteJobRole,
+  removeStaffFromRole,
+  renameJobRole,
+  setSopInRole,
+} from "../actions";
 
 export function RoleEditor({
   role,
   allSops,
   linkedSopIds,
   staff,
+  candidates,
 }: {
   role: { id: string; name: string };
   allSops: { id: string; name: string; published_version: number | null }[];
   linkedSopIds: string[];
   staff: { id: string; name: string }[];
+  candidates: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -22,6 +30,7 @@ export function RoleEditor({
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [staffPick, setStaffPick] = useState("");
 
   const linked = useMemo(() => new Set(linkedSopIds), [linkedSopIds]);
 
@@ -141,17 +150,61 @@ export function RoleEditor({
         ) : (
           <ul className="mt-2 space-y-1 text-sm">
             {staff.map((s) => (
-              <li key={s.id}>
+              <li key={s.id} className="flex items-center justify-between gap-3">
                 <Link
                   href={`/admin/staff/${s.id}`}
                   className="text-slate-700 underline"
                 >
                   {s.name}
                 </Link>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() =>
+                    act(
+                      () => removeStaffFromRole(role.id, s.id),
+                      "Removed from role",
+                    )
+                  }
+                  className="text-xs text-slate-400 underline hover:text-slate-700"
+                >
+                  Remove
+                </button>
               </li>
             ))}
           </ul>
         )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+          <select
+            value={staffPick}
+            onChange={(e) => setStaffPick(e.target.value)}
+            disabled={pending}
+            className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            <option value="">Add a staff member to this role…</option>
+            {candidates.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={pending || !staffPick}
+            onClick={() => {
+              const id = staffPick;
+              setStaffPick("");
+              act(() => assignStaffToRole(role.id, id), "Assigned");
+            }}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+          >
+            Assign
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-slate-400">
+          Assigning moves the person onto this role and off their current one.
+        </p>
       </section>
 
       <section>
