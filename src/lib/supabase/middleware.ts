@@ -6,6 +6,9 @@ import { NextResponse, type NextRequest } from "next/server";
 // to /login; an authenticated request to /login is sent on to /sops.
 
 const PUBLIC_PATHS = new Set(["/login", "/auth/confirm"]);
+// Endpoints that authenticate themselves (the cron job checks CRON_SECRET), so
+// the session gate must not bounce them to /login.
+const PUBLIC_PREFIXES = ["/api/cron/"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -36,6 +39,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
+    return response;
+  }
 
   if (!user && !PUBLIC_PATHS.has(path)) {
     const url = request.nextUrl.clone();

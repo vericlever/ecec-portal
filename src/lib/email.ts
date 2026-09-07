@@ -2,10 +2,21 @@
 // send is best-effort: if Resend is not configured yet, callers fall back to
 // showing the invite link on screen.
 
-type SendResult = { ok: true; id: string } | { ok: false; error: string };
+export type SendResult = { ok: true; id: string } | { ok: false; error: string };
 
 export function emailEnabled(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM);
+}
+
+// Generic transactional send, used by the reminder engine. Same best-effort
+// contract as the rest of this module.
+export async function sendEmail(msg: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<SendResult> {
+  return send(msg);
 }
 
 async function send(msg: {
@@ -42,7 +53,7 @@ async function send(msg: {
   }
 }
 
-function esc(s: string): string {
+export function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
