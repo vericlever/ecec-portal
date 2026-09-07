@@ -342,7 +342,9 @@ The spec was written against an older step numbering (its "16 to 18" and "19" do
 - **Admin overview vs staff list:** separate surfaces, shared query logic.
 
 ### Step 19: Reminder engine
-**Status: not started. Prerequisite for Steps 20, 22, 23. The domain (`vericlever.site`) is now live so this is unblocked.**
+**Status: built on branch `step-19-reminders` 2026-09-07, not merged. Migration 0034 (notification_log) applied to live DB. Prerequisite for Steps 20, 22, 23. Sends are live once Zeke verifies `vericlever.site` in Resend and sets RESEND_FROM + CRON_SECRET in Vercel.**
+
+Built: `GET /api/cron/reminders` (Vercel Cron daily at 21:00 UTC, `vercel.json`; guarded by `CRON_SECRET`, fails closed in production without it, open in dev). `src/lib/reminders.ts` `runReminders({dryRun})` builds one weekly digest per person: a staff digest (own unsigned SOPs, unread policies, unsigned agreements, unsigned contract, unfinished onboarding, own credential/visa expiry within 60 days or past) and a manager digest (documents to sight, SOPs to countersign, and for Admin/hr_manager: staff contract renewals within 28 days and staff credential expiries; for content editors: SOPs and policies with a `next_review_date` within 14 days or past). `notification_log` records each send and enforces the 7-day cadence. Email via the existing `src/lib/email.ts` Resend wrapper (`sendEmail`). Verified end to end on localhost with `?dryRun=1` and a real run: the one digest to the Resend account owner sent, the rest returned Resend's sandbox 403 (expected until the domain is verified) and were not logged so they retry.
 
 The deferred email half of Steps 7, 9 and 11. A scheduled job (Vercel Cron) that sends, via Resend from the verified `vericlever.site` domain: SOP-incomplete reminders, SOP and policy review reminders (Step 20), credential-expiry reminders, contract renewal alerts (4/3/2/1 week), and the Reg 172 parent digest. `notification_rules` table if not already present. Each email type respects the tier rules already written into Steps 7, 9 and 11.
 
