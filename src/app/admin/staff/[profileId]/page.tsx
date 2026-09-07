@@ -382,6 +382,13 @@ export default async function StaffRecordPage({
     contractItems.push("Contract not signed by the staff member");
   }
 
+  const unsightedDocLabels = unsightedDocs.map((d) =>
+    d.detail ? `${d.label} — ${d.detail}` : d.label,
+  );
+
+  // Every flag this person carries. The same primitives that staffStatsByProfile
+  // counts for the staff-list "Outstanding" figure (same 60-day credential and
+  // 28-day contract windows), so this total matches that row.
   const outstandingCount =
     (onboardingOutstanding ? 1 : 0) +
     unsignedSops.length +
@@ -422,6 +429,50 @@ export default async function StaffRecordPage({
         {person.service_id ? serviceName.get(person.service_id) : "all services"}
         {!person.is_active && " · inactive"}
       </p>
+
+      {/* The first thing a leader sees: everything still owing for this person. */}
+      <section className="mt-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Outstanding items{outstandingCount > 0 ? ` (${outstandingCount})` : ""}
+        </h2>
+        <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4">
+          {outstandingCount === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nothing outstanding. Everything expected of this person is signed,
+              read and sighted.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <OutstandingGroup
+                title="Onboarding questionnaire"
+                items={onboardingOutstanding ? ["Not completed"] : []}
+              />
+              <OutstandingGroup title="SOPs not signed" items={unsignedSops} />
+              <OutstandingGroup
+                title="SOPs waiting on a manager countersignature"
+                items={awaitingCosignSops}
+              />
+              <OutstandingGroup
+                title="Policies not read"
+                items={unviewedPolicies}
+              />
+              <OutstandingGroup
+                title="Agreements not signed"
+                items={unsignedAgreements}
+              />
+              <OutstandingGroup title="Contract" items={contractItems} />
+              <OutstandingGroup
+                title="Credentials expired or expiring"
+                items={credentialItems}
+              />
+              <OutstandingGroup
+                title="Documents a leader has not sighted"
+                items={unsightedDocLabels}
+              />
+            </div>
+          )}
+        </div>
+      </section>
 
       {showSignOffPrompt && (
         <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -489,58 +540,6 @@ export default async function StaffRecordPage({
             total={policyTotal}
             emptyNote="No published policies target this person yet."
           />
-        </div>
-      </section>
-
-      <section className="mt-6">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Outstanding items
-        </h2>
-        <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4">
-          {outstandingCount === 0 ? (
-            <p className="text-sm text-slate-500">
-              Nothing outstanding. Everything expected of this person is signed,
-              viewed and sighted.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              <OutstandingGroup
-                title="Onboarding"
-                items={
-                  onboardingOutstanding
-                    ? ["Onboarding questionnaire not completed"]
-                    : []
-                }
-              />
-              <OutstandingGroup
-                title="SOPs not signed"
-                items={unsignedSops}
-              />
-              <OutstandingGroup
-                title="SOPs waiting on a manager countersignature"
-                items={awaitingCosignSops}
-              />
-              <OutstandingGroup
-                title="Policies not viewed"
-                items={unviewedPolicies}
-              />
-              <OutstandingGroup
-                title="Credentials expired or expiring"
-                items={credentialItems}
-              />
-              <OutstandingGroup title="Contract" items={contractItems} />
-              <OutstandingGroup
-                title="Agreements not signed"
-                items={unsignedAgreements}
-              />
-              <OutstandingGroup
-                title="Documents a leader has not sighted"
-                items={unsightedDocs.map((d) =>
-                  d.detail ? `${d.label} — ${d.detail}` : d.label,
-                )}
-              />
-            </div>
-          )}
         </div>
       </section>
 

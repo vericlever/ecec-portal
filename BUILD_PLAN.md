@@ -415,7 +415,9 @@ Page one: select files (SOPs and/or policies), set a category. Page two: every u
 - Review period is set from page two for both document types
 
 ### Step 25: Itemised outstanding items on the staff profile
-**Status: partly done. Spec: `REVISION_SOP_REVIEW_CYCLE.md` "Step 22". The staff record page already has an "Outstanding items" section from Step 8; this repositions and completes it.**
+**Status: built on branch `step-25-outstanding-items` 2026-09-08, not merged. No migration.**
+
+The "Outstanding items" section on the staff record page now sits directly under the identity line, before every other section, with a `(count)` in the heading. The count is the sum of the named groups (onboarding, SOPs not signed, SOPs awaiting countersign, policies not read, agreements not signed, contract, credential expiries, unsighted documents) and is computed from the same primitives with the same 60-day credential / 28-day contract windows as `staffStatsByProfile`, so it matches the staff-list "Outstanding" figure. Verified against real records (Sam 5 = 5, Zeke gmail 11 = 11, team roll-up 26).
 
 Move the itemised list to sit directly under the identity line (email, role, service), above the HR manager control and training progress, so it is the first thing an admin sees. Include a count that matches the "Outstanding" figure on the staff list row. Itemise every flag that person carries: overdue SOPs (named), SOPs awaiting countersign, unviewed policies, unsigned contract, unsigned agreements (including code of conduct), unsighted documents, credential expiries, contract renewal. Code of conduct is an agreement (Step 17), not a new record type.
 
