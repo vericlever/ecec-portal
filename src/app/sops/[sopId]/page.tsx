@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { SignForm } from "./sign-form";
+import { ReadAloud } from "./read-aloud";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,13 @@ export default async function SopDetailPage({
         </span>
       </div>
 
-      <article className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+      {sop.published_body && (
+        <div className="mt-6">
+          <ReadAloud text={sop.published_body} />
+        </div>
+      )}
+
+      <article className="mt-3 rounded-lg border border-slate-200 bg-white p-5">
         <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
           {sop.published_body || "(No text)"}
         </div>

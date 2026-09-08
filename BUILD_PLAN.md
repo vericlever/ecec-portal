@@ -237,7 +237,9 @@ Aggregates the data from Steps 8, 10, 11, 16 and 17, staff sign-off completion, 
 - Clicking a cell navigates to the relevant detailed outstanding-items view, not just a static colour with no way to act on it
 
 ## Step 14: SOP read-aloud
-**Status: not started, confirmed in scope for v1.0**
+**Status: built on branch `step-14-sop-read-aloud` 2026-09-08, not merged. No migration.**
+
+`ReadAloud` client component on the staff SOP page (`/sops/[sopId]`): one Listen / Pause / Resume button using `window.speechSynthesis`, plus a small Stop link to end playback (needed to exit a pause cleanly). The body is split into sentence-sized chunks and spoken in sequence so a long SOP keeps going past Chrome's ~15 second per-utterance cutoff, and pause/resume lands between sentences. Nothing stored; speech cancels on navigation. The button is hidden where the browser has no Speech API. Verified: play, pause, resume and stop all cycle correctly and speech stops on leaving the page.
 
 Browser-native, using the Web Speech API (`SpeechSynthesis`), not a cloud TTS service. Free, client-side, no backend or storage needed. This augments the SOP page already built in Step 3, it's an addition to that page, not a separate feature elsewhere.
 
