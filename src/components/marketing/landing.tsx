@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChainRing, StageArc, Wordmark, LogoMark } from "@/components/bauhaus";
 
-const CONTACT = "mailto:hello@vericlever.site";
+const CONTACT = "mailto:hello@vericlever.com.au";
 
 export function Landing() {
   return (
@@ -349,7 +349,7 @@ export function Landing() {
           <div className="flex items-center gap-3">
             <LogoMark size={24} />
             <span className="font-plex-mono text-[12px] font-semibold tracking-[0.16em] text-ink-faint">
-              vericlever.site &middot; Victoria, Australia
+              vericlever.com.au &middot; Victoria, Australia
             </span>
           </div>
           <div className="flex flex-wrap gap-6 text-[14px]">

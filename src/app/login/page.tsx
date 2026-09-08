@@ -107,7 +107,7 @@ export default function LoginPage() {
           <div className="border-t-4 border-ink pt-5 text-[15px] leading-[1.5] text-ink-muted">
             Trouble getting in? Your Centre Director or Approved Provider can
             reissue access, or{" "}
-            <a href="mailto:hello@vericlever.site" className="text-outcomes hover:text-ink">
+            <a href="mailto:hello@vericlever.com.au" className="text-outcomes hover:text-ink">
               ask us
             </a>
             .

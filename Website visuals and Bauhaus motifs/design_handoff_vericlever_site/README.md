@@ -106,7 +106,23 @@ Fields: Work email, Password — caps mono-free labels, white inputs with 2px in
 
 **Right (context panel)** — eyebrow "INSIDE THE PORTAL", statement "Every procedure your team signs closes a ring — and stays closed until something changes.", the four-quadrant ring (max 380px), and a four-column legend above a 4px black rule: POLICY/The obligation, PROCEDURE/The practice (label #9A6A08), TRAINING/The knowledge, OUTCOMES/The evidence.
 
-### 3. Visual language exploration (`Vericlever Visual Language.dc.html`)
+### 3. Portal page — Procedures empty state (`Vericlever Portal Procedures.dc.html`)
+Shows how the public visual language carries into the logged-in product. **The portal itself is already built — this is a styling reference for backgrounds and page furniture only, not a redesign of portal structure or navigation.**
+
+- Header: white, 10px black bottom rule, logo + wordmark, inline nav (Overview / Procedures / Policies / Manage) with the active item marked by a 3px amber underline, right side shows account name + role and a 2px-bordered "Sign out".
+- Page body: white, with a **large decorative arc field** filling the empty area — a set of concentric quarter arcs anchored at the bottom-right corner (blue → amber → vermilion, moving inward) plus a smaller green quarter at the bottom-left. Drawn in a `position: absolute; inset: 0` SVG at `preserveAspectRatio="xMaxYMax slice"`, stroke-width 14, **opacity 0.14**, `pointer-events: none`. Content sits above it with `position: relative`.
+- Content: amber eyebrow "PROCEDURES", H1 "Standard operating procedures", then an empty-state card (white, 2px ink border, 10px amber top border) explaining that procedures are issued by job role, with "Request a job role" (green) and "Browse policies" (outlined) actions, and a 200px ring showing only the policy quarter complete — the other three quarters at ink 18%.
+- Below: a four-column status strip (POLICY / PROCEDURE / TRAINING / OUTCOMES) with 4px coloured top rules and a one-line state under each.
+
+**Background motif rules (apply anywhere a page has large empty area):**
+- Always concentric arcs, three per colour group, corner-anchored — never centred, never scattered.
+- Opacity 0.13–0.14 against white. Never above 0.2; the motif must never compete with text.
+- Stroke weight scales with size: ~12–14 at full-page scale.
+- Colour order follows the chain outward-in (blue, amber, vermilion, green).
+- Always `pointer-events: none`, always behind content in a relative-positioned wrapper.
+- The landing page's contact section uses the same treatment at bottom-left (green then blue, opacity 0.13).
+
+### 4. Visual language exploration (`Vericlever Visual Language.dc.html`)
 Reference only — not a shippable page. Contains the earlier motif explorations (1a radiant arcs, 1b linked rings, 1d colour candidates) and the symbol-system options (2a four primitives, 2b the ring-completion set that was chosen). Useful for understanding why the system is what it is, and as a source of background/divider patterns.
 
 ## Interactions & Behavior
@@ -128,6 +144,7 @@ No bitmap assets. Every graphic is inline SVG built from circles and arcs — re
 - `landing-full.png` — landing page, top of page
 - `01-landing.png` … `04-landing.png` — how-it-works, two tiers, consultancy, contact sections
 - `05-sign-in.png` — sign-in page
+- `06-portal-procedures.png` — portal procedures page with background motif
 - `01-visual-language.png` … `04-visual-language.png` — symbol system (2a primitives, 2b ring completion) and the earlier arc/colour explorations
 
 Screenshots are captured at preview width — treat the HTML files as the source of truth for exact measurements.
@@ -135,6 +152,7 @@ Screenshots are captured at preview width — treat the HTML files as the source
 ## Files
 - `Vericlever Landing Page.dc.html` — landing page
 - `Vericlever Sign In.dc.html` — sign-in page
+- `Vericlever Portal Procedures.dc.html` — portal page styling reference (backgrounds, empty state)
 - `Vericlever Visual Language.dc.html` — motif and symbol-system exploration
 - `Vericlever_Claude_Design_Brief.md` — the original brief
 

@@ -19,6 +19,7 @@ const plexMono = IBM_Plex_Mono({
 import { getProfile, isManager, canEditContent, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
+import { PortalBackdrop } from "@/components/bauhaus";
 import { SiteNav } from "./site-nav";
 import { RegisterServiceWorker } from "./register-sw";
 
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f172a",
+  themeColor: "#1A1A17",
 };
 
 export default async function RootLayout({
@@ -66,10 +67,11 @@ export default async function RootLayout({
 
   return (
     <html lang="en-AU" className={`${jost.variable} ${plexMono.variable}`}>
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+      <body className="font-jost min-h-screen bg-paper text-slate-900 antialiased">
         <RegisterServiceWorker />
+        {profile && <PortalBackdrop />}
         {profile && (
-          <header className="relative border-b border-slate-200 bg-white">
+          <header className="relative z-10 border-b-[10px] border-ink bg-paper">
             <SiteNav
               fullName={profile.full_name}
               tierLabel={TIER_LABELS[profile.access_tier]}
@@ -84,7 +86,7 @@ export default async function RootLayout({
           </header>
         )}
         {showOnboardingPrompt && (
-          <div className="border-b border-amber-200 bg-amber-50">
+          <div className="relative z-10 border-b border-amber-200 bg-amber-50">
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-2 text-sm text-amber-900">
               <span>Your onboarding details are not complete yet.</span>
               <Link
@@ -97,7 +99,7 @@ export default async function RootLayout({
           </div>
         )}
         {staffToSignOff > 0 && (
-          <div className="border-b border-amber-200 bg-amber-50">
+          <div className="relative z-10 border-b border-amber-200 bg-amber-50">
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-2 text-sm text-amber-900">
               <span>
                 {staffToSignOff === 1
@@ -114,7 +116,9 @@ export default async function RootLayout({
           </div>
         )}
         {profile ? (
-          <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
+          <main className="relative z-10 mx-auto max-w-3xl px-4 py-8">
+            {children}
+          </main>
         ) : (
           // Public pages (landing, sign-in, forgot-password) own their layout.
           children

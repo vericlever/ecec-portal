@@ -137,6 +137,40 @@ export function LogoMark({ size = 30 }: { size?: number }) {
   );
 }
 
+// The faint concentric-arc field that sits behind a portal page. Corner
+// anchored, opacity ~0.13, never competing with text. Purely decorative.
+export function PortalBackdrop() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-0 select-none overflow-hidden"
+    >
+      <svg
+        viewBox="0 0 1200 800"
+        preserveAspectRatio="xMaxYMax slice"
+        className="h-full w-full"
+      >
+        <g fill="none" strokeWidth={14} opacity={0.13}>
+          <path d="M 1200 300 A 500 500 0 0 0 700 800" stroke="#1F51A8" />
+          <path d="M 1200 340 A 460 460 0 0 0 740 800" stroke="#1F51A8" />
+          <path d="M 1200 380 A 420 420 0 0 0 780 800" stroke="#1F51A8" />
+          <path d="M 1200 460 A 340 340 0 0 0 860 800" stroke="#C98A0E" />
+          <path d="M 1200 500 A 300 300 0 0 0 900 800" stroke="#C98A0E" />
+          <path d="M 1200 540 A 260 260 0 0 0 940 800" stroke="#C98A0E" />
+          <path d="M 1200 620 A 180 180 0 0 0 1020 800" stroke="#C8451F" />
+          <path d="M 1200 660 A 140 140 0 0 0 1060 800" stroke="#C8451F" />
+          <path d="M 1200 700 A 100 100 0 0 0 1100 800" stroke="#C8451F" />
+        </g>
+        <g fill="none" stroke="#1B7A3E" strokeWidth={14} opacity={0.13}>
+          <path d="M 0 640 A 160 160 0 0 1 160 800" />
+          <path d="M 0 600 A 200 200 0 0 1 200 800" />
+          <path d="M 0 560 A 240 240 0 0 1 240 800" />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 export function Wordmark({ size = 30 }: { size?: number }) {
   return (
     <span className="flex items-center gap-3">

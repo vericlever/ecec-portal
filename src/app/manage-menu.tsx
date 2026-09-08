@@ -71,9 +71,11 @@ export function ManageMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1 text-sm ${
-          active ? "text-slate-900" : "text-slate-500"
-        } hover:text-slate-900`}
+        className={`flex items-center gap-1 text-sm hover:text-ink ${
+          active
+            ? "border-b-[3px] border-procedure pb-[3px] font-semibold text-ink"
+            : "text-ink-muted"
+        }`}
       >
         Manage
         <svg
@@ -93,11 +95,11 @@ export function ManageMenu({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-20 mt-2 w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+        <div className="absolute left-0 z-30 mt-3 w-56 border-2 border-ink bg-paper py-1">
           {groups.map((g, i) => (
-            <div key={i} className={i > 0 ? "mt-1 border-t border-slate-100 pt-1" : ""}>
+            <div key={i} className={i > 0 ? "mt-1 border-t border-ink/15 pt-1" : ""}>
               {g.label && (
-                <div className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <div className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
                   {g.label}
                 </div>
               )}
@@ -105,10 +107,10 @@ export function ManageMenu({
                 <Link
                   key={it.href}
                   href={it.href}
-                  className={`block px-3 py-1.5 text-sm hover:bg-slate-50 ${
+                  className={`block px-3 py-1.5 text-sm hover:bg-ink/[0.04] ${
                     pathname === it.href || pathname.startsWith(it.href + "/")
-                      ? "font-medium text-slate-900"
-                      : "text-slate-600"
+                      ? "font-semibold text-ink"
+                      : "text-ink-muted"
                   }`}
                 >
                   {it.label}

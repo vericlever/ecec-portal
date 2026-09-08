@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #FFFFFF; font-family: Jost, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #1B7A3E; text-decoration: none; }
+  a:hover { color: #1A1A17; }
+</style>
+</helmet>
+
+<div style="background: #FFFFFF; color: #1A1A17; min-height: 100vh; display: flex; flex-direction: column">
+
+  <div style="border-bottom: 10px solid #1A1A17; background: #FFFFFF">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; row-gap: 12px">
+      <div style="display: flex; align-items: center; gap: 30px; flex-wrap: wrap">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <svg viewBox="0 0 40 40" style="width: 28px; height: 28px; display: block; flex: none">
+            <g fill="none" stroke="#1B7A3E" stroke-width="3.4">
+              <path d="M 14 36 A 10 10 0 0 0 4 26"></path>
+              <path d="M 22 36 A 18 18 0 0 0 4 18"></path>
+              <path d="M 30 36 A 26 26 0 0 0 4 10"></path>
+            </g>
+            <circle cx="4" cy="36" r="2.8" fill="#1B7A3E"></circle>
+          </svg>
+          <div style="font-size: 15px; font-weight: 600; letter-spacing: 0.2em">VERICLEVER</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 26px; white-space: nowrap">
+          <a href="#overview" style="font-size: 15px; color: #45423A">Overview</a>
+          <a href="#procedures" style="font-size: 15px; color: #1A1A17; font-weight: 600; border-bottom: 3px solid #C98A0E; padding-bottom: 3px">Procedures</a>
+          <a href="#policies" style="font-size: 15px; color: #45423A">Policies</a>
+          <a href="#manage" style="font-size: 15px; color: #45423A">Manage</a>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 18px; white-space: nowrap">
+        <div style="text-align: right; line-height: 1.2">
+          <div style="font-size: 14px; font-weight: 500">Pot Pots</div>
+          <div style="font-size: 12px; color: #6B6659">Admin</div>
+        </div>
+        <a href="#signout" style="font-size: 14px; color: #1A1A17; border: 2px solid #1A1A17; padding: 8px 14px">Sign out</a>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column">
+
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMaxYMax slice" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none">
+      <g fill="none" stroke-width="14" opacity="0.14">
+        <path d="M 1200 300 A 500 500 0 0 0 700 800" stroke="#1F51A8"></path>
+        <path d="M 1200 340 A 460 460 0 0 0 740 800" stroke="#1F51A8"></path>
+        <path d="M 1200 380 A 420 420 0 0 0 780 800" stroke="#1F51A8"></path>
+        <path d="M 1200 460 A 340 340 0 0 0 860 800" stroke="#C98A0E"></path>
+        <path d="M 1200 500 A 300 300 0 0 0 900 800" stroke="#C98A0E"></path>
+        <path d="M 1200 540 A 260 260 0 0 0 940 800" stroke="#C98A0E"></path>
+        <path d="M 1200 620 A 180 180 0 0 0 1020 800" stroke="#C8451F"></path>
+        <path d="M 1200 660 A 140 140 0 0 0 1060 800" stroke="#C8451F"></path>
+        <path d="M 1200 700 A 100 100 0 0 0 1100 800" stroke="#C8451F"></path>
+      </g>
+      <g fill="none" stroke="#1B7A3E" stroke-width="14" opacity="0.14">
+        <path d="M 0 640 A 160 160 0 0 1 160 800"></path>
+        <path d="M 0 600 A 200 200 0 0 1 200 800"></path>
+        <path d="M 0 560 A 240 240 0 0 1 240 800"></path>
+      </g>
+    </svg>
+
+    <div style="position: relative; max-width: 1240px; width: 100%; margin: 0 auto; padding: 56px 40px 80px; box-sizing: border-box; display: flex; flex-direction: column; gap: 40px">
+
+      <div style="display: flex; flex-direction: column; gap: 14px; max-width: 720px">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: #C98A0E">Procedures</div>
+        <h1 style="margin: 0; font-size: clamp(32px, 4vw, 44px); line-height: 1.05; font-weight: 600; letter-spacing: -0.025em">Standard operating procedures</h1>
+      </div>
+
+      <div style="background: #FFFFFF; border: 2px solid #1A1A17; border-top: 10px solid #C98A0E; padding: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 40px; align-items: center; max-width: 900px">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <div style="font-size: 24px; font-weight: 600; letter-spacing: -0.01em">No job role assigned yet</div>
+          <p style="margin: 0; font-size: 17px; line-height: 1.5; color: #45423A">Procedures are issued by job role, so there is nothing here to sign until an administrator sets yours. Once it is set, your chain starts at the first procedure.</p>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; padding-top: 6px">
+            <a href="#request" style="font-size: 16px; color: #FFFFFF; background: #1B7A3E; padding: 14px 24px">Request a job role</a>
+            <a href="#policies" style="font-size: 16px; color: #1A1A17; border: 2px solid #1A1A17; padding: 13px 23px">Browse policies</a>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: center">
+          <svg viewBox="0 0 200 200" style="width: 100%; max-width: 200px; display: block">
+            <g fill="none" stroke-width="7">
+              <path d="M 188 100 A 88 88 0 0 0 100 12" stroke="#1F51A8"></path>
+              <path d="M 172 100 A 72 72 0 0 0 100 28" stroke="#1F51A8"></path>
+              <path d="M 156 100 A 56 56 0 0 0 100 44" stroke="#1F51A8"></path>
+              <path d="M 100 188 A 88 88 0 0 0 188 100" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 100 172 A 72 72 0 0 0 172 100" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 100 156 A 56 56 0 0 0 156 100" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 12 100 A 88 88 0 0 0 100 188" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 28 100 A 72 72 0 0 0 100 172" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 44 100 A 56 56 0 0 0 100 156" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 100 12 A 88 88 0 0 0 12 100" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 100 28 A 72 72 0 0 0 28 100" stroke="#1A1A17" opacity="0.18"></path>
+              <path d="M 100 44 A 56 56 0 0 0 44 100" stroke="#1A1A17" opacity="0.18"></path>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; max-width: 900px">
+        <div style="display: flex; flex-direction: column; gap: 8px; border-top: 4px solid #1F51A8; padding-top: 14px">
+          <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #1F51A8">POLICY</div>
+          <div style="font-size: 15px; color: #45423A">14 policies apply to your service</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; border-top: 4px solid #C98A0E; padding-top: 14px">
+          <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #9A6A08">PROCEDURE</div>
+          <div style="font-size: 15px; color: #45423A">Awaiting job role</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; border-top: 4px solid #C8451F; padding-top: 14px">
+          <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #C8451F">TRAINING</div>
+          <div style="font-size: 15px; color: #45423A">Nothing due</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; border-top: 4px solid #1B7A3E; padding-top: 14px">
+          <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #1B7A3E">OUTCOMES</div>
+          <div style="font-size: 15px; color: #45423A">No record yet</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>
