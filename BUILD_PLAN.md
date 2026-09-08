@@ -236,6 +236,18 @@ Aggregates the data from Steps 8, 10, 11, 16 and 17, staff sign-off completion, 
 - Admin sees all sites they have access to, Manager tiers see only their own site(s)
 - Clicking a cell navigates to the relevant detailed outstanding-items view, not just a static colour with no way to act on it
 
+## Public site: landing page and sign-in (added 2026-09-08)
+**Status: built on branch `site-landing-signin`, not merged. No migration.**
+
+Recreated the Claude Design handoff (`Website visuals and Bauhaus motifs/design_handoff_vericlever_site/`) in the app. Crisp Bauhaus: white ground, near-black rules, flat geometry, four accent colours (policy blue / procedure amber / training vermilion / outcomes green), Jost + IBM Plex Mono.
+
+- `src/components/bauhaus.tsx` - `ChainRing`, `StageArc`, `LogoMark`, `Wordmark` as inline SVG components.
+- `src/components/marketing/landing.tsx` - the marketing page (hero, how it works, two tiers, status table, dark consultancy band, contact, footer). `src/app/page.tsx` shows it when logged out, redirects to the portal when logged in.
+- `src/app/login/page.tsx` - restyled to the two-panel Bauhaus sign-in (10px black divider, mono field labels, ring + legend on the right). Auth is unchanged and still works; error state uses a vermilion left rule.
+- `src/app/layout.tsx` loads the two fonts and drops the `max-w-3xl` wrapper for logged-out pages so they can go full-bleed. `tailwind.config.ts` gained the Bauhaus palette and font families (additive, portal untouched). Middleware makes `/` public.
+- Contact buttons point at `mailto:hello@vericlever.site` (placeholder - Zeke to confirm the address); footer says `vericlever.site` (the design mockup said `.com.au`). No pricing anywhere, per the brief.
+- Verified: landing renders desktop and mobile with no horizontal scroll; sign-in works, wrong password shows the error; a logged-in user hitting `/` is redirected to the portal.
+
 ## Step 14: SOP read-aloud
 **Status: built on branch `step-14-sop-read-aloud` 2026-09-08, not merged. No migration.**
 

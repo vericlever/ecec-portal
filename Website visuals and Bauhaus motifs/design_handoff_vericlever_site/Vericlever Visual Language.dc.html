@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #E4E0D6; font-family: Jost, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #1B7A3E; text-decoration: none; }
+  a:hover { color: #1A1A17; }
+</style>
+</helmet>
+
+<section style="padding: 72px 72px 40px; display: flex; flex-direction: column; gap: 40px">
+
+  <div style="display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">Turn 2</div>
+    <div style="font-size: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A17">A symbol and a colour for each element</div>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">green stays the brand accent · these four are the system's vocabulary</div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start">
+
+    <div id="2a" style="width: 820px; flex: none; background: #EFEBE1; border: 1px solid rgba(26,26,23,0.14); padding: 40px; display: flex; flex-direction: column; gap: 32px">
+      <div style="display: flex; gap: 20px; align-items: flex-start">
+        <div style="width: 34px; height: 34px; background: #1A1A17; color: #EFEBE1; font-family: 'IBM Plex Mono', monospace; font-size: 13px; display: flex; align-items: center; justify-content: center; flex: none">2a</div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="font-size: 24px; font-weight: 600; color: #1A1A17; letter-spacing: -0.01em">Four primitives — square, half, triangle, circle</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #6B6659; line-height: 1.5">Straight Bauhaus vocabulary, one shape per element.<br>Strength: each symbol is instantly distinguishable at 16px in a UI.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px">
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px"><svg viewBox="0 0 160 160" style="width: 100%; display: block"><rect x="40" y="40" width="80" height="80" fill="#1F51A8"></rect></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Policy</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">Fixed, four-square, load-bearing.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1F51A8">#1F51A8</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px"><svg viewBox="0 0 160 160" style="width: 100%; display: block"><path d="M 28 106 A 52 52 0 0 1 132 106 Z" fill="#C98A0E"></path></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Procedure</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">The turn from intent into action.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #C98A0E">#C98A0E</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px"><svg viewBox="0 0 160 160" style="width: 100%; display: block"><polygon points="80,34 132,124 28,124" fill="#C8451F"></polygon></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Training</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">Building up, level by level.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #C8451F">#C8451F</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px"><svg viewBox="0 0 160 160" style="width: 100%; display: block"><circle cx="80" cy="80" r="48" fill="#1B7A3E"></circle></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Outcomes</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">Closed, whole, on the record.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">#1B7A3E</div></div>
+        </div>
+      </div>
+
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">In combination</div>
+      <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 32px">
+        <svg viewBox="0 0 660 130" style="width: 100%; display: block">
+          <line x1="30" y1="72" x2="630" y2="72" stroke="#1A1A17" stroke-width="1.5"></line>
+          <rect x="30" y="42" width="60" height="60" fill="#1F51A8"></rect>
+          <path d="M 180 102 A 60 60 0 0 1 300 102 Z" fill="#C98A0E"></path>
+          <polygon points="425,30 470,102 380,102" fill="#C8451F"></polygon>
+          <circle cx="600" cy="72" r="34" fill="#1B7A3E"></circle>
+        </svg>
+      </div>
+
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">Applied — one SOP, end to end</div>
+      <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 30px 32px; display: flex; flex-direction: column; gap: 22px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 20px">
+          <div style="font-size: 22px; font-weight: 600; color: #1A1A17">Emergency evacuation</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">Reg 97 · NQS 2.2</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px">
+          <div style="border-top: 3px solid #1F51A8; padding-top: 14px; display: flex; flex-direction: column; gap: 8px">
+            <svg viewBox="0 0 20 20" style="width: 16px; height: 16px; display: block"><rect x="1" y="1" width="18" height="18" fill="#1F51A8"></rect></svg>
+            <div style="font-size: 15px; font-weight: 500; color: #1A1A17">Emergency &amp; evacuation policy</div>
+            <div style="font-size: 13px; color: #6B6659">v4 · approved Mar 2026</div>
+          </div>
+          <div style="border-top: 3px solid #C98A0E; padding-top: 14px; display: flex; flex-direction: column; gap: 8px">
+            <svg viewBox="0 0 20 20" style="width: 16px; height: 16px; display: block"><path d="M 1 19 A 9 9 0 0 1 19 19 Z" fill="#C98A0E"></path></svg>
+            <div style="font-size: 15px; font-weight: 500; color: #1A1A17">Evacuation drill SOP</div>
+            <div style="font-size: 13px; color: #6B6659">6 steps · room-level</div>
+          </div>
+          <div style="border-top: 3px solid #C8451F; padding-top: 14px; display: flex; flex-direction: column; gap: 8px">
+            <svg viewBox="0 0 20 20" style="width: 16px; height: 16px; display: block"><polygon points="10,2 19,18 1,18" fill="#C8451F"></polygon></svg>
+            <div style="font-size: 15px; font-weight: 500; color: #1A1A17">Read &amp; understood</div>
+            <div style="font-size: 13px; color: #6B6659">22 of 24 educators</div>
+          </div>
+          <div style="border-top: 3px solid #1B7A3E; padding-top: 14px; display: flex; flex-direction: column; gap: 8px">
+            <svg viewBox="0 0 20 20" style="width: 16px; height: 16px; display: block"><circle cx="10" cy="10" r="9" fill="#1B7A3E"></circle></svg>
+            <div style="font-size: 15px; font-weight: 500; color: #1A1A17">Drill logged, evidence held</div>
+            <div style="font-size: 13px; color: #6B6659">last run 14 Aug 2026</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="2b" style="width: 820px; flex: none; background: #EFEBE1; border: 1px solid rgba(26,26,23,0.14); padding: 40px; display: flex; flex-direction: column; gap: 32px">
+      <div style="display: flex; gap: 20px; align-items: flex-start">
+        <div style="width: 34px; height: 34px; background: #1A1A17; color: #EFEBE1; font-family: 'IBM Plex Mono', monospace; font-size: 13px; display: flex; align-items: center; justify-content: center; flex: none">2b</div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="font-size: 24px; font-weight: 600; color: #1A1A17; letter-spacing: -0.01em">One ring, four states of completion</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #6B6659; line-height: 1.5">Quarter, half, three-quarter, whole — the same arc language as 1a and 1b.<br>Strength: the symbols themselves show progress, and double as status.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px">
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#1F51A8" stroke-width="6"><path d="M 144 80 A 64 64 0 0 0 80 16"></path><path d="M 132 80 A 52 52 0 0 0 80 28"></path><path d="M 120 80 A 40 40 0 0 0 80 40"></path></g></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Policy</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">The first quarter. Everything starts here.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1F51A8">#1F51A8</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#C98A0E" stroke-width="6"><path d="M 144 80 A 64 64 0 0 0 16 80"></path><path d="M 132 80 A 52 52 0 0 0 28 80"></path><path d="M 120 80 A 40 40 0 0 0 40 80"></path></g></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Procedure</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">Half turn — obligation becomes instruction.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #C98A0E">#C98A0E</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#C8451F" stroke-width="6"><path d="M 144 80 A 64 64 0 1 0 80 144"></path><path d="M 132 80 A 52 52 0 1 0 80 132"></path><path d="M 120 80 A 40 40 0 1 0 80 120"></path></g></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Training</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">Three quarters — nearly closed, not yet proven.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #C8451F">#C8451F</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 22px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#1B7A3E" stroke-width="6"><circle cx="80" cy="80" r="64"></circle><circle cx="80" cy="80" r="52"></circle><circle cx="80" cy="80" r="40"></circle></g><circle cx="80" cy="80" r="14" fill="#1B7A3E"></circle></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 3px"><div style="font-size: 17px; font-weight: 600; color: #1A1A17">Outcomes</div><div style="font-size: 14px; color: #45423A; line-height: 1.4">Closed ring, filled centre. Evidence held.</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">#1B7A3E</div></div>
+        </div>
+      </div>
+
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">In combination — one ring assembled from four</div>
+      <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 32px; display: grid; grid-template-columns: 260px 1fr; gap: 40px; align-items: center">
+        <svg viewBox="0 0 220 220" style="width: 100%; display: block">
+          <g fill="none" stroke-width="9">
+            <path d="M 204 110 A 94 94 0 0 0 110 16" stroke="#1F51A8"></path>
+            <path d="M 110 204 A 94 94 0 0 0 204 110" stroke="#C98A0E"></path>
+            <path d="M 16 110 A 94 94 0 0 0 110 204" stroke="#C8451F"></path>
+            <path d="M 110 16 A 94 94 0 0 0 16 110" stroke="#1B7A3E"></path>
+          </g>
+          <g fill="none" stroke-width="5" opacity="0.55">
+            <path d="M 184 110 A 74 74 0 0 0 110 36" stroke="#1F51A8"></path>
+            <path d="M 110 184 A 74 74 0 0 0 184 110" stroke="#C98A0E"></path>
+            <path d="M 36 110 A 74 74 0 0 0 110 184" stroke="#C8451F"></path>
+            <path d="M 110 36 A 74 74 0 0 0 36 110" stroke="#1B7A3E"></path>
+          </g>
+        </svg>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="font-size: 20px; font-weight: 500; color: #1A1A17; line-height: 1.3">The four quarters make one ring. A gap in any quarter is a gap in the record.</div>
+          <div style="font-size: 15px; color: #45423A; line-height: 1.5">Usable as a live completion dial in the portal, a section divider on the site, and the basis of the mark itself.</div>
+        </div>
+      </div>
+
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">Applied — status at a glance</div>
+      <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 30px 32px; display: flex; flex-direction: column; gap: 18px">
+        <div style="display: grid; grid-template-columns: 1.6fr repeat(4, 68px); gap: 16px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(26,26,23,0.12)">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #6B6659">SOP</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">Pol</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">Proc</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">Train</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">Out</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1.6fr repeat(4, 68px); gap: 16px; align-items: center">
+          <div style="font-size: 16px; color: #1A1A17">Emergency evacuation</div>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 0 0 16 3" fill="none" stroke="#1F51A8" stroke-width="5"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 0 0 3 16" fill="none" stroke="#C98A0E" stroke-width="5"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 1 0 16 29" fill="none" stroke="#C8451F" stroke-width="5"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><circle cx="16" cy="16" r="13" fill="none" stroke="#1B7A3E" stroke-width="5"></circle></svg>
+        </div>
+        <div style="display: grid; grid-template-columns: 1.6fr repeat(4, 68px); gap: 16px; align-items: center">
+          <div style="font-size: 16px; color: #1A1A17">Nappy change &amp; toileting</div>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 0 0 16 3" fill="none" stroke="#1F51A8" stroke-width="5"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 0 0 3 16" fill="none" stroke="#C98A0E" stroke-width="5"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 1 0 16 29" fill="none" stroke="#1A1A17" stroke-width="5" opacity="0.18"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><circle cx="16" cy="16" r="13" fill="none" stroke="#1A1A17" stroke-width="5" opacity="0.18"></circle></svg>
+        </div>
+        <div style="display: grid; grid-template-columns: 1.6fr repeat(4, 68px); gap: 16px; align-items: center">
+          <div style="font-size: 16px; color: #1A1A17">Anaphylaxis response</div>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 0 0 16 3" fill="none" stroke="#1F51A8" stroke-width="5"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 0 0 3 16" fill="none" stroke="#1A1A17" stroke-width="5" opacity="0.18"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><path d="M 29 16 A 13 13 0 1 0 16 29" fill="none" stroke="#1A1A17" stroke-width="5" opacity="0.18"></path></svg>
+          <svg viewBox="0 0 32 32" style="width: 26px; height: 26px"><circle cx="16" cy="16" r="13" fill="none" stroke="#1A1A17" stroke-width="5" opacity="0.18"></circle></svg>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section style="padding: 0 72px 40px; display: flex; flex-direction: column; gap: 40px">
+
+  <div style="display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">Turn 1</div>
+    <div style="font-size: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A17">Two ways the geometry can carry the chain</div>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">policy → procedure → training → outcomes</div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start">
+
+    <div id="1a" style="width: 820px; flex: none; background: #EFEBE1; border: 1px solid rgba(26,26,23,0.14); padding: 40px; display: flex; flex-direction: column; gap: 32px">
+      <div style="display: flex; gap: 20px; align-items: flex-start">
+        <div style="width: 34px; height: 34px; background: #1B7A3E; color: #EFEBE1; font-family: 'IBM Plex Mono', monospace; font-size: 13px; display: flex; align-items: center; justify-content: center; flex: none">1a</div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="font-size: 24px; font-weight: 600; color: #1A1A17; letter-spacing: -0.01em">Radiant — everything comes out of policy</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #6B6659; line-height: 1.5">One origin point. Each band outward is one layer of the system.<br>Reads as: nothing exists on the floor that didn't start in a policy.</div>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 740 420" style="width: 100%; display: block">
+        <g fill="none" stroke="#1B7A3E" stroke-width="2">
+          <path d="M 82 380 A 22 22 0 0 0 60 358"></path>
+          <path d="M 90 380 A 30 30 0 0 0 60 350"></path>
+          <path d="M 130 380 A 70 70 0 0 0 60 310"></path>
+          <path d="M 144 380 A 84 84 0 0 0 60 296"></path>
+          <path d="M 158 380 A 98 98 0 0 0 60 282"></path>
+          <path d="M 172 380 A 112 112 0 0 0 60 268"></path>
+          <path d="M 210 380 A 150 150 0 0 0 60 230"></path>
+          <path d="M 224 380 A 164 164 0 0 0 60 216"></path>
+          <path d="M 238 380 A 178 178 0 0 0 60 202"></path>
+          <path d="M 252 380 A 192 192 0 0 0 60 188"></path>
+          <path d="M 290 380 A 230 230 0 0 0 60 150"></path>
+          <path d="M 304 380 A 244 244 0 0 0 60 136"></path>
+          <path d="M 318 380 A 258 258 0 0 0 60 122"></path>
+          <path d="M 332 380 A 272 272 0 0 0 60 108"></path>
+          <path d="M 346 380 A 286 286 0 0 0 60 94"></path>
+        </g>
+        <circle cx="60" cy="380" r="9" fill="#1B7A3E"></circle>
+      </svg>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; border-top: 1px solid rgba(26,26,23,0.14); padding-top: 20px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">01</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Policy</div><div style="font-size: 14px; color: #6B6659; line-height: 1.45">The obligation. Sits behind the scenes.</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">02</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Procedure</div><div style="font-size: 14px; color: #6B6659; line-height: 1.45">The SOP staff actually work from.</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">03</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Training</div><div style="font-size: 14px; color: #6B6659; line-height: 1.45">Read, understood, signed off.</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">04</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Outcomes</div><div style="font-size: 14px; color: #6B6659; line-height: 1.45">Evidence, capability, a defensible record.</div></div>
+      </div>
+
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">Applied — landing hero</div>
+      <div style="border: 1px solid rgba(26,26,23,0.14); background: #F6F3EB; overflow: hidden; position: relative; min-height: 470px; padding-bottom: 60px">
+        <svg viewBox="0 0 740 470" preserveAspectRatio="none" style="position: absolute; inset: 0; width: 100%; height: 100%">
+          <g fill="none" stroke="#1B7A3E" stroke-width="1.5" opacity="0.9">
+            <path d="M 680 470 A 60 60 0 0 1 740 410"></path>
+            <path d="M 650 470 A 90 90 0 0 1 740 380"></path>
+            <path d="M 620 470 A 120 120 0 0 1 740 350"></path>
+            <path d="M 560 470 A 180 180 0 0 1 740 290"></path>
+            <path d="M 530 470 A 210 210 0 0 1 740 260"></path>
+            <path d="M 500 470 A 240 240 0 0 1 740 230"></path>
+            <path d="M 440 470 A 300 300 0 0 1 740 170"></path>
+            <path d="M 410 470 A 330 330 0 0 1 740 140"></path>
+            <path d="M 380 470 A 360 360 0 0 1 740 110"></path>
+            <path d="M 350 470 A 390 390 0 0 1 740 80"></path>
+          </g>
+        </svg>
+        <div style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 22px 36px; border-bottom: 1px solid rgba(26,26,23,0.12)">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; display: block"><path d="M 2 22 A 20 20 0 0 0 22 2" fill="none" stroke="#1B7A3E" stroke-width="2.5"></path><path d="M 2 13 A 11 11 0 0 0 13 2" fill="none" stroke="#1B7A3E" stroke-width="2.5"></path><circle cx="2" cy="2" r="2.5" fill="#1B7A3E"></circle></svg>
+            <div style="font-size: 15px; font-weight: 600; letter-spacing: 0.18em; color: #1A1A17">VERICLEVER</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 28px; white-space: nowrap">
+            <div style="font-size: 14px; color: #1A1A17">Product</div>
+            <div style="font-size: 14px; color: #1A1A17">How it works</div>
+            <div style="font-size: 14px; color: #1A1A17">Pricing</div>
+            <div style="font-size: 14px; color: #1A1A17">Sign in</div>
+            <div style="font-size: 14px; color: #EFEBE1; background: #1A1A17; padding: 9px 16px">Book a walkthrough</div>
+          </div>
+        </div>
+        <div style="position: relative; padding: 60px 36px 0; max-width: 520px; display: flex; flex-direction: column; gap: 22px">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #1B7A3E">For Australian ECEC providers</div>
+          <div style="font-size: 52px; line-height: 1.02; font-weight: 600; letter-spacing: -0.02em; color: #1A1A17; text-wrap: pretty">From policy to practice, on the record.</div>
+          <div style="font-size: 17px; line-height: 1.5; color: #45423A; max-width: 440px">Policies carry the obligation. Procedures tell staff what to do. Vericlever links the two, builds the knowledge behind them, and keeps the evidence.</div>
+          <div style="display: flex; gap: 14px; padding-top: 6px">
+            <div style="font-size: 15px; color: #EFEBE1; background: #1B7A3E; padding: 13px 22px">Book a walkthrough</div>
+            <div style="font-size: 15px; color: #1A1A17; border: 1px solid #1A1A17; padding: 13px 22px">See how it works</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="1b" style="width: 820px; flex: none; background: #EFEBE1; border: 1px solid rgba(26,26,23,0.14); padding: 40px; display: flex; flex-direction: column; gap: 32px">
+      <div style="display: flex; gap: 20px; align-items: flex-start">
+        <div style="width: 34px; height: 34px; background: #1B7A3E; color: #EFEBE1; font-family: 'IBM Plex Mono', monospace; font-size: 13px; display: flex; align-items: center; justify-content: center; flex: none">1b</div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="font-size: 24px; font-weight: 600; color: #1A1A17; letter-spacing: -0.01em">Linked — four rings on one axis</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #6B6659; line-height: 1.5">Overlapping circles on a single line. Density builds left to right.<br>Reads as: four linked stages, each one carrying the last.</div>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 740 300" style="width: 100%; display: block">
+        <line x1="20" y1="150" x2="720" y2="150" stroke="#1A1A17" stroke-width="1" opacity="0.35"></line>
+        <g fill="none" stroke="#1B7A3E" stroke-width="2">
+          <circle cx="150" cy="150" r="90"></circle>
+          <circle cx="290" cy="150" r="90"></circle>
+          <circle cx="290" cy="150" r="70"></circle>
+          <circle cx="430" cy="150" r="90"></circle>
+          <circle cx="430" cy="150" r="70"></circle>
+          <circle cx="430" cy="150" r="50"></circle>
+          <circle cx="570" cy="150" r="90"></circle>
+          <circle cx="570" cy="150" r="70"></circle>
+          <circle cx="570" cy="150" r="50"></circle>
+          <circle cx="570" cy="150" r="30"></circle>
+        </g>
+        <circle cx="570" cy="150" r="11" fill="#1B7A3E"></circle>
+        <circle cx="150" cy="150" r="4" fill="#1A1A17"></circle>
+        <circle cx="290" cy="150" r="4" fill="#1A1A17"></circle>
+        <circle cx="430" cy="150" r="4" fill="#1A1A17"></circle>
+      </svg>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; border-top: 1px solid rgba(26,26,23,0.14); padding-top: 20px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">01</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Policy</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">02</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Procedure</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">03</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Training</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #1B7A3E">04</div><div style="font-size: 17px; font-weight: 500; color: #1A1A17">Outcomes</div></div>
+      </div>
+
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6B6659">Applied — landing hero</div>
+      <div style="border: 1px solid rgba(26,26,23,0.14); background: #F6F3EB; overflow: hidden; min-height: 470px; display: flex; flex-direction: column">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 22px 36px; border-bottom: 1px solid rgba(26,26,23,0.12)">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <svg viewBox="0 0 28 24" style="width: 24px; height: 20px; display: block"><g fill="none" stroke="#1B7A3E" stroke-width="2.5"><circle cx="9" cy="12" r="8"></circle><circle cx="19" cy="12" r="8"></circle></g></svg>
+            <div style="font-size: 15px; font-weight: 600; letter-spacing: 0.18em; color: #1A1A17">VERICLEVER</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 28px; white-space: nowrap">
+            <div style="font-size: 14px; color: #1A1A17">Product</div>
+            <div style="font-size: 14px; color: #1A1A17">How it works</div>
+            <div style="font-size: 14px; color: #1A1A17">Pricing</div>
+            <div style="font-size: 14px; color: #1A1A17">Sign in</div>
+            <div style="font-size: 14px; color: #EFEBE1; background: #1A1A17; padding: 9px 16px">Book a walkthrough</div>
+          </div>
+        </div>
+        <div style="padding: 54px 36px 34px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #1B7A3E">Compliance and capability in one system</div>
+          <div style="font-size: 50px; line-height: 1.03; font-weight: 600; letter-spacing: -0.02em; color: #1A1A17; max-width: 620px; text-wrap: pretty">Four links between the regulation and the room.</div>
+          <div style="font-size: 17px; line-height: 1.5; color: #45423A; max-width: 520px">Every SOP your staff sign off traces back to the policy it serves, and forward to the evidence you can produce on the day.</div>
+          <div style="display: flex; gap: 14px; padding-top: 4px">
+            <div style="font-size: 15px; color: #EFEBE1; background: #1B7A3E; padding: 13px 22px">Book a walkthrough</div>
+            <div style="font-size: 15px; color: #1A1A17; border: 1px solid #1A1A17; padding: 13px 22px">See how it works</div>
+          </div>
+        </div>
+        <div style="flex: 1; overflow: hidden; border-top: 1px solid rgba(26,26,23,0.12)">
+          <svg viewBox="0 0 740 160" preserveAspectRatio="xMidYMin slice" style="width: 100%; height: 100%; display: block">
+            <g fill="none" stroke="#1B7A3E" stroke-width="1.5">
+              <circle cx="110" cy="120" r="70"></circle>
+              <circle cx="300" cy="120" r="70"></circle>
+              <circle cx="300" cy="120" r="52"></circle>
+              <circle cx="490" cy="120" r="70"></circle>
+              <circle cx="490" cy="120" r="52"></circle>
+              <circle cx="490" cy="120" r="34"></circle>
+              <circle cx="680" cy="120" r="70"></circle>
+              <circle cx="680" cy="120" r="52"></circle>
+              <circle cx="680" cy="120" r="34"></circle>
+              <circle cx="680" cy="120" r="16"></circle>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div id="1d" style="width: 820px; flex: none; background: #EFEBE1; border: 1px solid rgba(26,26,23,0.14); padding: 40px; display: flex; flex-direction: column; gap: 28px">
+      <div style="display: flex; gap: 20px; align-items: flex-start">
+        <div style="width: 34px; height: 34px; background: #1A1A17; color: #EFEBE1; font-family: 'IBM Plex Mono', monospace; font-size: 13px; display: flex; align-items: center; justify-content: center; flex: none">1d</div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="font-size: 24px; font-weight: 600; color: #1A1A17; letter-spacing: -0.01em">The one colour — poster green</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #6B6659; line-height: 1.5">Locked to the Bauhaus 1920 reference. Alternates kept for the record.</div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px">
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 18px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#1B7A3E" stroke-width="2.4"><path d="M 50 150 A 40 40 0 0 0 10 110"></path><path d="M 66 150 A 56 56 0 0 0 10 94"></path><path d="M 98 150 A 88 88 0 0 0 10 62"></path><path d="M 114 150 A 104 104 0 0 0 10 46"></path><path d="M 146 150 A 136 136 0 0 0 10 14"></path></g><circle cx="10" cy="150" r="7" fill="#1B7A3E"></circle></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; color: #1B7A3E">Poster green — selected</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">#1B7A3E · matched to your reference</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 18px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#2246B8" stroke-width="2.4"><path d="M 50 150 A 40 40 0 0 0 10 110"></path><path d="M 66 150 A 56 56 0 0 0 10 94"></path><path d="M 98 150 A 88 88 0 0 0 10 62"></path><path d="M 114 150 A 104 104 0 0 0 10 46"></path><path d="M 146 150 A 136 136 0 0 0 10 14"></path></g><circle cx="10" cy="150" r="7" fill="#2246B8"></circle></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; color: #1A1A17">Ultramarine</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">#2246B8 · institutional, safest for compliance</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 18px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#0E6B5E" stroke-width="2.4"><path d="M 50 150 A 40 40 0 0 0 10 110"></path><path d="M 66 150 A 56 56 0 0 0 10 94"></path><path d="M 98 150 A 88 88 0 0 0 10 62"></path><path d="M 114 150 A 104 104 0 0 0 10 46"></path><path d="M 146 150 A 136 136 0 0 0 10 14"></path></g><circle cx="10" cy="150" r="7" fill="#0E6B5E"></circle></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; color: #1A1A17">Teal green</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">#0E6B5E · cooler, more clinical</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div style="background: #F6F3EB; border: 1px solid rgba(26,26,23,0.12); padding: 18px">
+            <svg viewBox="0 0 160 160" style="width: 100%; display: block"><g fill="none" stroke="#1A1A17" stroke-width="2.4"><path d="M 50 150 A 40 40 0 0 0 10 110"></path><path d="M 66 150 A 56 56 0 0 0 10 94"></path><path d="M 98 150 A 88 88 0 0 0 10 62"></path><path d="M 114 150 A 104 104 0 0 0 10 46"></path><path d="M 146 150 A 136 136 0 0 0 10 14"></path></g><circle cx="10" cy="150" r="7" fill="#1A1A17"></circle></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; color: #1A1A17">Ink only</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B6659">#1A1A17 · colour held back for the product itself</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+</body>
+</html>

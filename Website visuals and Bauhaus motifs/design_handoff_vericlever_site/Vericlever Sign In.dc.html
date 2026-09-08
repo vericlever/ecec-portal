@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #FFFFFF; font-family: Jost, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #1B7A3E; text-decoration: none; }
+  a:hover { color: #1A1A17; }
+  input::placeholder { color: #9A9488; }
+  input:focus { outline: 2px solid #1B7A3E; outline-offset: 1px; }
+</style>
+</helmet>
+
+<div style="background: #FFFFFF; color: #1A1A17; min-height: 100vh; display: flex; flex-direction: column">
+
+  <div style="border-bottom: 10px solid #1A1A17">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; row-gap: 12px">
+      <a href="Vericlever Landing Page.dc.html" style="display: flex; align-items: center; gap: 12px; color: #1A1A17">
+        <svg viewBox="0 0 40 40" style="width: 30px; height: 30px; display: block; flex: none">
+          <g fill="none" stroke="#1B7A3E" stroke-width="3.4">
+            <path d="M 14 36 A 10 10 0 0 0 4 26"></path>
+            <path d="M 22 36 A 18 18 0 0 0 4 18"></path>
+            <path d="M 30 36 A 26 26 0 0 0 4 10"></path>
+          </g>
+          <circle cx="4" cy="36" r="2.8" fill="#1B7A3E"></circle>
+        </svg>
+        <div style="font-size: 16px; font-weight: 600; letter-spacing: 0.2em">VERICLEVER</div>
+      </a>
+      <div style="display: flex; align-items: center; gap: 24px; white-space: nowrap; flex: none">
+        <div style="font-size: 15px; color: #45423A">Not set up yet?</div>
+        <a href="Vericlever Landing Page.dc.html" style="font-size: 15px; color: #1A1A17; border: 1px solid #1A1A17; padding: 10px 18px">Book a walkthrough</a>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); align-items: stretch">
+
+    <div style="padding: clamp(48px, 7vw, 96px) clamp(28px, 5vw, 72px); display: flex; flex-direction: column; justify-content: center; gap: 28px; max-width: 620px; margin: 0 auto; width: 100%; box-sizing: border-box">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: #1B7A3E">Sign in</div>
+        <h1 style="margin: 0; font-size: clamp(34px, 4.4vw, 48px); line-height: 1.05; font-weight: 600; letter-spacing: -0.025em; text-wrap: pretty">Are you already VeriClever?</h1>
+        <p style="margin: 0; font-size: 17px; line-height: 1.5; color: #45423A">Sign in to your service's portal.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 20px">
+        <label style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6659">Work email</span>
+          <input type="email" placeholder="you@yourservice.com.au" style="font-family: Jost, Helvetica, sans-serif; font-size: 17px; color: #1A1A17; background: #FFFFFF; border: 2px solid #1A1A17; border-radius: 0; padding: 15px 16px; width: 100%; box-sizing: border-box">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #6B6659">Password</span>
+          <input type="password" placeholder="••••••••" style="font-family: Jost, Helvetica, sans-serif; font-size: 17px; color: #1A1A17; background: #FFFFFF; border: 2px solid #1A1A17; border-radius: 0; padding: 15px 16px; width: 100%; box-sizing: border-box">
+        </label>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap">
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 15px; color: #45423A">
+            <input type="checkbox" style="width: 18px; height: 18px; accent-color: #1B7A3E; margin: 0">
+            Keep me signed in on this device
+          </label>
+          <a href="#reset" style="font-size: 15px">Forgot password</a>
+        </div>
+        <button type="button" style="font-family: Jost, Helvetica, sans-serif; font-size: 17px; font-weight: 500; color: #FFFFFF; background: #1B7A3E; border: none; border-radius: 0; padding: 17px 26px; cursor: pointer; width: 100%; text-align: center" style-hover="background: #166533">Sign in</button>
+        <div style="display: flex; align-items: center; gap: 16px">
+          <div style="flex: 1; height: 1px; background: rgba(26,26,23,0.16)"></div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.1em; color: #6B6659">OR</div>
+          <div style="flex: 1; height: 1px; background: rgba(26,26,23,0.16)"></div>
+        </div>
+        <button type="button" style="font-family: Jost, Helvetica, sans-serif; font-size: 17px; color: #1A1A17; background: transparent; border: 1px solid #1A1A17; border-radius: 0; padding: 16px 26px; cursor: pointer; width: 100%; text-align: center">Email me a sign-in link</button>
+      </div>
+
+      <div style="border-top: 4px solid #1A1A17; padding-top: 20px; font-size: 15px; color: #45423A; line-height: 1.5">
+        Trouble getting in? Your Centre Director or Approved Provider can reissue access, or <a href="#help">ask us</a>.
+      </div>
+    </div>
+
+    <div style="background: #FFFFFF; border-left: 10px solid #1A1A17; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: clamp(48px, 6vw, 80px) clamp(28px, 5vw, 72px); min-height: 520px">
+      <div style="position: relative; display: flex; flex-direction: column; gap: 18px; max-width: 460px">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: #1B7A3E">Inside the portal</div>
+        <div style="font-size: clamp(24px, 2.6vw, 30px); line-height: 1.2; font-weight: 500; color: #1A1A17; text-wrap: pretty">Every procedure your team signs closes a ring — and stays closed until something changes.</div>
+      </div>
+
+      <div style="position: relative; display: flex; justify-content: center; align-items: center; flex: 1; min-height: 240px">
+        <svg viewBox="0 0 340 340" style="width: 100%; max-width: 380px; display: block">
+          <g fill="none" stroke-width="8">
+            <path d="M 320 170 A 150 150 0 0 0 170 20" stroke="#1F51A8"></path>
+            <path d="M 170 320 A 150 150 0 0 0 320 170" stroke="#C98A0E"></path>
+            <path d="M 20 170 A 150 150 0 0 0 170 320" stroke="#C8451F"></path>
+            <path d="M 170 20 A 150 150 0 0 0 20 170" stroke="#1B7A3E"></path>
+            <path d="M 296 170 A 126 126 0 0 0 170 44" stroke="#1F51A8"></path>
+            <path d="M 170 296 A 126 126 0 0 0 296 170" stroke="#C98A0E"></path>
+            <path d="M 44 170 A 126 126 0 0 0 170 296" stroke="#C8451F"></path>
+            <path d="M 170 44 A 126 126 0 0 0 44 170" stroke="#1B7A3E"></path>
+            <path d="M 272 170 A 102 102 0 0 0 170 68" stroke="#1F51A8"></path>
+            <path d="M 170 272 A 102 102 0 0 0 272 170" stroke="#C98A0E"></path>
+            <path d="M 68 170 A 102 102 0 0 0 170 272" stroke="#C8451F"></path>
+            <path d="M 170 68 A 102 102 0 0 0 68 170" stroke="#1B7A3E"></path>
+          </g>
+          <g stroke="none">
+            <path d="M 170 170 L 186 170 A 16 16 0 0 0 170 154 Z" fill="#1F51A8"></path>
+            <path d="M 170 170 L 170 186 A 16 16 0 0 0 186 170 Z" fill="#C98A0E"></path>
+            <path d="M 170 170 L 154 170 A 16 16 0 0 0 170 186 Z" fill="#C8451F"></path>
+            <path d="M 170 170 L 170 154 A 16 16 0 0 0 154 170 Z" fill="#1B7A3E"></path>
+          </g>
+        </svg>
+      </div>
+
+      <div style="position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 18px; border-top: 4px solid #1A1A17; padding-top: 22px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #1F51A8">POLICY</div><div style="font-size: 14px; color: #45423A">The obligation</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #9A6A08">PROCEDURE</div><div style="font-size: 14px; color: #45423A">The practice</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #C8451F">TRAINING</div><div style="font-size: 14px; color: #45423A">The knowledge</div></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="font-size: 12px; font-weight: 600; letter-spacing: 0.16em; color: #1B7A3E">OUTCOMES</div><div style="font-size: 14px; color: #45423A">The evidence</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>

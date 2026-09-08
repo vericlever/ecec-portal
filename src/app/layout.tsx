@@ -1,6 +1,21 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { Jost, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+
+const jost = Jost({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-jost",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
 import { getProfile, isManager, canEditContent, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
@@ -50,7 +65,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en-AU">
+    <html lang="en-AU" className={`${jost.variable} ${plexMono.variable}`}>
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
         <RegisterServiceWorker />
         {profile && (
@@ -98,7 +113,12 @@ export default async function RootLayout({
             </div>
           </div>
         )}
-        <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
+        {profile ? (
+          <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>
+        ) : (
+          // Public pages (landing, sign-in, forgot-password) own their layout.
+          children
+        )}
       </body>
     </html>
   );
