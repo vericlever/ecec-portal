@@ -253,7 +253,9 @@ Browser-native, using the Web Speech API (`SpeechSynthesis`), not a cloud TTS se
 - Works on both desktop and mobile browsers, since educators will mostly be using this on the floor via phone
 
 ## Step 15: Click-through from SOP to source policy
-**Status: not started, confirmed important**
+**Status: built on branch `step-15-sop-policy-links` 2026-09-08, not merged. No migration.**
+
+The "Source policies" list on the staff SOP page is now clickable: each linked policy is a link to its view-only `/policies/[id]` page. RLS already limits the list to published policies that target the reader, so every entry is safe to open. Multiple links all show; the heading reads "Source policy" or "Source policies" accordingly. The reverse ("Related SOPs" on the staff policy page) was already clickable from Step 6. Verified end to end as a staff member.
 
 Depends on Step 6's policy-SOP linking already existing, since this surfaces those links on the staff-facing side, not just the admin/manager linking interface.
 

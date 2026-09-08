@@ -57,10 +57,14 @@ export default async function SopDetailPage({
         : Promise.resolve({ data: null }),
     ]);
 
+  // Linked policies the staff member is allowed to open. RLS on `policies`
+  // already limits this to published policies that target them, matching their
+  // view-only access on the Policies page, so anything returned here is safe to
+  // link straight through.
   const policyIds = (links ?? []).map((l) => l.policy_id);
   const { data: policyRows } = policyIds.length
-    ? await supabase.from("policies").select("name").in("id", policyIds)
-    : { data: [] as { name: string }[] };
+    ? await supabase.from("policies").select("id, name").in("id", policyIds)
+    : { data: [] as { id: string; name: string }[] };
   const policies = (policyRows ?? [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -102,11 +106,18 @@ export default async function SopDetailPage({
       {policies.length > 0 && (
         <section className="mt-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Source policies
+            Source {policies.length === 1 ? "policy" : "policies"}
           </h2>
-          <ul className="mt-2 text-sm text-slate-600">
+          <ul className="mt-2 space-y-1 text-sm">
             {policies.map((p) => (
-              <li key={p.name}>{p.name}</li>
+              <li key={p.id}>
+                <Link
+                  href={`/policies/${p.id}`}
+                  className="text-slate-700 underline hover:text-slate-900"
+                >
+                  {p.name}
+                </Link>
+              </li>
             ))}
           </ul>
         </section>
