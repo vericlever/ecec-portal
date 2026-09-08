@@ -178,7 +178,7 @@ export function SiteNav(props: SiteNavProps) {
 
       {/* Mobile sheet */}
       {open && (
-        <div className="absolute inset-x-0 top-full z-30 border-b-2 border-ink bg-paper sm:hidden">
+        <div className="absolute inset-x-0 top-full z-50 border-b-2 border-ink bg-paper sm:hidden">
           <div className="mx-auto max-w-3xl space-y-1 px-4 py-3">
             {primary.map((it) => (
               <Link

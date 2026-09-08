@@ -95,7 +95,7 @@ export function ManageMenu({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-30 mt-3 w-56 border-2 border-ink bg-paper py-1">
+        <div className="absolute left-0 z-50 mt-3 w-56 border-2 border-ink bg-paper py-1">
           {groups.map((g, i) => (
             <div key={i} className={i > 0 ? "mt-1 border-t border-ink/15 pt-1" : ""}>
               {g.label && (
