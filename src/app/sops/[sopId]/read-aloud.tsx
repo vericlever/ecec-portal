@@ -4,6 +4,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Status = "idle" | "playing" | "paused";
 
+// Prefer an Australian English voice, then British, then any English, then
+// whatever the device defaults to. The Web Speech API can only use voices the
+// device already has: most Apple devices and many Android phones carry an
+// en-AU voice; a lot of Windows machines only have US English unless the
+// Australian language pack is installed, so this degrades gracefully.
+function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  if (voices.length === 0) return null;
+  const en = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+  const byLang = (code: string) =>
+    en.find((v) => v.lang?.toLowerCase() === code);
+  return (
+    byLang("en-au") ??
+    en.find((v) => /austral/i.test(v.name)) ??
+    byLang("en-gb") ??
+    en.find((v) => v.default) ??
+    en[0] ??
+    null
+  );
+}
+
 // Browser-native read-aloud (Web Speech API). No audio is generated or stored;
 // the device speaks the text live. The SOP body is split into short chunks so a
 // long procedure keeps going past Chrome's ~15 second per-utterance limit, and
@@ -37,10 +57,13 @@ export function ReadAloud({ text }: { text: string }) {
       return;
     }
     const u = new SpeechSynthesisUtterance(chunks.current[index.current]);
-    const en = synth
-      .getVoices()
-      .find((v) => v.lang && v.lang.toLowerCase().startsWith("en"));
-    if (en) u.voice = en;
+    const voice = pickVoice(synth.getVoices());
+    if (voice) {
+      u.voice = voice;
+      u.lang = voice.lang;
+    } else {
+      u.lang = "en-AU";
+    }
     u.onend = () => {
       if (stopped.current) return;
       index.current += 1;
