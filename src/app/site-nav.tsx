@@ -74,20 +74,28 @@ export function SiteNav(props: SiteNavProps) {
     }
     if (canCountersign) {
       items.push({ href: "/admin/countersign", label: "Procedure countersigning" });
-      items.push({ href: "/admin/observations", label: "Practice observations" });
     }
     manageGroups.push({ label: "Staff", items });
   }
-  if (canEditContent) {
-    manageGroups.push({
-      label: "Library",
-      items: [
+  // Library: content editors get the full editing set; anyone who can
+  // countersign (every manager tier, not just content editors) keeps their
+  // existing access to Procedure Outcomes here too, per Step 21's spec that
+  // logging is open to every manager tier - moving it into this group must
+  // not narrow who can reach it.
+  if (canEditContent || canCountersign) {
+    const items: Item[] = [];
+    if (canCountersign) {
+      items.push({ href: "/admin/observations", label: "Procedure Outcomes" });
+    }
+    if (canEditContent) {
+      items.push(
         { href: "/admin/policies", label: "Policies" },
         { href: "/admin/sops", label: "Procedures" },
         { href: "/admin/agreements", label: "Agreements" },
         { href: "/admin/job-roles", label: "Job roles" },
-      ],
-    });
+      );
+    }
+    manageGroups.push({ label: "Library", items });
   }
   const showManage = canManageStaff || canCountersign || canEditContent;
 

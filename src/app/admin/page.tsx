@@ -222,7 +222,7 @@ export default async function DashboardPage() {
     {
       show: manager,
       href: "/admin/observations",
-      label: "Procedures flagged by a practice observation",
+      label: "Procedures flagged by a procedure outcome record",
       count: flaggedSops.length,
       detail:
         flaggedSops.length === 0

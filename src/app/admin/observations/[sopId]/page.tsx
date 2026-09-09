@@ -59,7 +59,7 @@ export default async function ObservationDetailPage({
         href="/admin/observations"
         className="text-sm text-slate-500 hover:text-slate-900"
       >
-        ← Practice observations
+        ← Procedure Outcomes
       </Link>
 
       <h1 className="mt-3 text-xl font-semibold">

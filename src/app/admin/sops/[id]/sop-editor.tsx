@@ -188,7 +188,7 @@ export function SopEditor({
       )}
       {sop.needs_review && (
         <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
-          A practice observation flagged this procedure for review. Publishing a new
+          A procedure outcome record flagged this procedure for review. Publishing a new
           version or marking it reviewed in the Review cycle section clears this
           flag.
         </p>
@@ -514,7 +514,7 @@ export function SopEditor({
               Suggested review evidence
             </span>
             <p className="mt-0.5 text-xs text-slate-500">
-              Shown to a manager when they log a practice observation: what would
+              Shown to a manager when they log a procedure outcome: what would
               show this procedure is working (photos, rosters, records).
             </p>
             <textarea
