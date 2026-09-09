@@ -16,8 +16,28 @@ export type ContractRow = {
   superseded_at: string | null;
   signed_at: string | null;
   signed_name: string | null;
+  signed_by: string | null;
+  signed_content_hash: string | null;
+  is_deed: boolean;
+  countersigned_at: string | null;
+  countersigned_name: string | null;
+  countersigned_by: string | null;
+  countersigned_content_hash: string | null;
   created_at: string;
 };
+
+// Fully executed = both signature slots filled. A deed is reported as
+// "signed on paper" rather than unsigned or executed - it never goes through
+// either in-app slot (Step 39).
+export type ExecutionState = "deed" | "unsigned" | "awaiting_countersign" | "executed";
+
+export function executionState(contract: ContractRow | null): ExecutionState {
+  if (!contract) return "unsigned";
+  if (contract.is_deed) return "deed";
+  if (!contract.signed_at) return "unsigned";
+  if (!contract.countersigned_at) return "awaiting_countersign";
+  return "executed";
+}
 
 // Renewal escalation buckets. "due" covers the 4/3/2/1 week run-up, "expired"
 // once the date has passed. Only fixed-period contracts ever leave "none".

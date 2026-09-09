@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractDocument } from "@/lib/documents/extract";
 
@@ -104,6 +105,27 @@ export async function signedDocumentUrl(
     .createSignedUrl(doc.storage_path, 120, { download: doc.file_name });
   if (error || !data) return null;
   return { url: data.signedUrl, fileName: doc.file_name };
+}
+
+// sha256 of the exact stored bytes, for Step 39's "hash of the contract
+// version signed". Downloads the file once; not cheap, so callers use it only
+// at the moment of signing, not on every render.
+export async function documentSha256(
+  documentId: string | null,
+): Promise<string | null> {
+  if (!documentId) return null;
+  const admin = createAdminClient();
+  const { data: doc } = await admin
+    .from("documents")
+    .select("storage_path")
+    .eq("id", documentId)
+    .maybeSingle();
+  if (!doc) return null;
+
+  const { data, error } = await admin.storage.from(BUCKET).download(doc.storage_path);
+  if (error || !data) return null;
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {
