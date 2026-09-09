@@ -19,6 +19,7 @@ const plexMono = IBM_Plex_Mono({
 import {
   getProfile,
   isManager,
+  isWorker,
   canEditContent,
   canViewReports,
   TIER_LABELS,
@@ -52,9 +53,10 @@ export default async function RootLayout({
     profile && (isManager(profile.access_tier) || profile.hr_manager),
   );
 
-  // Anyone with a job role is a worker who needs a Worker Register entry.
+  // Anyone with a job role is a worker who needs a Worker Register entry - and
+  // so is an Admin, who has an underlying staff record too (Step 40).
   let showOnboardingPrompt = false;
-  if (profile && profile.job_role_id) {
+  if (profile && isWorker(profile)) {
     const { data } = await createClient()
       .from("worker_details")
       .select("onboarding_completed_at")
@@ -82,7 +84,7 @@ export default async function RootLayout({
               fullName={profile.full_name}
               tierLabel={TIER_LABELS[profile.access_tier]}
               isLeader={leader}
-              isWorker={Boolean(profile.job_role_id)}
+              isWorker={isWorker(profile)}
               canManageStaff={
                 isManager(profile.access_tier) || profile.hr_manager
               }

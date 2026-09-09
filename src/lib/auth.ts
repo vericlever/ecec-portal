@@ -45,6 +45,16 @@ export function isHrManager(profile: Profile | null): boolean {
   return Boolean(profile && (profile.access_tier === "admin" || profile.hr_manager));
 }
 
+// Someone who onboards and self-serves their own Worker Register record:
+// anyone with a job role, plus every Admin. An Admin normally has no job role
+// (operator accounts are "unassigned", migration 0014), but every Admin is
+// still a staff member underneath and must be able to complete their own
+// onboarding and edit their own details the same way anyone else can (Step
+// 40) - this does not change an Admin's reach over *other* people's records.
+export function isWorker(profile: Profile | null): boolean {
+  return Boolean(profile && (profile.job_role_id || profile.access_tier === "admin"));
+}
+
 export async function requireProfile(): Promise<Profile> {
   const profile = await getProfile();
   if (!profile) redirect("/login");
