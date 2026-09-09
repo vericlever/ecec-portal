@@ -28,3 +28,11 @@ export function isAdmin(tier: AccessTier | null | undefined): boolean {
 export function canEditContent(tier: AccessTier | null | undefined): boolean {
   return tier === "manager_policy" || tier === "admin";
 }
+
+// The Reports page and every report route (Step 30): Admin and Manager
+// (policy) only. Deliberately its own check rather than reusing
+// canEditContent - the spec names these two tiers explicitly, and this stays
+// correct even if canEditContent's set ever widens for an unrelated reason.
+export function canViewReports(tier: AccessTier | null | undefined): boolean {
+  return tier === "manager_policy" || tier === "admin";
+}

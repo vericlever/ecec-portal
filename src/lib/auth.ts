@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { type AccessTier, isManager, isAdmin, canEditContent } from "@/lib/roles";
+import {
+  type AccessTier,
+  isManager,
+  isAdmin,
+  canEditContent,
+  canViewReports,
+} from "@/lib/roles";
 
 export * from "@/lib/roles";
 
@@ -70,4 +76,26 @@ export async function requireContentEditor(): Promise<Profile> {
   const profile = await requireProfile();
   if (!canEditContent(profile.access_tier)) redirect("/policies");
   return profile;
+}
+
+// The Reports page and its report routes (Step 30): Admin or Manager
+// (policy) only. Staff and Manager (staff) never see the nav item and are
+// redirected here if they hit the URL directly.
+export async function requireReportsAccess(): Promise<Profile> {
+  const profile = await requireProfile();
+  if (!canViewReports(profile.access_tier)) redirect("/sops");
+  return profile;
+}
+
+// Same gate for a route handler, which returns a Response instead of
+// redirecting. Every report-generation endpoint calls this first.
+export async function reportsProfileOrResponse(): Promise<
+  { ok: true; profile: Profile } | { ok: false; response: Response }
+> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, response: new Response("Sign in", { status: 401 }) };
+  if (!canViewReports(profile.access_tier)) {
+    return { ok: false, response: new Response("Forbidden", { status: 403 }) };
+  }
+  return { ok: true, profile };
 }

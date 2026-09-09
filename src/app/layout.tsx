@@ -16,7 +16,13 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   display: "swap",
 });
-import { getProfile, isManager, canEditContent, TIER_LABELS } from "@/lib/auth";
+import {
+  getProfile,
+  isManager,
+  canEditContent,
+  canViewReports,
+  TIER_LABELS,
+} from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
 import { PortalBackdrop } from "@/components/bauhaus";
@@ -82,6 +88,7 @@ export default async function RootLayout({
               }
               canCountersign={isManager(profile.access_tier)}
               canEditContent={canEditContent(profile.access_tier)}
+              canViewReports={canViewReports(profile.access_tier)}
             />
           </header>
         )}

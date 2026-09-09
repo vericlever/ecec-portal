@@ -16,6 +16,7 @@ export type SiteNavProps = {
   canManageStaff: boolean;
   canCountersign: boolean;
   canEditContent: boolean;
+  canViewReports: boolean;
 };
 
 export function SiteNav(props: SiteNavProps) {
@@ -27,6 +28,7 @@ export function SiteNav(props: SiteNavProps) {
     canManageStaff,
     canCountersign,
     canEditContent,
+    canViewReports,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -46,6 +48,7 @@ export function SiteNav(props: SiteNavProps) {
     ...(isLeader ? [{ href: "/admin", label: "Overview" }] : []),
     { href: "/sops", label: "SOPs" },
     { href: "/policies", label: "Policies" },
+    ...(canViewReports ? [{ href: "/reports", label: "Reports" }] : []),
     ...(isWorker
       ? [
           { href: "/agreements", label: "Agreements" },
