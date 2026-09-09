@@ -75,7 +75,7 @@ export default async function SopDetailPage({
   return (
     <div>
       <Link href="/sops" className="text-sm text-slate-500 hover:text-slate-900">
-        ← All SOPs
+        ← All Procedures
       </Link>
 
       <h1 className="mt-3 text-xl font-semibold">{sop.name}</h1>
@@ -141,7 +141,7 @@ export default async function SopDetailPage({
         <SignForm sopId={sop.id} needsManager={needsManager} />
       ) : (
         <p className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
-          This SOP is not part of your assigned job role, so it is shown for
+          This procedure is not part of your assigned job role, so it is shown for
           reference only.
         </p>
       )}

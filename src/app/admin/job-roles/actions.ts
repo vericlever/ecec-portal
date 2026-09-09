@@ -112,7 +112,7 @@ export async function setSopInRole(
       .eq("id", sopId)
       .maybeSingle();
     if (!sop || sop.organisation_id !== owned.role.organisation_id) {
-      return { ok: false, error: "That SOP is not in your organisation." };
+      return { ok: false, error: "That procedure is not in your organisation." };
     }
     const { error } = await admin.from("job_role_sops").insert({
       organisation_id: owned.role.organisation_id,

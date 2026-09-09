@@ -71,12 +71,12 @@ export function SopBulkUpload({
         <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
           <div>
             <span className="text-sm font-medium text-slate-700">
-              Job roles for the new SOPs
+              Job roles for the new procedures
             </span>
             <p className="text-xs text-slate-500">
-              This is what decides which staff see the SOP. You can change it per
-              SOP on the next page. A file that matches an existing SOP keeps
-              that SOP&apos;s current job roles.
+              This is what decides which staff see the procedure. You can change it per
+              procedure on the next page. A file that matches an existing procedure keeps
+              that procedure&apos;s current job roles.
             </p>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
               {jobRoles.map((r) => (
@@ -99,7 +99,7 @@ export function SopBulkUpload({
           </div>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">
-              Sign-off type for new SOPs
+              Sign-off type for new procedures
             </span>
             <select
               value={signoffType}

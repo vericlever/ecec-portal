@@ -91,7 +91,7 @@ export default async function PolicyDetailPage({
         allSops={(allSops ?? []) as { id: string; name: string }[]}
         linkedSops={Array.from(linkedSopIds).map((id) => ({
           id: id as string,
-          name: sopName.get(id) ?? "SOP",
+          name: sopName.get(id) ?? "Procedure",
         }))}
       />
     </div>

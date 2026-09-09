@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Bad request." }, { status: 400 });
   }
   if (!sopId) {
-    return NextResponse.json({ ok: false, error: "Missing SOP." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Missing procedure." }, { status: 400 });
   }
 
   const supabase = createClient();
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!sop || sop.published_version == null) {
-    return NextResponse.json({ ok: false, error: "SOP not found." }, { status: 404 });
+    return NextResponse.json({ ok: false, error: "Procedure not found." }, { status: 404 });
   }
 
   const { error } = await supabase.from("sign_offs").insert({

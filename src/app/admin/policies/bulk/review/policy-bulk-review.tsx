@@ -284,7 +284,7 @@ export function PolicyBulkReview({
 
             <div className="mt-3 text-sm">
               <span className="text-xs font-medium text-slate-500">
-                Linked SOPs
+                Linked Procedures
               </span>
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {s.linkedSopIds.map((sid) => (
@@ -292,7 +292,7 @@ export function PolicyBulkReview({
                     key={sid}
                     className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
                   >
-                    {sopName.get(sid) ?? "SOP"}
+                    {sopName.get(sid) ?? "Procedure"}
                     <button
                       type="button"
                       onClick={() =>
@@ -318,7 +318,7 @@ export function PolicyBulkReview({
                     }}
                     className="rounded-md border border-slate-300 px-2 py-1 text-xs"
                   >
-                    <option value="">Link a SOP…</option>
+                    <option value="">Link a procedure…</option>
                     {linkable.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}

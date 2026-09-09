@@ -209,7 +209,7 @@ export function PolicyEditor({
         </h2>
         <p className="mt-1 text-xs text-slate-500">
           How this policy is filed in the library, and used when linking it to
-          SOPs. A policy can be in more than one.
+          procedures. A policy can be in more than one.
         </p>
         <div className="mt-2 space-y-1.5">
           {categories.map((c) => (
@@ -442,13 +442,13 @@ export function PolicyEditor({
         </div>
       </section>
 
-      {/* Linked SOPs */}
+      {/* Linked Procedures */}
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Linked SOPs
+          Linked Procedures
         </h2>
         {linkedSops.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No SOPs linked.</p>
+          <p className="mt-2 text-sm text-slate-500">No procedures linked.</p>
         ) : (
           <ul className="mt-2 space-y-1 text-sm">
             {linkedSops.map((s) => (
@@ -473,7 +473,7 @@ export function PolicyEditor({
             list="sop-options"
             value={sopToAdd}
             onChange={(e) => setSopToAdd(e.target.value)}
-            placeholder="Find a SOP by name"
+            placeholder="Find a procedure by name"
             className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
           />
           <datalist id="sop-options">
@@ -489,7 +489,7 @@ export function PolicyEditor({
                 (s) => s.name.toLowerCase() === sopToAdd.trim().toLowerCase(),
               );
               if (!match) {
-                setErr("Pick a SOP from the list.");
+                setErr("Pick a procedure from the list.");
                 return;
               }
               act(() => linkSop(policy.id, match.id), "Linked");

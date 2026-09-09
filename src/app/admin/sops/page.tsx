@@ -68,7 +68,7 @@ export default async function AdminSopsPage() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">SOPs</h1>
+        <h1 className="text-xl font-semibold">Procedures</h1>
         <div className="flex gap-2">
           <Link
             href="/admin/sops/bulk"
@@ -80,13 +80,13 @@ export default async function AdminSopsPage() {
             href="/admin/sops/new"
             className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
           >
-            New SOP
+            New Procedure
           </Link>
         </div>
       </div>
 
       <p className="mt-1 text-sm text-slate-500">
-        {rows.length} SOPs · {publishedCount} published
+        {rows.length} procedures · {publishedCount} published
         {needsContent > 0 && ` · ${needsContent} still need content`}
         {reviewOverdue > 0 && (
           <span className="text-red-700">

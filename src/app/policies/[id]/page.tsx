@@ -83,7 +83,7 @@ export default async function PolicyViewPage({
       {(sops ?? []).length > 0 && (
         <section className="mt-6">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Related SOPs
+            Related Procedures
           </h2>
           <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
             {(sops ?? []).map((s) => (

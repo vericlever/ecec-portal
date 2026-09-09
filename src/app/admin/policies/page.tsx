@@ -146,7 +146,7 @@ export default async function AdminPoliciesPage() {
                               ? `${serviceName.get(p.service_id) ?? "one site"} only`
                               : "all sites"}
                             {sopN > 0 &&
-                              ` · ${sopN} SOP${sopN === 1 ? "" : "s"}`}
+                              ` · ${sopN} procedure${sopN === 1 ? "" : "s"}`}
                           </div>
                         </div>
                         <span

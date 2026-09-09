@@ -89,7 +89,7 @@ export async function createSop(input: {
     return {
       ok: false,
       error: error.message.includes("duplicate")
-        ? "A SOP with that name already exists."
+        ? "A procedure with that name already exists."
         : error.message,
     };
   }
@@ -109,7 +109,7 @@ export async function updateSopMeta(
   },
 ): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const name = input.name.trim();
   if (!name) return { ok: false, error: "A name is required." };
 
@@ -137,7 +137,7 @@ export async function updateSopMeta(
     return {
       ok: false,
       error: error.message.includes("duplicate")
-        ? "A SOP with that name already exists."
+        ? "A procedure with that name already exists."
         : error.message,
     };
   }
@@ -152,7 +152,7 @@ export async function updateSopSuggestedEvidence(
   text: string,
 ): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const admin = createAdminClient();
   const { error } = await admin
     .from("sops")
@@ -170,7 +170,7 @@ export async function updateSopBody(
   resetReviewClock = false,
 ): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const admin = createAdminClient();
 
   const patch: Record<string, unknown> = {
@@ -217,7 +217,7 @@ export async function updateSopReview(
   input: { reviewPeriod: number; nextReviewDate: string },
 ): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
 
   const period = cleanReviewPeriod(input.reviewPeriod);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(input.nextReviewDate)
@@ -271,7 +271,7 @@ export async function markSopReviewed(
   note?: string,
 ): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
 
   const period = cleanReviewPeriod(owned.sop.review_period_months);
   const newDue = reviewDateFromNow(period);
@@ -311,7 +311,7 @@ export async function markSopReviewed(
 
 export async function publishSop(id: string): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   if (!owned.sop.body || !owned.sop.body.trim()) {
     return { ok: false, error: "Add the procedure text before publishing." };
   }
@@ -338,7 +338,7 @@ export async function publishSop(id: string): Promise<Result> {
 
 export async function unpublishSop(id: string): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const admin = createAdminClient();
   const { error } = await admin
     .from("sops")
@@ -353,7 +353,7 @@ export async function unpublishSop(id: string): Promise<Result> {
 
 export async function deleteSop(id: string): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const admin = createAdminClient();
   const { data: docs } = await admin
     .from("documents")
@@ -372,7 +372,7 @@ export async function uploadSopDocument(
   formData: FormData,
 ): Promise<Result> {
   const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "Choose a file." };
@@ -417,7 +417,7 @@ export async function setJobRole(
   attach: boolean,
 ): Promise<Result> {
   const owned = await ownedSop(sopId);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const admin = createAdminClient();
 
   if (attach) {
@@ -468,7 +468,7 @@ export async function setSopQualityArea(
   attach: boolean,
 ): Promise<Result> {
   const owned = await ownedSop(sopId);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const r = await writeDocumentTag({
     kind: "quality_area",
     documentType: "sop",
@@ -489,7 +489,7 @@ export async function setSopChildSafeStandard(
   attach: boolean,
 ): Promise<Result> {
   const owned = await ownedSop(sopId);
-  if (!owned) return { ok: false, error: "SOP not found." };
+  if (!owned) return { ok: false, error: "Procedure not found." };
   const r = await writeDocumentTag({
     kind: "child_safe_standard",
     documentType: "sop",
@@ -581,7 +581,7 @@ export async function bulkImportSops(
             fileName: file.name,
             sopName,
             outcome: "error",
-            detail: error?.message ?? "Could not create the SOP.",
+            detail: error?.message ?? "Could not create the procedure.",
           });
           continue;
         }

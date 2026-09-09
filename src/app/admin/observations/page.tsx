@@ -59,12 +59,12 @@ export default async function ObservationsPage() {
       <h1 className="text-xl font-semibold">Practice observations</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
         Record what you saw when a procedure was carried out, and whether it
-        needs a review. High-risk SOPs (the ones needing a manager co-sign) are
+        needs a review. High-risk procedures (the ones needing a manager co-sign) are
         listed first.
         {flagged > 0 && (
           <span className="text-red-700">
             {" "}
-            {flagged} SOP{flagged === 1 ? "" : "s"} currently flagged for review.
+            {flagged} procedure{flagged === 1 ? "" : "s"} currently flagged for review.
           </span>
         )}
       </p>
@@ -104,7 +104,7 @@ export default async function ObservationsPage() {
         ))}
         {rows.length === 0 && (
           <li className="px-4 py-6 text-sm text-slate-500">
-            No published SOPs to observe against yet.
+            No published procedures to observe against yet.
           </li>
         )}
       </ul>

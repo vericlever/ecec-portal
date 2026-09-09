@@ -95,7 +95,7 @@ export default async function AccountPage() {
         {!worker && (
           <p className="text-xs text-slate-400">
             You do not have a job role, so there is no Worker Register record or
-            SOP suite attached to this account.
+            procedure suite attached to this account.
           </p>
         )}
       </div>

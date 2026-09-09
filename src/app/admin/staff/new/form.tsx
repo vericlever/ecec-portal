@@ -130,7 +130,7 @@ export function NewStaffForm({
           {jobRoles.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}
-              {r.is_placeholder ? " (no SOPs attached)" : ""}
+              {r.is_placeholder ? " (no procedures attached)" : ""}
             </option>
           ))}
         </select>

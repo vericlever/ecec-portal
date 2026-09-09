@@ -130,7 +130,7 @@ export function ObservationForm({
             <span>
               <span className="font-medium text-slate-800">Needs review</span>
               <span className="block text-xs text-slate-500">
-                Flags the SOP for a content editor to look at and re-publish.
+                Flags the procedure for a content editor to look at and re-publish.
               </span>
             </span>
           </label>
@@ -151,7 +151,7 @@ export function ObservationForm({
       ) : (
         <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
           <p className="font-medium text-slate-700">
-            Update the review clock for this SOP?
+            Update the review clock for this procedure?
           </p>
           <p className="text-xs text-slate-500">
             Recommended. Resets the next review to {fmtReviewDate(resetDate)}

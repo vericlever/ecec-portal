@@ -31,7 +31,7 @@ export default async function JobRolesPage() {
         <h1 className="text-xl font-semibold">Job roles</h1>
       </div>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Each job role has a suite of SOPs attached. Assigning a staff member a
+        Each job role has a suite of procedures attached. Assigning a staff member a
         job role gives them that whole suite to sign off.
       </p>
 
@@ -44,7 +44,7 @@ export default async function JobRolesPage() {
             >
               <span className="text-sm font-medium">{r.name}</span>
               <span className="text-xs text-slate-500">
-                {sopCount.get(r.id) ?? 0} SOPs · {staffCount.get(r.id) ?? 0} staff
+                {sopCount.get(r.id) ?? 0} procedures · {staffCount.get(r.id) ?? 0} staff
               </span>
             </Link>
           </li>

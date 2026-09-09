@@ -414,7 +414,7 @@ export async function linkSop(policyId: string, sopId: string): Promise<Result> 
     .eq("id", sopId)
     .maybeSingle();
   if (!sop || sop.organisation_id !== owned.policy.organisation_id) {
-    return { ok: false, error: "That SOP is not in your organisation." };
+    return { ok: false, error: "That procedure is not in your organisation." };
   }
   const { error } = await admin.from("policy_sop_links").insert({
     organisation_id: owned.policy.organisation_id,

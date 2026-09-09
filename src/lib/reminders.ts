@@ -303,7 +303,7 @@ export async function runReminders(opts?: {
       .map((sopId) => pubSopById.get(sopId)!.name)
       .sort();
     if (unsignedSops.length) {
-      sections.push({ heading: "SOPs to sign", items: unsignedSops });
+      sections.push({ heading: "Procedures to sign", items: unsignedSops });
     }
 
     // unviewed policies
@@ -380,7 +380,7 @@ export async function runReminders(opts?: {
     const d = s.next_review_date as string | null;
     if (!d || daysUntil(d) > REVIEW_WINDOW_DAYS) continue;
     const list = reviewDueByOrg.get(s.organisation_id as string) ?? [];
-    list.push(`SOP: ${s.name} (${reviewPhrase(d)})`);
+    list.push(`Procedure: ${s.name} (${reviewPhrase(d)})`);
     reviewDueByOrg.set(s.organisation_id as string, list);
   }
   for (const pol of pubPolicies ?? []) {
@@ -429,7 +429,7 @@ export async function runReminders(opts?: {
     }
     if (countersign > 0) {
       sections.push({
-        heading: "SOPs to countersign",
+        heading: "Procedures to countersign",
         items: [`${countersign} staff sign-off${countersign === 1 ? "" : "s"} waiting on your countersignature`],
       });
     }

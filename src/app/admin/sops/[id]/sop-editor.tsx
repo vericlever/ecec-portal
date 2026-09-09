@@ -188,7 +188,7 @@ export function SopEditor({
       )}
       {sop.needs_review && (
         <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
-          A practice observation flagged this SOP for review. Publishing a new
+          A practice observation flagged this procedure for review. Publishing a new
           version or marking it reviewed in the Review cycle section clears this
           flag.
         </p>
@@ -496,7 +496,7 @@ export function SopEditor({
             onClick={() => {
               if (
                 !confirm(
-                  `Mark this SOP as reviewed now? The next review moves to ${reviewDateFromNow(sop.review_period_months)}.`,
+                  `Mark this procedure as reviewed now? The next review moves to ${reviewDateFromNow(sop.review_period_months)}.`,
                 )
               )
                 return;
@@ -577,7 +577,7 @@ export function SopEditor({
       {/* Job roles */}
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Job roles that must complete this SOP
+          Job roles that must complete this procedure
         </h2>
         <div className="mt-2 space-y-1.5">
           {jobRoles.map((r) => (
@@ -596,7 +596,7 @@ export function SopEditor({
               <span>
                 {r.name}
                 {r.is_placeholder && (
-                  <span className="text-slate-400"> (no SOPs attached yet)</span>
+                  <span className="text-slate-400"> (no procedures attached yet)</span>
                 )}
               </span>
             </label>
@@ -657,7 +657,7 @@ export function SopEditor({
           }}
           className="text-xs font-medium text-red-600 underline"
         >
-          Delete this SOP
+          Delete this procedure
         </button>
       </section>
     </div>

@@ -132,7 +132,7 @@ export function SopBulkReview({
       <div className="mt-6 space-y-4">
         <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
           <p className="font-medium">
-            {result.published} SOP{result.published === 1 ? "" : "s"} published
+            {result.published} procedure{result.published === 1 ? "" : "s"} published
             {result.drafted > 0 && (
               <>
                 {" "}
@@ -143,7 +143,7 @@ export function SopBulkReview({
           </p>
           {result.published > 0 && (
             <p className="mt-1">
-              Staff in the attached job roles can see the published SOPs now.
+              Staff in the attached job roles can see the published procedures now.
             </p>
           )}
         </div>
@@ -161,7 +161,7 @@ export function SopBulkReview({
             href="/admin/sops"
             className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"
           >
-            Go to SOPs
+            Go to Procedures
           </Link>
           <Link
             href="/admin/sops/bulk"
@@ -227,7 +227,7 @@ export function SopBulkReview({
 
             <div className="mt-3 text-sm">
               <span className="text-xs font-medium text-slate-500">
-                Job roles (who sees this SOP)
+                Job roles (who sees this procedure)
               </span>
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {s.jobRoleIds.map((rid) => (
@@ -290,7 +290,7 @@ export function SopBulkReview({
                     type="button"
                     onClick={() => spreadFromHere(r.id)}
                     className="text-xs text-slate-500 underline hover:text-slate-800"
-                    title="Set this date on this SOP and step every SOP below it a week later"
+                    title="Set this date on this procedure and step every procedure below it a week later"
                   >
                     Spread from here
                   </button>
@@ -384,7 +384,7 @@ export function SopBulkReview({
           {pending ? "Publishing…" : `Publish ${publishCount} and save all`}
         </button>
         <span className="text-xs text-slate-500">
-          {rows.length} SOP{rows.length === 1 ? "" : "s"} in this batch
+          {rows.length} procedure{rows.length === 1 ? "" : "s"} in this batch
         </span>
       </div>
     </div>

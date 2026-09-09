@@ -21,7 +21,7 @@ export default async function SopListPage() {
       <div>
         <h1 className="text-xl font-semibold">Standard operating procedures</h1>
         <p className="mt-3 max-w-prose text-sm text-slate-500">
-          You have not been assigned a job role yet, so you have no SOPs to sign.
+          You have not been assigned a job role yet, so you have no procedures to sign.
           Ask an administrator to set your job role.
         </p>
       </div>
@@ -75,7 +75,7 @@ export default async function SopListPage() {
       <h1 className="text-xl font-semibold">Standard operating procedures</h1>
       {rows.length === 0 ? (
         <p className="mt-3 max-w-prose text-sm text-slate-500">
-          There are no published SOPs for your role yet.
+          There are no published procedures for your role yet.
         </p>
       ) : (
         <>

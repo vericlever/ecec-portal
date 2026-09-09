@@ -73,7 +73,7 @@ export default async function SopDetailPage({
   return (
     <div className="max-w-2xl">
       <Link href="/admin/sops" className="text-sm text-slate-500 hover:text-slate-900">
-        ← SOPs
+        ← Procedures
       </Link>
 
       <SopEditor

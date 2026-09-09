@@ -87,7 +87,7 @@ export function NewSopForm() {
         disabled={pending || !name.trim()}
         className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
       >
-        {pending ? "Creating…" : "Create SOP"}
+        {pending ? "Creating…" : "Create Procedure"}
       </button>
     </form>
   );

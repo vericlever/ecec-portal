@@ -80,10 +80,10 @@ export function RoleEditor({
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          SOP suite ({inSuite.length})
+          Procedure suite ({inSuite.length})
         </h2>
         {inSuite.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No SOPs in this suite yet.</p>
+          <p className="mt-2 text-sm text-slate-500">No procedures in this suite yet.</p>
         ) : (
           <ul className="mt-2 space-y-1 text-sm">
             {inSuite.map((s) => (
@@ -113,7 +113,7 @@ export function RoleEditor({
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Find a SOP to add"
+            placeholder="Find a procedure to add"
             className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
           />
           {filter.trim() !== "" && (

@@ -447,9 +447,9 @@ export default async function StaffRecordPage({
                 title="Onboarding questionnaire"
                 items={onboardingOutstanding ? ["Not completed"] : []}
               />
-              <OutstandingGroup title="SOPs not signed" items={unsignedSops} />
+              <OutstandingGroup title="Procedures not signed" items={unsignedSops} />
               <OutstandingGroup
-                title="SOPs waiting on a manager countersignature"
+                title="Procedures waiting on a manager countersignature"
                 items={awaitingCosignSops}
               />
               <OutstandingGroup
@@ -525,13 +525,13 @@ export default async function StaffRecordPage({
         </h2>
         <div className="mt-2 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
           <ProgressBar
-            label="SOPs signed"
+            label="Procedures signed"
             done={sopSigned}
             total={sopTotal}
             emptyNote={
               person.job_role_id
-                ? "This job role has no SOPs attached yet."
-                : "No job role set, so there are no SOPs to sign."
+                ? "This job role has no procedures attached yet."
+                : "No job role set, so there are no procedures to sign."
             }
           />
           <ProgressBar

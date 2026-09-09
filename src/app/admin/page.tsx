@@ -139,7 +139,7 @@ export default async function DashboardPage() {
   ).length;
 
   // --- review cycle (Steps 20 & 21) ------------------------------------
-  type ReviewItem = { id: string; name: string; kind: "SOP" | "Policy"; label: string; overdue: boolean };
+  type ReviewItem = { id: string; name: string; kind: "Procedure" | "Policy"; label: string; overdue: boolean };
   const reviewItems: ReviewItem[] = [];
   for (const s of pubSops ?? []) {
     const r = reviewState(s.next_review_date as string | null);
@@ -147,7 +147,7 @@ export default async function DashboardPage() {
       reviewItems.push({
         id: s.id as string,
         name: s.name as string,
-        kind: "SOP",
+        kind: "Procedure",
         label: r.label,
         overdue: r.status === "overdue",
       });
@@ -211,7 +211,7 @@ export default async function DashboardPage() {
     {
       show: editor,
       href: "/admin/sops",
-      label: "SOPs and policies due for review",
+      label: "Procedures and policies due for review",
       count: reviewItems.length,
       detail:
         reviewItems.length === 0
@@ -222,7 +222,7 @@ export default async function DashboardPage() {
     {
       show: manager,
       href: "/admin/observations",
-      label: "SOPs flagged by a practice observation",
+      label: "Procedures flagged by a practice observation",
       count: flaggedSops.length,
       detail:
         flaggedSops.length === 0
@@ -275,7 +275,7 @@ export default async function DashboardPage() {
     {
       show: manager,
       href: "/admin/countersign",
-      label: "SOPs waiting for your countersignature",
+      label: "Procedures waiting for your countersignature",
       count: cosignCount,
       detail: cosignCount === 0 ? "Nothing waiting" : "staff have signed",
     },
@@ -296,7 +296,7 @@ export default async function DashboardPage() {
           value={`${summary.clear} of ${summary.total}`}
         />
         <StatCard
-          label="SOPs signed"
+          label="Procedures signed"
           value={summary.sopPct === null ? "—" : `${summary.sopPct}%`}
           sub={
             summary.sopTotal > 0
@@ -386,7 +386,7 @@ export default async function DashboardPage() {
                     <li key={i.kind + i.id} className="flex justify-between gap-3">
                       <Link
                         href={
-                          i.kind === "SOP"
+                          i.kind === "Procedure"
                             ? `/admin/sops/${i.id}`
                             : `/admin/policies/${i.id}`
                         }
@@ -418,7 +418,7 @@ export default async function DashboardPage() {
           </h2>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
             <IntegrityCard
-              title="Published SOPs with no policy link"
+              title="Published procedures with no policy link"
               names={orphanSops.map((s) => s.name as string)}
               hrefFor={(name) =>
                 `/admin/sops/${orphanSops.find((s) => s.name === name)?.id}`
@@ -426,7 +426,7 @@ export default async function DashboardPage() {
               total={(pubSops ?? []).length}
             />
             <IntegrityCard
-              title="Published policies with no SOP link"
+              title="Published policies with no procedure link"
               names={orphanPolicies.map((p) => p.name as string)}
               hrefFor={(name) =>
                 `/admin/policies/${orphanPolicies.find((p) => p.name === name)?.id}`
@@ -435,9 +435,9 @@ export default async function DashboardPage() {
             />
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            {(sopLinks ?? []).length} policy-to-SOP link
+            {(sopLinks ?? []).length} policy-to-procedure link
             {(sopLinks ?? []).length === 1 ? "" : "s"} across{" "}
-            {linkedPolicyIds.size} policies and {linkedSopIds.size} SOPs.
+            {linkedPolicyIds.size} policies and {linkedSopIds.size} procedures.
           </p>
         </>
       )}
@@ -453,7 +453,7 @@ export default async function DashboardPage() {
               <th className="px-4 py-2 font-medium">Service</th>
               <th className="px-3 py-2 font-medium">Staff</th>
               <th className="px-3 py-2 font-medium">Fully compliant</th>
-              <th className="px-3 py-2 font-medium">SOPs signed</th>
+              <th className="px-3 py-2 font-medium">Procedures signed</th>
               <th className="px-3 py-2 font-medium">Policies read</th>
               <th className="px-3 py-2 font-medium">Outstanding</th>
             </tr>
@@ -546,7 +546,7 @@ export default async function DashboardPage() {
               href="/admin/sops"
               className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              SOPs
+              Procedures
             </Link>
           </>
         )}

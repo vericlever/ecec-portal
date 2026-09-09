@@ -100,7 +100,7 @@ export default async function PolicyBulkReviewPage({
       <h1 className="mt-3 text-xl font-semibold">Review and publish</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
         Step 2 of 2. Everything with readable text is set to publish. Check the
-        categories, the next review date and any SOP links, then publish the lot
+        categories, the next review date and any procedure links, then publish the lot
         in one step. A policy with no readable text stays a draft for you to fix.
       </p>
       {failed > 0 && (

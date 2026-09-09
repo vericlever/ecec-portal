@@ -40,7 +40,7 @@ export function SignForm({
       if (data.ok) {
         setStatus("done");
       } else {
-        setError(data.error ?? "Could not sign this SOP.");
+        setError(data.error ?? "Could not sign this procedure.");
         setStatus("idle");
       }
     } catch {

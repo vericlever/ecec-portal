@@ -47,7 +47,7 @@ export function ManageMenu({
       items.push({ href: "/admin/verification", label: "Document verification" });
     }
     if (canCountersign) {
-      items.push({ href: "/admin/countersign", label: "SOP countersigning" });
+      items.push({ href: "/admin/countersign", label: "Procedure countersigning" });
       items.push({ href: "/admin/observations", label: "Practice observations" });
     }
     groups.push({ label: "Staff", items });
@@ -57,7 +57,7 @@ export function ManageMenu({
       label: "Library",
       items: [
         { href: "/admin/policies", label: "Policies" },
-        { href: "/admin/sops", label: "SOPs" },
+        { href: "/admin/sops", label: "Procedures" },
         { href: "/admin/agreements", label: "Agreements" },
         { href: "/admin/job-roles", label: "Job roles" },
       ],

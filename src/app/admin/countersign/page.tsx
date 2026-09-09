@@ -36,15 +36,15 @@ export default async function CountersignPage() {
     .map((r) => ({
       id: r.id,
       staffName: nameById.get(r.user_id) ?? "Unknown",
-      sopName: sopById.get(r.sop_id)?.name ?? "SOP",
+      sopName: sopById.get(r.sop_id)?.name ?? "Procedure",
       signedAt: r.signed_at as string,
     }));
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">SOP countersigning</h1>
+      <h1 className="text-xl font-semibold">Procedure countersigning</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        SOPs that need a manager to sign alongside the staff member. Staff at
+        Procedures that need a manager to sign alongside the staff member. Staff at
         your service who have signed but are still waiting on you.
       </p>
 

@@ -43,10 +43,10 @@ export async function logSopObservation(
     .eq("id", sopId)
     .maybeSingle();
   if (!sop || sop.organisation_id !== me.organisation_id) {
-    return { ok: false, error: "SOP not found." };
+    return { ok: false, error: "Procedure not found." };
   }
   if (sop.published_version == null) {
-    return { ok: false, error: "This SOP is not published yet." };
+    return { ok: false, error: "This procedure is not published yet." };
   }
 
   const period = cleanReviewPeriod(sop.review_period_months);

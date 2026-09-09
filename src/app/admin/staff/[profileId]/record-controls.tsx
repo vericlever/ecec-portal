@@ -185,7 +185,7 @@ export function ProbationControl({
             className="rounded-md border border-slate-300 px-2 py-1 text-sm"
           />
           <span className="text-xs text-slate-500">
-            Separate from the employment start date. SOP sign-off deadlines are
+            Separate from the employment start date. Procedure sign-off deadlines are
             measured from here.
           </span>
         </label>
@@ -298,7 +298,7 @@ export function JobRoleControl({
     <div className="text-sm">
       <span className="font-medium text-slate-700">Job role</span>
       <p className="mt-0.5 text-xs text-slate-500">
-        Sets which SOP suite this person must complete. Changing it swaps the
+        Sets which procedure suite this person must complete. Changing it swaps the
         suite straight away. Sign-offs on the old role stay in the record but
         stop counting.
       </p>

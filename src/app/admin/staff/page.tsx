@@ -104,7 +104,7 @@ export default async function StaffPage() {
             value={`${summary.clear} of ${rows.length}`}
           />
           <SummaryBox
-            label="SOPs signed"
+            label="Procedures signed"
             value={summary.sopPct === null ? "—" : `${summary.sopPct}%`}
             sub={
               summary.sopTotal > 0
@@ -169,7 +169,7 @@ export default async function StaffPage() {
                 {stat && (
                   <div className="flex shrink-0 gap-2">
                     <StatBox
-                      label="SOP"
+                      label="Procedure"
                       value={stat.sopPct === null ? "—" : `${stat.sopPct}%`}
                     />
                     <StatBox

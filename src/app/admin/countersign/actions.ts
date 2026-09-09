@@ -30,7 +30,7 @@ export async function countersignSop(signOffId: string): Promise<Result> {
     .eq("id", row.sop_id)
     .maybeSingle();
   if (sop?.signoff_type !== "self_and_manager") {
-    return { ok: false, error: "This SOP does not need a manager countersign." };
+    return { ok: false, error: "This procedure does not need a manager countersign." };
   }
 
   const { error } = await supabase

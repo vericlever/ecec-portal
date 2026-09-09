@@ -102,7 +102,7 @@ export default async function SopBulkReviewPage({
       <p className="mt-1 max-w-prose text-sm text-slate-500">
         Step 2 of 2. Everything with readable text is set to publish. Check the
         job roles, the next review date and any policy links, then publish the
-        lot in one step. A SOP with no readable text stays a draft for you to
+        lot in one step. A procedure with no readable text stays a draft for you to
         fix.
       </p>
       {failed > 0 && (
