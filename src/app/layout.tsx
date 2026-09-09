@@ -20,6 +20,7 @@ import {
   getProfile,
   isManager,
   isWorker,
+  isAdmin,
   canEditContent,
   canViewReports,
   TIER_LABELS,
@@ -84,7 +85,12 @@ export default async function RootLayout({
               fullName={profile.full_name}
               tierLabel={TIER_LABELS[profile.access_tier]}
               isLeader={leader}
-              isWorker={isWorker(profile)}
+              // The top-nav "Agreements"/"My details" shortcuts are for staff
+              // who live there day to day. An Admin reaches the same pages by
+              // clicking their own name into /account instead (Step 40 gave
+              // /account its "Your details" link) - a persistent nav item
+              // would be clutter for a tier that isn't usually also a worker.
+              isWorker={isWorker(profile) && !isAdmin(profile.access_tier)}
               canManageStaff={
                 isManager(profile.access_tier) || profile.hr_manager
               }
