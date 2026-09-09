@@ -16,7 +16,13 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   display: "swap",
 });
-import { getProfile, isManager, canEditContent, TIER_LABELS } from "@/lib/auth";
+import {
+  getProfile,
+  isManager,
+  isWorker,
+  canEditContent,
+  TIER_LABELS,
+} from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
 import { PortalBackdrop } from "@/components/bauhaus";
@@ -46,9 +52,10 @@ export default async function RootLayout({
     profile && (isManager(profile.access_tier) || profile.hr_manager),
   );
 
-  // Anyone with a job role is a worker who needs a Worker Register entry.
+  // Anyone with a job role is a worker who needs a Worker Register entry - and
+  // so is an Admin, who has an underlying staff record too (Step 40).
   let showOnboardingPrompt = false;
-  if (profile && profile.job_role_id) {
+  if (profile && isWorker(profile)) {
     const { data } = await createClient()
       .from("worker_details")
       .select("onboarding_completed_at")
@@ -76,7 +83,7 @@ export default async function RootLayout({
               fullName={profile.full_name}
               tierLabel={TIER_LABELS[profile.access_tier]}
               isLeader={leader}
-              isWorker={Boolean(profile.job_role_id)}
+              isWorker={isWorker(profile)}
               canManageStaff={
                 isManager(profile.access_tier) || profile.hr_manager
               }

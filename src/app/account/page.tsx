@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireProfile, TIER_LABELS } from "@/lib/auth";
+import { requireProfile, isWorker, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function AccountPage() {
         : Promise.resolve({ data: null }),
     ]);
 
-  const isWorker = Boolean(profile.job_role_id);
+  const worker = isWorker(profile);
 
   return (
     <div className="max-w-xl">
@@ -75,7 +75,7 @@ export default async function AccountPage() {
           >
             Change password
           </Link>
-          {isWorker && (
+          {worker && (
             <>
               <Link
                 href="/onboarding"
@@ -92,7 +92,7 @@ export default async function AccountPage() {
             </>
           )}
         </div>
-        {!isWorker && (
+        {!worker && (
           <p className="text-xs text-slate-400">
             You do not have a job role, so there is no Worker Register record or
             SOP suite attached to this account.
