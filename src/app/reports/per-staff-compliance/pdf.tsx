@@ -85,11 +85,24 @@ export function PerStaffCompliancePdf({
                 ? `Fixed term, expires ${data.contract.expiry_date}`
                 : "No fixed period"}
             </Text>
-            <Text style={styles.cell}>
-              {data.contract.signed_at
-                ? `Signed by ${data.contract.signed_name} on ${new Date(data.contract.signed_at).toLocaleDateString("en-AU")}`
-                : "Not yet signed"}
-            </Text>
+            {data.contract.is_deed ? (
+              <Text style={styles.cell}>
+                This is a deed, signed on paper - see the uploaded document.
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.cell}>
+                  {data.contract.signed_at
+                    ? `Signed by ${data.contract.signed_name} on ${new Date(data.contract.signed_at).toLocaleDateString("en-AU")}`
+                    : "Not yet signed"}
+                </Text>
+                <Text style={styles.cell}>
+                  {data.contract.countersigned_at
+                    ? `Countersigned by ${data.contract.countersigned_name} on ${new Date(data.contract.countersigned_at).toLocaleDateString("en-AU")}`
+                    : "Not yet countersigned"}
+                </Text>
+              </>
+            )}
             {(data.contractRenewal.bucket === "due" || data.contractRenewal.bucket === "expired") && (
               <Text style={styles.badgeOverdue}>
                 {data.contractRenewal.bucket === "expired" ? "Expired" : "Due for renewal"}

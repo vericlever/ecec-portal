@@ -2,9 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ReportDownloadButton } from "@/app/reports/report-download-button";
 import type { ContractRow } from "@/lib/contracts";
-import { renewalState } from "@/lib/contracts";
-import { uploadContract, deleteContract, signOwnContract } from "./actions";
+import { renewalState, executionState } from "@/lib/contracts";
+import {
+  uploadContract,
+  deleteContract,
+  signOwnContract,
+  countersignContract,
+} from "./actions";
 
 function fmtDate(v: string | null) {
   if (!v) return "—";
@@ -44,11 +50,15 @@ export function ContractPanel({
   const [periodType, setPeriodType] = useState<"fixed" | "no_fixed_period">(
     "fixed",
   );
+  const [isDeed, setIsDeed] = useState(false);
+  const [employeeName, setEmployeeName] = useState("");
+  const [counterName, setCounterName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const active = contracts.find((c) => !c.superseded_at) ?? null;
   const history = contracts.filter((c) => c.superseded_at);
+  const execution = active ? executionState(active) : null;
 
   const onSubmit = (form: HTMLFormElement) => {
     start(async () => {
@@ -57,6 +67,7 @@ export function ContractPanel({
       if (r.ok) {
         setShowForm(false);
         form.reset();
+        setIsDeed(false);
         router.refresh();
       } else {
         setError(r.error);
@@ -73,12 +84,25 @@ export function ContractPanel({
     });
   };
 
-  const onSign = (id: string) => {
+  const onSign = (id: string, name: string) => {
     start(async () => {
       setError(null);
-      const r = await signOwnContract(id);
-      if (r.ok) router.refresh();
-      else setError(r.error);
+      const r = await signOwnContract(id, name);
+      if (r.ok) {
+        setEmployeeName("");
+        router.refresh();
+      } else setError(r.error);
+    });
+  };
+
+  const onCountersign = (id: string, name: string) => {
+    start(async () => {
+      setError(null);
+      const r = await countersignContract(id, name);
+      if (r.ok) {
+        setCounterName("");
+        router.refresh();
+      } else setError(r.error);
     });
   };
 
@@ -113,34 +137,97 @@ export function ContractPanel({
                 <dd className="text-slate-800">{active.notes}</dd>
               </>
             )}
-            <dt className="text-slate-500">Signed by staff member</dt>
-            <dd className="text-slate-800">
-              {active.signed_at
-                ? `${active.signed_name ?? "Yes"} · ${fmtDate(active.signed_at.slice(0, 10))}`
-                : "Not signed yet"}
-            </dd>
+            {!active.is_deed && (
+              <>
+                <dt className="text-slate-500">Signed by staff member</dt>
+                <dd className="text-slate-800">
+                  {active.signed_at
+                    ? `${active.signed_name ?? "Yes"} · ${fmtDate(active.signed_at.slice(0, 10))}`
+                    : "Not signed yet"}
+                </dd>
+                <dt className="text-slate-500">Countersigned</dt>
+                <dd className="text-slate-800">
+                  {active.countersigned_at
+                    ? `${active.countersigned_name ?? "Yes"} · ${fmtDate(active.countersigned_at.slice(0, 10))}`
+                    : "Not yet"}
+                </dd>
+              </>
+            )}
           </dl>
 
-          {canSign && !active.signed_at && (
-            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
-              <p className="text-amber-900">
-                Please read your contract and accept it.
-              </p>
-              <label className="mt-2 flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  onChange={(e) => {
-                    if (e.target.checked) onSign(active.id);
-                  }}
-                  disabled={pending}
-                  className="mt-0.5"
-                />
-                <span className="text-amber-900">
-                  I have read this contract and I accept it.
-                </span>
-              </label>
-            </div>
+          {active.is_deed && (
+            <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              This contract is a deed and is signed on paper, not in the
+              portal. The signed copy is the uploaded document.
+            </p>
           )}
+
+          {!active.is_deed && execution === "executed" && (
+            <p className="mt-2 rounded-md border border-green-200 bg-green-50 p-2.5 text-sm text-green-800">
+              Fully executed - signed by both parties.
+            </p>
+          )}
+
+          {canSign && !active.is_deed && !active.signed_at && (
+            <form
+              className="mt-2 space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSign(active.id, employeeName);
+              }}
+            >
+              <p className="text-amber-900">
+                Type your full legal name to read and accept this contract.
+              </p>
+              <input
+                value={employeeName}
+                onChange={(e) => setEmployeeName(e.target.value)}
+                placeholder="Full legal name"
+                required
+                disabled={pending}
+                className="w-full rounded-md border border-amber-300 px-2 py-1.5 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={pending || !employeeName.trim()}
+                className="rounded-md bg-amber-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+              >
+                I have read this contract and I accept it
+              </button>
+            </form>
+          )}
+
+          {canManage &&
+            !active.is_deed &&
+            active.signed_at &&
+            !active.countersigned_at && (
+              <form
+                className="mt-2 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onCountersign(active.id, counterName);
+                }}
+              >
+                <p className="text-slate-700">
+                  Type your full legal name to countersign this contract.
+                </p>
+                <input
+                  value={counterName}
+                  onChange={(e) => setCounterName(e.target.value)}
+                  placeholder="Full legal name"
+                  required
+                  disabled={pending}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={pending || !counterName.trim()}
+                  className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                >
+                  Countersign
+                </button>
+              </form>
+            )}
           <div className="mt-2 flex items-center gap-3 text-sm">
             {active.document_id ? (
               <a
@@ -152,6 +239,11 @@ export function ContractPanel({
             ) : (
               <span className="text-amber-700">No document on file</span>
             )}
+            <ReportDownloadButton
+              href={`/reports/contract?contract=${active.id}`}
+              label="Print signature summary (PDF)"
+              className="text-slate-700 underline hover:text-slate-900"
+            />
             {canManage && (
               <button
                 type="button"
@@ -294,6 +386,20 @@ export function ContractPanel({
               rows={2}
               className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1"
             />
+          </label>
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              name="is_deed"
+              checked={isDeed}
+              onChange={(e) => setIsDeed(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-slate-600">
+              This document is a deed. It will be signed on paper, not in the
+              portal - a deed generally needs an attesting witness, which a
+              typed name here cannot provide.
+            </span>
           </label>
           <div className="flex items-center gap-3">
             <button

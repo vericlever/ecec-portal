@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile, isHrManager, isAdmin, isManager } from "@/lib/auth";
 import { type AccessTier, ASSIGNABLE_TIERS } from "@/lib/roles";
-import { storeDocument, deleteDocument } from "@/lib/documents/store";
+import { storeDocument, deleteDocument, documentSha256 } from "@/lib/documents/store";
 import { calcExpiry } from "@/lib/contracts";
 import { generatePasswordResetLink } from "@/lib/invite";
 import { emailEnabled, sendPasswordReset } from "@/lib/email";
@@ -188,6 +188,9 @@ export async function uploadContract(
   }
 
   const notes = String(formData.get("notes") ?? "").trim() || null;
+  // A deed is never signed in-app (see migration 0042) - HR/Admin flags it at
+  // upload, based on the document they are looking at.
+  const isDeed = formData.get("is_deed") === "on";
 
   const admin = createAdminClient();
   const { data: contract, error } = await admin
@@ -200,6 +203,7 @@ export async function uploadContract(
       duration_months: durationMonths,
       expiry_date: expiry,
       notes,
+      is_deed: isDeed,
       created_by: gate.me.id,
     })
     .select("id")
@@ -232,16 +236,24 @@ export async function uploadContract(
   return { ok: true };
 }
 
-// A staff member reads and accepts their own active contract. Verified in code
-// (the staff member is not in contracts_write RLS) then written with the admin
-// client, recording their name and the time.
-export async function signOwnContract(contractId: string): Promise<Result> {
+// A staff member reads and accepts their own active contract by typing their
+// full legal name (Step 39 - replaces the tick-box). Verified in code (the
+// staff member is not in contracts_write RLS) then written with the admin
+// client, recording their name, their profile id, the time, and a hash of the
+// exact document they were shown. A deed is never signed this way.
+export async function signOwnContract(
+  contractId: string,
+  typedName: string,
+): Promise<Result> {
   const me = await getProfile();
   if (!me) return { ok: false, error: "Sign in." };
+  const name = typedName.trim();
+  if (!name) return { ok: false, error: "Type your full legal name to sign." };
+
   const admin = createAdminClient();
   const { data: contract } = await admin
     .from("contracts")
-    .select("id, profile_id, superseded_at, signed_at")
+    .select("id, profile_id, superseded_at, signed_at, is_deed, document_id")
     .eq("id", contractId)
     .maybeSingle();
   if (!contract || contract.profile_id !== me.id) {
@@ -250,16 +262,89 @@ export async function signOwnContract(contractId: string): Promise<Result> {
   if (contract.superseded_at) {
     return { ok: false, error: "This contract has been replaced." };
   }
+  if (contract.is_deed) {
+    return {
+      ok: false,
+      error: "This contract is a deed and is signed on paper, not in the portal.",
+    };
+  }
   if (contract.signed_at) return { ok: true };
 
+  const hash = await documentSha256(contract.document_id);
   const { error } = await admin
     .from("contracts")
-    .update({ signed_at: new Date().toISOString(), signed_name: me.full_name })
+    .update({
+      signed_at: new Date().toISOString(),
+      signed_name: name,
+      signed_by: me.id,
+      signed_content_hash: hash,
+    })
     .eq("id", contractId);
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/onboarding");
   revalidatePath("/admin/staff", "layout");
+  return { ok: true };
+}
+
+// HR manager or Admin countersigns, independent of the employee slot -
+// gated the same as canManageContractFor (contracts_write RLS: Admin
+// org-wide, HR manager at the worker's own service).
+export async function countersignContract(
+  contractId: string,
+  typedName: string,
+): Promise<Result> {
+  const me = await getProfile();
+  if (!me || !isHrManager(me)) {
+    return { ok: false, error: "You are not allowed to countersign contracts." };
+  }
+  const name = typedName.trim();
+  if (!name) return { ok: false, error: "Type your full legal name to countersign." };
+
+  const admin = createAdminClient();
+  const { data: contract } = await admin
+    .from("contracts")
+    .select("id, profile_id, superseded_at, is_deed, document_id, countersigned_at")
+    .eq("id", contractId)
+    .maybeSingle();
+  if (!contract) return { ok: false, error: "Contract not found." };
+
+  const { data: worker } = await admin
+    .from("profiles")
+    .select("organisation_id, service_id")
+    .eq("id", contract.profile_id)
+    .maybeSingle();
+  if (!worker || worker.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Contract not found." };
+  }
+  if (!isAdmin(me.access_tier) && worker.service_id !== me.service_id) {
+    return { ok: false, error: "That staff member is not at your service." };
+  }
+  if (contract.superseded_at) {
+    return { ok: false, error: "This contract has been replaced." };
+  }
+  if (contract.is_deed) {
+    return {
+      ok: false,
+      error: "This contract is a deed and is signed on paper, not in the portal.",
+    };
+  }
+  if (contract.countersigned_at) return { ok: true };
+
+  const hash = await documentSha256(contract.document_id);
+  const { error } = await admin
+    .from("contracts")
+    .update({
+      countersigned_at: new Date().toISOString(),
+      countersigned_name: name,
+      countersigned_by: me.id,
+      countersigned_content_hash: hash,
+    })
+    .eq("id", contractId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/admin");
   return { ok: true };
 }
 

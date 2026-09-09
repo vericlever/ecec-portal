@@ -98,7 +98,7 @@ export default async function StaffRecordPage({
     supabase
       .from("contracts")
       .select(
-        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, created_at",
+        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, signed_by, signed_content_hash, is_deed, countersigned_at, countersigned_name, countersigned_by, countersigned_content_hash, created_at",
       )
       .eq("profile_id", params.profileId)
       .order("created_at", { ascending: false }),
@@ -378,7 +378,7 @@ export default async function StaffRecordPage({
       `Contract expires ${fmtDate(contract?.expiry_date)} (${contractRenewal.daysLeft} days) — due for renewal`,
     );
   }
-  if (contract && !contract.signed_at) {
+  if (contract && !contract.signed_at && !contract.is_deed) {
     contractItems.push("Contract not signed by the staff member");
   }
 

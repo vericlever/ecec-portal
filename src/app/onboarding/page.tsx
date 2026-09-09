@@ -96,7 +96,7 @@ export default async function OnboardingPage() {
     supabase
       .from("contracts")
       .select(
-        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, created_at",
+        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, signed_by, signed_content_hash, is_deed, countersigned_at, countersigned_name, countersigned_by, countersigned_content_hash, created_at",
       )
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false }),

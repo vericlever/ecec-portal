@@ -126,7 +126,7 @@ export async function staffStatsByProfile(
       .not("expiry_date", "is", null),
     supabase
       .from("contracts")
-      .select("profile_id, expiry_date, period_type, signed_at")
+      .select("profile_id, expiry_date, period_type, signed_at, is_deed")
       .is("superseded_at", null),
     unsignedAgreementsByProfile(supabase, people),
   ]);
@@ -187,7 +187,9 @@ export async function staffStatsByProfile(
     ) {
       bump(pid);
     }
-    if (!c.signed_at) bump(pid);
+    // A deed is signed on paper, never in-app (Step 39) - it never counts as
+    // an outstanding in-app signature.
+    if (!c.signed_at && !c.is_deed) bump(pid);
   }
 
   // Only published SOPs count. A self_and_manager SOP is not "signed" until the
