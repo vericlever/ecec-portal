@@ -21,7 +21,7 @@ export async function logSopObservation(
   if (!me || !me.organisation_id || !isManager(me.access_tier)) {
     return {
       ok: false,
-      error: "Only a manager can log a practice observation.",
+      error: "Only a manager can log a procedure outcome.",
     };
   }
   const evidence = String(formData.get("evidence") ?? "").trim();
@@ -97,7 +97,7 @@ export async function logSopObservation(
     event_type: "review",
     actor_profile_id: me.id,
     note:
-      `Practice observation — ${
+      `Procedure outcome — ${
         outcome === "needs_review" ? "needs review" : "continue as is"
       }. ${excerpt}` +
       (evidenceDocumentId ? " Evidence file attached." : "") +

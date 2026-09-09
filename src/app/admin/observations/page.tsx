@@ -56,7 +56,7 @@ export default async function ObservationsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Practice observations</h1>
+      <h1 className="text-xl font-semibold">Procedure Outcomes</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
         Record what you saw when a procedure was carried out, and whether it
         needs a review. High-risk SOPs (the ones needing a manager co-sign) are
