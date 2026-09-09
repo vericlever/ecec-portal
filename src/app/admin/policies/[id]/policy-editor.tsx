@@ -11,6 +11,8 @@ import {
   markPolicyReviewed,
   publishPolicy,
   setPolicyCategory,
+  setPolicyChildSafeStandard,
+  setPolicyQualityArea,
   unlinkSop,
   unpublishPolicy,
   updatePolicyBody,
@@ -18,6 +20,13 @@ import {
   updatePolicyReview,
   uploadPolicyDocument,
 } from "../actions";
+import { TagPicker } from "@/app/admin/_tags/tag-picker";
+import {
+  CHILD_SAFE_STANDARDS,
+  MAX_CHILD_SAFE_STANDARDS,
+  MAX_QUALITY_AREAS,
+  NQS_QUALITY_AREAS,
+} from "@/lib/tags";
 
 type Policy = {
   id: string;
@@ -36,6 +45,8 @@ export function PolicyEditor({
   policy,
   categories,
   linkedCategoryIds,
+  qualityAreaIds,
+  childSafeStandardIds,
   services,
   sourceDoc,
   allSops,
@@ -44,6 +55,8 @@ export function PolicyEditor({
   policy: Policy;
   categories: PolicyCategory[];
   linkedCategoryIds: string[];
+  qualityAreaIds: number[];
+  childSafeStandardIds: number[];
   services: { id: string; name: string }[];
   sourceDoc: {
     id: string;
@@ -229,6 +242,45 @@ export function PolicyEditor({
             172 parent notification.
           </p>
         )}
+      </section>
+
+      {/* Quality areas and child safe standards */}
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Quality areas and child safe standards
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Used by the coverage report and the child safety and quality area
+          reports. Not shown to staff.
+        </p>
+        <div className="mt-3 space-y-5">
+          <TagPicker
+            legend="NQS quality areas"
+            options={NQS_QUALITY_AREAS}
+            selectedIds={qualityAreaIds}
+            max={MAX_QUALITY_AREAS}
+            disabled={pending}
+            onToggle={(id, checked) =>
+              act(
+                () => setPolicyQualityArea(policy.id, id, checked),
+                checked ? "Quality area added" : "Quality area removed",
+              )
+            }
+          />
+          <TagPicker
+            legend="Child safe standards"
+            options={CHILD_SAFE_STANDARDS}
+            selectedIds={childSafeStandardIds}
+            max={MAX_CHILD_SAFE_STANDARDS}
+            disabled={pending}
+            onToggle={(id, checked) =>
+              act(
+                () => setPolicyChildSafeStandard(policy.id, id, checked),
+                checked ? "Standard added" : "Standard removed",
+              )
+            }
+          />
+        </div>
       </section>
 
       {/* Document */}

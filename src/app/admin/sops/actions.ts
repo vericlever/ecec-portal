@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { cleanReviewPeriod } from "@/lib/constants";
 import { reviewDateFromNow } from "@/lib/sop-review";
+import { writeDocumentTag } from "@/lib/document-tags";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -456,6 +457,50 @@ export async function setJobRole(
 
   revalidatePath(`/admin/sops/${sopId}`);
   revalidatePath("/admin/job-roles");
+  return { ok: true };
+}
+
+// Quality area / child safe standard tags (Steps 28, 29). The picker toggles
+// one tag at a time, matching the job-role and policy-category controls.
+export async function setSopQualityArea(
+  sopId: string,
+  areaId: number,
+  attach: boolean,
+): Promise<Result> {
+  const owned = await ownedSop(sopId);
+  if (!owned) return { ok: false, error: "SOP not found." };
+  const r = await writeDocumentTag({
+    kind: "quality_area",
+    documentType: "sop",
+    documentId: sopId,
+    organisationId: owned.sop.organisation_id,
+    tagId: areaId,
+    attach,
+    actorId: owned.me.id,
+  });
+  if (!r.ok) return r;
+  revalidatePath(`/admin/sops/${sopId}`);
+  return { ok: true };
+}
+
+export async function setSopChildSafeStandard(
+  sopId: string,
+  standardId: number,
+  attach: boolean,
+): Promise<Result> {
+  const owned = await ownedSop(sopId);
+  if (!owned) return { ok: false, error: "SOP not found." };
+  const r = await writeDocumentTag({
+    kind: "child_safe_standard",
+    documentType: "sop",
+    documentId: sopId,
+    organisationId: owned.sop.organisation_id,
+    tagId: standardId,
+    attach,
+    actorId: owned.me.id,
+  });
+  if (!r.ok) return r;
+  revalidatePath(`/admin/sops/${sopId}`);
   return { ok: true };
 }
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { documentTags } from "@/lib/document-tags";
 import { SopEditor } from "./sop-editor";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,7 @@ export default async function SopDetailPage({
   }));
 
   const linkedRoleIds = new Set((links ?? []).map((l) => l.job_role_id));
+  const tags = await documentTags(supabase, "sop", params.id);
 
   return (
     <div className="max-w-2xl">
@@ -102,6 +104,8 @@ export default async function SopDetailPage({
           }[]
         }
         linkedRoleIds={Array.from(linkedRoleIds) as string[]}
+        qualityAreaIds={tags.qualityAreas}
+        childSafeStandardIds={tags.childSafeStandards}
         signOffCount={signCount ?? 0}
         sourceDoc={
           sourceDoc

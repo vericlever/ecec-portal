@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { policyCategories } from "@/lib/policy-categories";
+import { documentTags } from "@/lib/document-tags";
 import { PolicyEditor } from "./policy-editor";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export default async function PolicyDetailPage({
 
   const linkedSopIds = new Set((links ?? []).map((l) => l.sop_id));
   const sopName = new Map((allSops ?? []).map((s) => [s.id, s.name]));
+  const tags = await documentTags(supabase, "policy", params.id);
 
   return (
     <div className="max-w-2xl">
@@ -73,6 +75,8 @@ export default async function PolicyDetailPage({
         linkedCategoryIds={
           (catLinks ?? []).map((l) => l.category_id as string)
         }
+        qualityAreaIds={tags.qualityAreas}
+        childSafeStandardIds={tags.childSafeStandards}
         services={(services ?? []) as { id: string; name: string }[]}
         sourceDoc={
           sourceDoc
