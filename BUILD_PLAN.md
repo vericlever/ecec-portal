@@ -6,6 +6,8 @@ Three companion documents hold detail this file only summarises: `ROLE_ACCESS_MA
 
 Status lines are kept current and reflect manual verification against real logins, not Claude Code's own "done" claims.
 
+For the consolidated state of play (completion table, migration register, chronological log, the drift in this file's summary block, and the Supabase dev review status) see `BUILD_LOG.md`. This file holds scope and "done when" criteria, `BUILD_LOG.md` holds what is built.
+
 ## Where things stand (3 September 2026)
 
 - **Built, verified, merged to `main`:** Steps 1 to 8, 10, 11, 16, 17.
