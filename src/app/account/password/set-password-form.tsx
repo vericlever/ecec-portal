@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { PasswordInput } from "@/components/password-input";
 import { setPassword, type SetPasswordState } from "./actions";
 
 const initialState: SetPasswordState = { error: null };
@@ -27,10 +28,9 @@ export function SetPasswordForm() {
         <label htmlFor="password" className="block text-sm font-medium text-slate-700">
           New password
         </label>
-        <input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={10}
@@ -41,10 +41,9 @@ export function SetPasswordForm() {
         <label htmlFor="confirm" className="block text-sm font-medium text-slate-700">
           Confirm password
         </label>
-        <input
+        <PasswordInput
           id="confirm"
           name="confirm"
-          type="password"
           autoComplete="new-password"
           required
           minLength={10}
