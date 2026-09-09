@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { ChainRing, Wordmark } from "@/components/bauhaus";
+import { PasswordInput } from "@/components/password-input";
 import { login, type LoginState } from "./actions";
 
 const initialState: LoginState = { error: null };
@@ -76,9 +77,8 @@ export default function LoginPage() {
               <span className="font-plex-mono text-[12px] uppercase tracking-[0.12em] text-ink-faint">
                 Password
               </span>
-              <input
+              <PasswordInput
                 name="password"
-                type="password"
                 autoComplete="current-password"
                 required
                 placeholder="••••••••"
