@@ -171,6 +171,9 @@ export default async function DashboardPage() {
     (a, b) => Number(b.overdue) - Number(a.overdue) || a.name.localeCompare(b.name),
   );
   const reviewOverdue = reviewItems.filter((i) => i.overdue).length;
+  const needsRevision = (pubSops ?? []).filter(
+    (s) => sopReviewStatus.get(s.id as string)?.latestDecision === "needs_revision",
+  );
 
   // --- structural integrity (Step 6 linking) --------------------------
   const linkedSopIds = new Set((sopLinks ?? []).map((l) => l.sop_id as string));
@@ -221,6 +224,14 @@ export default async function DashboardPage() {
           ? "Nothing due in the next month"
           : `${reviewOverdue} overdue`,
       alert: reviewOverdue > 0,
+    },
+    {
+      show: editor,
+      href: "/admin/sops",
+      label: "Procedures a review decided need revision",
+      count: needsRevision.length,
+      detail: needsRevision.length === 0 ? "None" : "waiting on a content editor",
+      alert: needsRevision.length > 0,
     },
     {
       show: true,
@@ -343,12 +354,31 @@ export default async function DashboardPage() {
         ))}
       </ul>
 
-      {editor && reviewItems.length > 0 && (
+      {editor && (reviewItems.length > 0 || needsRevision.length > 0) && (
         <details className="mt-3 rounded-lg border border-slate-200 bg-white">
           <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-700">
             Review cycle detail
           </summary>
           <div className="border-t border-slate-100 px-4 py-3 text-sm">
+            {needsRevision.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                  A review decided these need revision
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {needsRevision.map((s) => (
+                    <li key={s.id as string}>
+                      <Link
+                        href={`/admin/sops/${s.id}`}
+                        className="text-slate-700 underline"
+                      >
+                        {s.name as string}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {reviewItems.length > 0 && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

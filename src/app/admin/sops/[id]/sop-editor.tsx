@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   REVIEW_PERIODS,
@@ -42,6 +43,7 @@ type Sop = {
   published_at: string | null;
   review_period_months: number;
   next_review_date: string | null;
+  latest_decision: "stands" | "needs_revision" | null;
   suggested_evidence: string;
 };
 
@@ -362,11 +364,10 @@ export function SopEditor({
         </button>
       </section>
 
-      {/* Review status - read only here; the review event itself (Review cycle
-          v2) is completed from the procedure page, not this editor. */}
+      {/* Review */}
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Review status
+          Review
         </h2>
         <p
           className={`mt-2 text-sm font-medium ${
@@ -379,6 +380,17 @@ export function SopEditor({
         >
           {review.label}
         </p>
+        {sop.latest_decision === "needs_revision" && (
+          <p className="mt-1 text-sm text-red-700">
+            The last review decided this procedure needs revision.
+          </p>
+        )}
+        <Link
+          href={`/admin/sops/${sop.id}/review`}
+          className="mt-3 inline-block rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"
+        >
+          Review now
+        </Link>
       </section>
 
       {/* Review history */}

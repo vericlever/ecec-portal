@@ -94,6 +94,7 @@ export default async function SopDetailPage({
           published_at: sop.published_at,
           review_period_months: sop.review_period_months ?? 6,
           next_review_date: reviewStatus.nextReviewDate,
+          latest_decision: reviewStatus.latestDecision,
           suggested_evidence: sop.suggested_evidence ?? "",
         }}
         history={historyRows}

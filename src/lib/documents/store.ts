@@ -146,3 +146,37 @@ export async function deleteDocument(documentId: string): Promise<void> {
   if (doc) await admin.storage.from(BUCKET).remove([doc.storage_path]);
   await admin.from("documents").delete().eq("id", documentId);
 }
+
+// Review cycle v2's single evidence file, one per review. sop_reviews stores
+// the path directly (evidence_path text) rather than going through the
+// documents table's polymorphic owner pattern - there is exactly one file,
+// it belongs to exactly one review, and it is never replaced or re-tagged,
+// so the extra indirection the documents table exists for buys nothing here.
+export async function storeReviewEvidence(opts: {
+  organisationId: string;
+  sopId: string;
+  fileName: string;
+  mimeType: string | null;
+  bytes: Uint8Array;
+}): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  const admin = createAdminClient();
+  const path = `${opts.organisationId}/sop_review/${opts.sopId}/${Date.now()}-${safeName(opts.fileName)}`;
+  const up = await admin.storage.from(BUCKET).upload(path, opts.bytes, {
+    contentType: opts.mimeType ?? "application/octet-stream",
+    upsert: false,
+  });
+  if (up.error) return { ok: false, error: up.error.message };
+  return { ok: true, path };
+}
+
+export async function signedReviewEvidenceUrl(
+  path: string,
+  downloadName: string,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage
+    .from(BUCKET)
+    .createSignedUrl(path, 120, { download: downloadName });
+  if (error || !data) return null;
+  return data.signedUrl;
+}

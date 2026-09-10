@@ -18,6 +18,7 @@ type SopRow = {
   published_version: number | null;
   service_id: string | null;
   next_review_date: string | null;
+  latest_decision: "stands" | "needs_revision" | null;
 };
 
 function statusOf(s: SopRow): { label: string; tone: "grey" | "amber" | "green" | "blue" } {
@@ -62,12 +63,14 @@ export default async function AdminSopsPage() {
   const rows = (sops ?? []).map((s) => ({
     ...s,
     next_review_date: reviewStatus.get(s.id as string)?.nextReviewDate ?? null,
+    latest_decision: reviewStatus.get(s.id as string)?.latestDecision ?? null,
   })) as SopRow[];
   const publishedCount = rows.filter((s) => s.published_version).length;
   const needsContent = rows.filter((s) => statusOf(s).label === "Needs content").length;
   const reviewOverdue = rows.filter(
     (s) => s.published_version && reviewState(s.next_review_date).status === "overdue",
   ).length;
+  const needsRevision = rows.filter((s) => s.latest_decision === "needs_revision").length;
 
   return (
     <div>
@@ -96,6 +99,12 @@ export default async function AdminSopsPage() {
           <span className="text-red-700">
             {" "}
             · {reviewOverdue} overdue for review
+          </span>
+        )}
+        {needsRevision > 0 && (
+          <span className="text-red-700">
+            {" "}
+            · {needsRevision} needing revision
           </span>
         )}
       </p>
@@ -135,6 +144,11 @@ export default async function AdminSopsPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  {s.latest_decision === "needs_revision" && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      Needs revision
+                    </span>
+                  )}
                   {rev && (rev.status === "overdue" || rev.status === "soon") && (
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
