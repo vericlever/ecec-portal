@@ -16,6 +16,16 @@ const nextConfig = {
     // both packages external tells Next to leave them alone and let Node
     // require them directly at runtime instead.
     serverComponentsExternalPackages: ["@react-pdf/renderer", "yoga-layout"],
+    // pdfkit (used by @react-pdf/renderer) loads its built-in fonts through a
+    // package.json "imports" subpath that only resolves at runtime. Vercel's
+    // build step doesn't follow that indirection when it decides which files
+    // to ship with the serverless function, so the font file is missing and
+    // every PDF route 500s in production while working fine under `next dev`
+    // (which reads straight from the full node_modules on disk). This forces
+    // those font files to be included alongside the report routes.
+    outputFileTracingIncludes: {
+      "/reports/**": ["./node_modules/pdfkit/js/standard-fonts/*.cjs"],
+    },
   },
 };
 
