@@ -43,9 +43,7 @@ export default async function SopBulkReviewPage({
   ] = await Promise.all([
     supabase
       .from("sops")
-      .select(
-        "id, name, organisation_id, body, review_period_months, next_review_date, published_version",
-      )
+      .select("id, name, organisation_id, body, review_period_months, published_version")
       .in("id", ids),
     supabase
       .from("policies")
@@ -83,7 +81,6 @@ export default async function SopBulkReviewPage({
       hasText: !!(s.body && String(s.body).trim()),
       alreadyPublished: (s.published_version as number | null) != null,
       reviewPeriod: (s.review_period_months as number | null) ?? 6,
-      nextReviewDate: (s.next_review_date as string | null) ?? null,
       linkedPolicyIds: linkedBySop.get(s.id as string) ?? [],
       jobRoleIds: rolesBySop.get(s.id as string) ?? [],
     }));
@@ -101,7 +98,7 @@ export default async function SopBulkReviewPage({
       <h1 className="mt-3 text-xl font-semibold">Review and publish</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
         Step 2 of 2. Everything with readable text is set to publish. Check the
-        job roles, the next review date and any policy links, then publish the
+        job roles, the review cadence and any policy links, then publish the
         lot in one step. A procedure with no readable text stays a draft for you to
         fix.
       </p>

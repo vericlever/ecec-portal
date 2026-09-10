@@ -51,25 +51,17 @@ export function ManageMenu({
     }
     groups.push({ label: "Staff", items });
   }
-  // Library: content editors get the full editing set; anyone who can
-  // countersign (every manager tier, not just content editors) keeps their
-  // existing access to Procedure Outcomes here too, per Step 21's spec that
-  // logging is open to every manager tier - moving it into this group must
-  // not narrow who can reach it.
-  if (canEditContent || canCountersign) {
-    const items: Item[] = [];
-    if (canCountersign) {
-      items.push({ href: "/admin/observations", label: "Procedure Outcomes" });
-    }
-    if (canEditContent) {
-      items.push(
+  // Library: content editors get the full editing set.
+  if (canEditContent) {
+    groups.push({
+      label: "Library",
+      items: [
         { href: "/admin/policies", label: "Policies" },
         { href: "/admin/sops", label: "Procedures" },
         { href: "/admin/agreements", label: "Agreements" },
         { href: "/admin/job-roles", label: "Job roles" },
-      );
-    }
-    groups.push({ label: "Library", items });
+      ],
+    });
   }
 
   const active = pathname.startsWith("/admin");

@@ -591,9 +591,13 @@ export async function versionChangeHistoryData(
   supabase: ServerClient,
 ): Promise<ChangeHistoryEntry[]> {
   const [{ data: history }, { data: policies }] = await Promise.all([
+    // period_change events stay in the audit log but are dropped from every
+    // report and history view - a cadence change is not part of the
+    // improvement story and dilutes the log a reviewer has to read.
     supabase
       .from("sop_history")
       .select("sop_id, event_type, note, actor_profile_id, created_at")
+      .neq("event_type", "period_change")
       .order("created_at", { ascending: false })
       .limit(200),
     // No per-version policy history log exists yet - the latest publish and

@@ -17,7 +17,6 @@ type SopRow = {
   published_version: number | null;
   service_id: string | null;
   next_review_date: string | null;
-  needs_review: boolean | null;
 };
 
 function statusOf(s: SopRow): { label: string; tone: "grey" | "amber" | "green" | "blue" } {
@@ -46,7 +45,7 @@ export default async function AdminSopsPage() {
       supabase
         .from("sops")
         .select(
-          "id, name, target_tier, signoff_type, priority, body, published_body, published_version, service_id, next_review_date, needs_review",
+          "id, name, target_tier, signoff_type, priority, body, published_body, published_version, service_id, next_review_date",
         )
         .order("name"),
       supabase.from("services").select("id, name"),
@@ -131,11 +130,6 @@ export default async function AdminSopsPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {s.needs_review && (
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                      Needs review
-                    </span>
-                  )}
                   {rev && (rev.status === "overdue" || rev.status === "soon") && (
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${

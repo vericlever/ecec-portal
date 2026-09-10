@@ -8,15 +8,9 @@ import {
   SOP_TIER_LABELS,
   SOP_TIER_ORDER,
 } from "@/lib/constants";
-import {
-  fmtReviewDate,
-  HISTORY_EVENT_LABELS,
-  reviewDateFromNow,
-  reviewState,
-} from "@/lib/sop-review";
+import { HISTORY_EVENT_LABELS, reviewState } from "@/lib/sop-review";
 import {
   deleteSop,
-  markSopReviewed,
   publishSop,
   setJobRole,
   setSopChildSafeStandard,
@@ -24,8 +18,6 @@ import {
   unpublishSop,
   updateSopBody,
   updateSopMeta,
-  updateSopReview,
-  updateSopSuggestedEvidence,
   uploadSopDocument,
 } from "../actions";
 import { TagPicker } from "@/app/admin/_tags/tag-picker";
@@ -50,7 +42,6 @@ type Sop = {
   published_at: string | null;
   review_period_months: number;
   next_review_date: string | null;
-  needs_review: boolean;
   suggested_evidence: string;
 };
 
@@ -99,23 +90,10 @@ export function SopEditor({
   const [priority, setPriority] = useState(sop.priority?.toString() ?? "");
   const [notes, setNotes] = useState(sop.notes);
   const [serviceId, setServiceId] = useState(sop.service_id ?? "");
+  const [reviewPeriod, setReviewPeriod] = useState(sop.review_period_months);
   const [body, setBody] = useState(sop.body);
 
-  const [reviewPeriod, setReviewPeriod] = useState(sop.review_period_months);
-  const [nextReviewDate, setNextReviewDate] = useState(
-    sop.next_review_date ?? "",
-  );
-  const [suggestedEvidence, setSuggestedEvidence] = useState(
-    sop.suggested_evidence,
-  );
-  // When the body has been edited and a future review date exists, ask whether
-  // to reset the review clock as part of saving.
-  const [askResetClock, setAskResetClock] = useState(false);
-
   const review = reviewState(sop.next_review_date);
-  const reviewDirty =
-    reviewPeriod !== sop.review_period_months ||
-    nextReviewDate !== (sop.next_review_date ?? "");
 
   const fileRef = useRef<HTMLInputElement>(null);
   const linked = new Set(linkedRoleIds);
@@ -184,13 +162,6 @@ export function SopEditor({
         <p className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
           Publishing changes bumps the version. Every staff member who signed the
           old version has to read and sign again.
-        </p>
-      )}
-      {sop.needs_review && (
-        <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
-          A procedure outcome record flagged this procedure for review. Publishing a new
-          version or marking it reviewed in the Review cycle section clears this
-          flag.
         </p>
       )}
       {msg && <p className="text-sm text-green-700">{msg}</p>}
@@ -267,6 +238,20 @@ export function SopEditor({
             </label>
           </div>
           <label className="block text-sm">
+            <span className="font-medium text-slate-700">Review every</span>
+            <select
+              value={reviewPeriod}
+              onChange={(e) => setReviewPeriod(Number(e.target.value))}
+              className="mt-1 w-full max-w-[12rem] rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              {REVIEW_PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {REVIEW_PERIOD_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
             <span className="font-medium text-slate-700">
               Internal notes <span className="font-normal text-slate-400">(not shown to staff)</span>
             </span>
@@ -290,6 +275,7 @@ export function SopEditor({
                     priority,
                     notes,
                     serviceId: serviceId || null,
+                    reviewPeriod,
                   }),
                 "Details saved",
               )
@@ -366,75 +352,21 @@ export function SopEditor({
           rows={16}
           className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
         />
-        {!askResetClock ? (
-          <button
-            type="button"
-            disabled={pending || body === sop.body}
-            onClick={() => {
-              // An edit made while a review is still scheduled (not overdue) is
-              // out of sequence: ask whether to reset the clock.
-              if (sop.next_review_date && review.status !== "overdue") {
-                setAskResetClock(true);
-              } else {
-                act(() => updateSopBody(sop.id, body, false), "Text saved");
-              }
-            }}
-            className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
-          >
-            Save text
-          </button>
-        ) : (
-          <div className="mt-3 space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            <p>
-              This edit is outside the review schedule (next review{" "}
-              {review.dueDate ? fmtReviewDate(review.dueDate) : ""}). Reset the review clock?
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  setAskResetClock(false);
-                  act(
-                    () => updateSopBody(sop.id, body, true),
-                    "Text saved, review clock reset",
-                  );
-                }}
-                className="rounded-md bg-amber-900 px-3 py-1.5 font-medium text-white disabled:opacity-40"
-              >
-                Save & reset review to{" "}
-                {reviewDateFromNow(sop.review_period_months)}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  setAskResetClock(false);
-                  act(
-                    () => updateSopBody(sop.id, body, false),
-                    "Text saved",
-                  );
-                }}
-                className="rounded-md border border-amber-300 px-3 py-1.5 font-medium text-amber-900 disabled:opacity-40"
-              >
-                Save, keep {review.dueDate ? fmtReviewDate(review.dueDate) : ""}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAskResetClock(false)}
-                className="px-2 py-1.5 text-amber-700 underline"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          disabled={pending || body === sop.body}
+          onClick={() => act(() => updateSopBody(sop.id, body), "Text saved")}
+          className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+        >
+          Save text
+        </button>
       </section>
 
-      {/* Review cycle */}
+      {/* Review status - read only here; the review event itself (Review cycle
+          v2) is completed from the procedure page, not this editor. */}
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Review cycle
+          Review status
         </h2>
         <p
           className={`mt-2 text-sm font-medium ${
@@ -447,97 +379,6 @@ export function SopEditor({
         >
           {review.label}
         </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Review every</span>
-            <select
-              value={reviewPeriod}
-              onChange={(e) => setReviewPeriod(Number(e.target.value))}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {REVIEW_PERIODS.map((p) => (
-                <option key={p} value={p}>
-                  {REVIEW_PERIOD_LABELS[p]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Next review date</span>
-            <input
-              type="date"
-              value={nextReviewDate}
-              onChange={(e) => setNextReviewDate(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={pending || !reviewDirty}
-            onClick={() =>
-              act(
-                () =>
-                  updateSopReview(sop.id, {
-                    reviewPeriod,
-                    nextReviewDate,
-                  }),
-                "Review schedule saved",
-              )
-            }
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
-          >
-            Save review schedule
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              if (
-                !confirm(
-                  `Mark this procedure as reviewed now? The next review moves to ${reviewDateFromNow(sop.review_period_months)}.`,
-                )
-              )
-                return;
-              act(() => markSopReviewed(sop.id), "Marked as reviewed");
-            }}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-          >
-            Mark as reviewed now
-          </button>
-        </div>
-
-        <div className="mt-4 border-t border-slate-100 pt-3">
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">
-              Suggested review evidence
-            </span>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Shown to a manager when they log a procedure outcome: what would
-              show this procedure is working (photos, rosters, records).
-            </p>
-            <textarea
-              value={suggestedEvidence}
-              onChange={(e) => setSuggestedEvidence(e.target.value)}
-              rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={pending || suggestedEvidence === sop.suggested_evidence}
-            onClick={() =>
-              act(
-                () => updateSopSuggestedEvidence(sop.id, suggestedEvidence),
-                "Saved",
-              )
-            }
-            className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
-          >
-            Save suggested evidence
-          </button>
-        </div>
       </section>
 
       {/* Review history */}
@@ -547,7 +388,7 @@ export function SopEditor({
         </h2>
         {history.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">
-            No edits, schedule changes or reviews recorded yet.
+            No edits or reviews recorded yet.
           </p>
         ) : (
           <ul className="mt-2 divide-y divide-slate-100 text-sm">

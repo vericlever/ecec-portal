@@ -5,12 +5,11 @@ import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { cleanReviewPeriod } from "@/lib/constants";
-import { reviewDateFromNow } from "@/lib/sop-review";
 import { writeDocumentTag } from "@/lib/document-tags";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
-type SopEvent = "edit" | "period_change" | "review";
+type SopEvent = "edit";
 
 async function logSopEvent(
   db: ReturnType<typeof createClient>,
@@ -105,6 +104,7 @@ export async function updateSopMeta(
     priority: string;
     notes: string;
     serviceId: string | null;
+    reviewPeriod: number;
   },
 ): Promise<Result> {
   const owned = await ownedSop(id);
@@ -129,6 +129,7 @@ export async function updateSopMeta(
       priority,
       notes: input.notes.trim() || null,
       service_id: input.serviceId,
+      review_period_months: cleanReviewPeriod(input.reviewPeriod),
       updated_by: owned.me.id,
     })
     .eq("id", id);
@@ -145,7 +146,8 @@ export async function updateSopMeta(
   return { ok: true };
 }
 
-// The per-SOP "suggested evidence" hint a manager sees at review time (Step 22).
+// The per-SOP "what to look for" hint, retained on the row but rendered only
+// inside the review form (Review cycle v2), not this editor.
 export async function updateSopSuggestedEvidence(
   id: string,
   text: string,
@@ -159,31 +161,23 @@ export async function updateSopSuggestedEvidence(
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/admin/sops/${id}`);
-  revalidatePath(`/admin/observations/${id}`);
   return { ok: true };
 }
 
-export async function updateSopBody(
-  id: string,
-  body: string,
-  resetReviewClock = false,
-): Promise<Result> {
+// The review clock is no longer touched from here. It derives entirely from
+// sop_reviews (migration 0039) - a content edit no longer resets it, and
+// there is no longer a "reset the clock while you're at it" prompt, matching
+// Review cycle v2's rule that nothing but a completed review may move the
+// due date.
+export async function updateSopBody(id: string, body: string): Promise<Result> {
   const owned = await ownedSop(id);
   if (!owned) return { ok: false, error: "Procedure not found." };
   const db = createClient();
 
-  const patch: Record<string, unknown> = {
-    body: body.trim() || null,
-    updated_by: owned.me.id,
-  };
-  const period = cleanReviewPeriod(owned.sop.review_period_months);
-  let newDue: string | null = null;
-  if (resetReviewClock) {
-    newDue = reviewDateFromNow(period);
-    patch.next_review_date = newDue;
-  }
-
-  const { error } = await db.from("sops").update(patch).eq("id", id);
+  const { error } = await db
+    .from("sops")
+    .update({ body: body.trim() || null, updated_by: owned.me.id })
+    .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
   await logSopEvent(db, {
@@ -191,116 +185,7 @@ export async function updateSopBody(
     sopId: id,
     eventType: "edit",
     actorId: owned.me.id,
-    note: resetReviewClock
-      ? `Content edited; review clock reset to ${newDue}`
-      : "Content edited",
-    detail: resetReviewClock
-      ? {
-          review_clock_reset: true,
-          previous_due: owned.sop.next_review_date,
-          new_due: newDue,
-        }
-      : { review_clock_reset: false },
-  });
-
-  revalidatePath(`/admin/sops/${id}`);
-  revalidatePath("/admin/sops");
-  return { ok: true };
-}
-
-// Save the review schedule: the cadence and the explicit next date. Any change
-// to either writes one period_change event so the history shows the schedule
-// moving.
-export async function updateSopReview(
-  id: string,
-  input: { reviewPeriod: number; nextReviewDate: string },
-): Promise<Result> {
-  const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "Procedure not found." };
-
-  const period = cleanReviewPeriod(input.reviewPeriod);
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(input.nextReviewDate)
-    ? input.nextReviewDate
-    : null;
-
-  const prevPeriod = cleanReviewPeriod(owned.sop.review_period_months);
-  const prevDate = (owned.sop.next_review_date as string | null) ?? null;
-  if (period === prevPeriod && date === prevDate) return { ok: true };
-
-  const db = createClient();
-  const { error } = await db
-    .from("sops")
-    .update({
-      review_period_months: period,
-      next_review_date: date,
-      updated_by: owned.me.id,
-    })
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
-
-  const parts: string[] = [];
-  if (period !== prevPeriod)
-    parts.push(`cadence ${prevPeriod} → ${period} months`);
-  if (date !== prevDate)
-    parts.push(`next review ${prevDate ?? "unset"} → ${date ?? "unset"}`);
-
-  await logSopEvent(db, {
-    organisationId: owned.sop.organisation_id,
-    sopId: id,
-    eventType: "period_change",
-    actorId: owned.me.id,
-    note: `Review schedule changed: ${parts.join(", ")}`,
-    detail: {
-      from_period: prevPeriod,
-      to_period: period,
-      from_date: prevDate,
-      to_date: date,
-    },
-  });
-
-  revalidatePath(`/admin/sops/${id}`);
-  revalidatePath("/admin/sops");
-  return { ok: true };
-}
-
-// Record that a review happened now: the next review date moves to the SOP's
-// cadence from today, and a review event is logged.
-export async function markSopReviewed(
-  id: string,
-  note?: string,
-): Promise<Result> {
-  const owned = await ownedSop(id);
-  if (!owned) return { ok: false, error: "Procedure not found." };
-
-  const period = cleanReviewPeriod(owned.sop.review_period_months);
-  const newDue = reviewDateFromNow(period);
-
-  const db = createClient();
-  const { error } = await db
-    .from("sops")
-    // Recording a review also clears any needs-review flag a practice
-    // observation raised (Step 21).
-    .update({
-      next_review_date: newDue,
-      needs_review: false,
-      updated_by: owned.me.id,
-    })
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
-
-  await logSopEvent(db, {
-    organisationId: owned.sop.organisation_id,
-    sopId: id,
-    eventType: "review",
-    actorId: owned.me.id,
-    note: note?.trim()
-      ? `Reviewed. ${note.trim()}`
-      : `Reviewed. Next review ${newDue}.`,
-    detail: {
-      previous_due: owned.sop.next_review_date,
-      new_due: newDue,
-      period_months: period,
-    },
+    note: "Content edited",
   });
 
   revalidatePath(`/admin/sops/${id}`);
@@ -324,8 +209,6 @@ export async function publishSop(id: string): Promise<Result> {
       published_at: new Date().toISOString(),
       published_by: owned.me.id,
       current_version: next,
-      // A fresh published version resolves any needs-review flag (Step 21).
-      needs_review: false,
     })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
@@ -659,19 +542,16 @@ export async function bulkImportSops(
 }
 
 // Page two of the bulk wizard. One call sets the job roles (which decide staff
-// visibility), the review period and next review date, and the policy links for
-// every uploaded SOP, then publishes the ones marked to publish that have text.
-// A SOP with no text stays an unpublished draft.
+// visibility), the review period and the policy links for every uploaded SOP,
+// then publishes the ones marked to publish that have text. A SOP with no
+// text stays an unpublished draft. Next review date is derived, not set here.
 export type SopBulkFinishItem = {
   sopId: string;
   jobRoleIds: string[];
   reviewPeriod: number;
-  nextReviewDate: string;
   linkedPolicyIds: string[];
   publish: boolean;
 };
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function finishBulkSops(
   items: SopBulkFinishItem[],
@@ -730,9 +610,6 @@ export async function finishBulkSops(
 
     const update: Record<string, unknown> = {
       review_period_months: cleanReviewPeriod(item.reviewPeriod),
-      next_review_date: ISO_DATE.test(item.nextReviewDate)
-        ? item.nextReviewDate
-        : null,
       updated_by: me.id,
     };
 
