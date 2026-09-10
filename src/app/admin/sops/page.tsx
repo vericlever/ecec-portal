@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { SOP_TIER_LABELS } from "@/lib/constants";
 import { reviewState } from "@/lib/sop-review";
+import { procedureCategories } from "@/lib/policy-categories";
+import { CategoryFilter } from "./category-filter";
 
 export const dynamic = "force-dynamic";
 
 type SopRow = {
   id: string;
   name: string;
-  target_tier: string | null;
+  category_id: string | null;
   signoff_type: string;
   priority: number | null;
   body: string | null;
@@ -37,28 +38,38 @@ const TONE: Record<string, string> = {
   blue: "bg-blue-100 text-blue-700",
 };
 
-export default async function AdminSopsPage() {
+export default async function AdminSopsPage({
+  searchParams,
+}: {
+  searchParams: { category?: string };
+}) {
   await requireContentEditor();
   const supabase = createClient();
 
-  const [{ data: sops }, { data: services }, { data: roleLinks }] =
+  const [{ data: sops }, { data: services }, { data: roleLinks }, categories] =
     await Promise.all([
       supabase
         .from("sops")
         .select(
-          "id, name, target_tier, signoff_type, priority, body, published_body, published_version, service_id, next_review_date, needs_review",
+          "id, name, category_id, signoff_type, priority, body, published_body, published_version, service_id, next_review_date, needs_review",
         )
         .order("name"),
       supabase.from("services").select("id, name"),
       supabase.from("job_role_sops").select("sop_id"),
+      procedureCategories(supabase),
     ]);
 
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
   const roleCount = new Map<string, number>();
   for (const l of roleLinks ?? [])
     roleCount.set(l.sop_id, (roleCount.get(l.sop_id) ?? 0) + 1);
 
-  const rows = (sops ?? []) as SopRow[];
+  const allRows = (sops ?? []) as SopRow[];
+  const categoryFilter = searchParams.category ?? "";
+  const rows = categoryFilter
+    ? allRows.filter((s) => s.category_id === categoryFilter)
+    : allRows;
   const publishedCount = rows.filter((s) => s.published_version).length;
   const needsContent = rows.filter((s) => statusOf(s).label === "Needs content").length;
   const reviewOverdue = rows.filter(
@@ -70,6 +81,7 @@ export default async function AdminSopsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Procedures</h1>
         <div className="flex gap-2">
+          <CategoryFilter categories={categories} />
           <Link
             href="/admin/sops/bulk"
             className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -119,8 +131,8 @@ export default async function AdminSopsPage() {
                     )}
                   </div>
                   <div className="mt-0.5 text-xs text-slate-400">
-                    {s.target_tier
-                      ? (SOP_TIER_LABELS[s.target_tier] ?? s.target_tier)
+                    {s.category_id
+                      ? (categoryName.get(s.category_id) ?? "—")
                       : "no category"}
                     {s.service_id
                       ? ` · ${serviceName.get(s.service_id) ?? "one site"} only`

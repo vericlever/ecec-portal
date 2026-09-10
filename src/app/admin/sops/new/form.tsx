@@ -3,13 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createSop } from "../actions";
-import { SOP_TIER_LABELS, SOP_TIER_ORDER } from "@/lib/constants";
+import type { PolicyCategory } from "@/lib/policy-categories";
 
-export function NewSopForm() {
+export function NewSopForm({ categories }: { categories: PolicyCategory[] }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [signoffType, setSignoffType] = useState("self");
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -21,7 +21,7 @@ export function NewSopForm() {
         e.preventDefault();
         start(async () => {
           setError(null);
-          const r = await createSop({ name, body, signoffType, category });
+          const r = await createSop({ name, body, signoffType, categoryId });
           if (r.ok && r.id) router.push(`/admin/sops/${r.id}`);
           else if (!r.ok) setError(r.error);
         });
@@ -54,14 +54,14 @@ export function NewSopForm() {
             Category <span className="font-normal text-slate-400">(optional)</span>
           </span>
           <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="">None</option>
-            {SOP_TIER_ORDER.map((t) => (
-              <option key={t} value={t}>
-                {SOP_TIER_LABELS[t]}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>

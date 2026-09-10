@@ -2,12 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  REVIEW_PERIODS,
-  REVIEW_PERIOD_LABELS,
-  SOP_TIER_LABELS,
-  SOP_TIER_ORDER,
-} from "@/lib/constants";
+import { REVIEW_PERIODS, REVIEW_PERIOD_LABELS } from "@/lib/constants";
+import type { PolicyCategory } from "@/lib/policy-categories";
 import {
   fmtReviewDate,
   HISTORY_EVENT_LABELS,
@@ -39,7 +35,7 @@ import {
 type Sop = {
   id: string;
   name: string;
-  target_tier: string;
+  category_id: string;
   signoff_type: string;
   priority: number | null;
   notes: string;
@@ -64,6 +60,7 @@ type HistoryRow = {
 
 export function SopEditor({
   sop,
+  categories,
   services,
   jobRoles,
   linkedRoleIds,
@@ -74,6 +71,7 @@ export function SopEditor({
   history,
 }: {
   sop: Sop;
+  categories: PolicyCategory[];
   services: { id: string; name: string }[];
   jobRoles: { id: string; name: string; is_placeholder: boolean }[];
   linkedRoleIds: string[];
@@ -95,7 +93,7 @@ export function SopEditor({
 
   const [name, setName] = useState(sop.name);
   const [signoffType, setSignoffType] = useState(sop.signoff_type);
-  const [category, setCategory] = useState(sop.target_tier);
+  const [categoryId, setCategoryId] = useState(sop.category_id);
   const [priority, setPriority] = useState(sop.priority?.toString() ?? "");
   const [notes, setNotes] = useState(sop.notes);
   const [serviceId, setServiceId] = useState(sop.service_id ?? "");
@@ -225,14 +223,14 @@ export function SopEditor({
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Category</span>
               <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               >
                 <option value="">None</option>
-                {SOP_TIER_ORDER.map((t) => (
-                  <option key={t} value={t}>
-                    {SOP_TIER_LABELS[t]}
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -286,7 +284,7 @@ export function SopEditor({
                   updateSopMeta(sop.id, {
                     name,
                     signoffType,
-                    category,
+                    categoryId,
                     priority,
                     notes,
                     serviceId: serviceId || null,

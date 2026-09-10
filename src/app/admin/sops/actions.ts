@@ -33,14 +33,25 @@ async function logSopEvent(
   });
 }
 
-const CATEGORIES = [
-  "educator",
-  "room_leader",
-  "educational_leader",
-  "director",
-  "finance_admin",
-];
 const SIGNOFF_TYPES = ["self", "self_and_manager"];
+
+// A category id is valid for a procedure only if it belongs to this org and
+// is flagged applies_to_procedures - the same policy_categories table
+// policies use, not a second lookup (build addendum item 4).
+async function validCategoryId(
+  db: ReturnType<typeof createClient>,
+  organisationId: string,
+  categoryId: string,
+): Promise<boolean> {
+  const { data } = await db
+    .from("policy_categories")
+    .select("id")
+    .eq("id", categoryId)
+    .eq("organisation_id", organisationId)
+    .eq("applies_to_procedures", true)
+    .maybeSingle();
+  return Boolean(data);
+}
 
 async function ownedSop(id: string) {
   const me = await requireContentEditor();
@@ -60,7 +71,7 @@ export async function createSop(input: {
   name: string;
   body: string;
   signoffType: string;
-  category: string;
+  categoryId: string;
 }): Promise<Result> {
   const me = await requireContentEditor();
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
@@ -68,6 +79,10 @@ export async function createSop(input: {
   if (!name) return { ok: false, error: "A name is required." };
 
   const db = createClient();
+  const categoryId =
+    input.categoryId && (await validCategoryId(db, me.organisation_id, input.categoryId))
+      ? input.categoryId
+      : null;
   const { data, error } = await db
     .from("sops")
     .insert({
@@ -77,7 +92,7 @@ export async function createSop(input: {
       signoff_type: SIGNOFF_TYPES.includes(input.signoffType)
         ? input.signoffType
         : "self",
-      target_tier: CATEGORIES.includes(input.category) ? input.category : null,
+      category_id: categoryId,
       body: input.body.trim() || null,
       updated_by: me.id,
     })
@@ -101,7 +116,7 @@ export async function updateSopMeta(
   input: {
     name: string;
     signoffType: string;
-    category: string;
+    categoryId: string;
     priority: string;
     notes: string;
     serviceId: string | null;
@@ -118,6 +133,11 @@ export async function updateSopMeta(
   }
 
   const db = createClient();
+  const categoryId =
+    input.categoryId &&
+    (await validCategoryId(db, owned.sop.organisation_id, input.categoryId))
+      ? input.categoryId
+      : null;
   const { error } = await db
     .from("sops")
     .update({
@@ -125,7 +145,7 @@ export async function updateSopMeta(
       signoff_type: SIGNOFF_TYPES.includes(input.signoffType)
         ? input.signoffType
         : "self",
-      target_tier: CATEGORIES.includes(input.category) ? input.category : null,
+      category_id: categoryId,
       priority,
       notes: input.notes.trim() || null,
       service_id: input.serviceId,

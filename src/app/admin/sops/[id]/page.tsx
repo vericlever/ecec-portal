@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { documentTags } from "@/lib/document-tags";
+import { procedureCategories } from "@/lib/policy-categories";
 import { SopEditor } from "./sop-editor";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,7 @@ export default async function SopDetailPage({
 
   const linkedRoleIds = new Set((links ?? []).map((l) => l.job_role_id));
   const tags = await documentTags(supabase, "sop", params.id);
+  const categories = await procedureCategories(supabase);
 
   return (
     <div className="max-w-2xl">
@@ -80,7 +82,7 @@ export default async function SopDetailPage({
         sop={{
           id: sop.id,
           name: sop.name,
-          target_tier: sop.target_tier ?? "",
+          category_id: sop.category_id ?? "",
           signoff_type: sop.signoff_type,
           priority: sop.priority,
           notes: sop.notes ?? "",
@@ -95,6 +97,7 @@ export default async function SopDetailPage({
           suggested_evidence: sop.suggested_evidence ?? "",
         }}
         history={historyRows}
+        categories={categories}
         services={(services ?? []) as { id: string; name: string }[]}
         jobRoles={
           (jobRoles ?? []) as {

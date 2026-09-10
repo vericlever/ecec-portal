@@ -20,6 +20,21 @@ export async function policyCategories(
   return (data ?? []) as PolicyCategory[];
 }
 
+// The same table, filtered to the categories a procedure may pick (build
+// addendum item 4). Procedures use a single category (sops.category_id),
+// not the policy tier's multi-select junction, so callers just need the
+// list, not a links map.
+export async function procedureCategories(
+  supabase: ServerClient,
+): Promise<PolicyCategory[]> {
+  const { data } = await supabase
+    .from("policy_categories")
+    .select("id, slug, name, is_parent_facing, sort_order")
+    .eq("applies_to_procedures", true)
+    .order("sort_order");
+  return (data ?? []) as PolicyCategory[];
+}
+
 // category id -> policy ids, and policy id -> category ids, for a set of
 // policies (or all, if ids omitted).
 export async function policyCategoryLinks(
