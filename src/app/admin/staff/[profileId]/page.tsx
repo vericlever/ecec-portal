@@ -10,8 +10,12 @@ import {
 import { ASSIGNABLE_TIERS } from "@/lib/roles";
 import {
   AccessTierControl,
+  ActiveControl,
+  DeleteAccountControl,
+  EmailControl,
   HrManagerToggle,
   JobRoleControl,
+  NameControl,
   PasswordResetControl,
   ProbationControl,
   RefereeCheckControl,
@@ -496,6 +500,8 @@ export default async function StaffRecordPage({
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Role and access
           </h2>
+          <NameControl profileId={person.id} value={person.full_name} />
+          <EmailControl profileId={person.id} value={person.email} />
           <JobRoleControl
             profileId={person.id}
             value={person.job_role_id}
@@ -516,6 +522,20 @@ export default async function StaffRecordPage({
             email={person.email}
             lastReset={lastReset}
           />
+          {person.id !== me.id && (
+            <ActiveControl profileId={person.id} isActive={person.is_active} />
+          )}
+        </section>
+      )}
+
+      {isAdmin(me.access_tier) && person.id !== me.id && (
+        <section className="mt-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Danger zone
+          </h2>
+          <div className="mt-2">
+            <DeleteAccountControl profileId={person.id} />
+          </div>
         </section>
       )}
 

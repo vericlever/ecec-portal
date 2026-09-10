@@ -442,6 +442,60 @@ const APP_SCENARIOS = [
       return { rowCount: r.rows[0].n };
     },
   },
+
+  // Build addendum item 1 (staff account CRUD, migrations 0044 then 0053).
+  // profiles_update's with-check requires access_tier='staff' on the
+  // manager/hr_manager branches - an HR manager can edit a plain staff
+  // member's own record but not a fellow manager's, matching
+  // canManageAccountFor()'s own gate in account-actions.ts exactly, so an
+  // over-permissive app check can never produce a silent 0-row "success".
+  {
+    label: "manager (same service) updates a staff-tier colleague's name",
+    expectOk: true,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(`update public.profiles set full_name=full_name where id=$1`, [STAFF]),
+  },
+  {
+    label: "manager (same service) updates a manager-tier colleague's name (admin-only)",
+    expectOk: false,
+    setup: async (c) => {
+      // ADMIN is normally service-less (org-wide); move it to Timboon for
+      // this probe only, so the block below is the access_tier check firing,
+      // not a service mismatch.
+      await c.query(`update public.profiles set service_id=$1 where id=$2`, [TIMBOON, ADMIN]);
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(`update public.profiles set full_name=full_name where id=$1`, [ADMIN]),
+  },
+  {
+    label: "manager updates a staff-tier colleague at a DIFFERENT service",
+    expectOk: false,
+    setup: async (c) => {
+      await c.query(`update public.profiles set service_id=$1 where id=$2`, [MORTLAKE, MANAGER]);
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(`update public.profiles set full_name=full_name where id=$1`, [STAFF]),
+  },
+  // Migration 0053: DELETE on profiles is its own admin-only policy, split
+  // out of the old for-all profiles_write so a same-service manager or
+  // hr_manager-flagged account (both still fine for UPDATE) cannot delete a
+  // colleague's account outright - permanentlyDeleteStaff() is admin-only in
+  // the application and RLS now holds that line independently.
+  {
+    label: "manager (non-admin) deletes a colleague's profile at their own service",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) => c.query(`delete from public.profiles where id=$1`, [STAFF]),
+  },
+  {
+    label: "admin deletes a staff profile in their own org",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) => c.query(`delete from public.profiles where id=$1`, [STAFF]),
+  },
 ];
 
 await client.connect();

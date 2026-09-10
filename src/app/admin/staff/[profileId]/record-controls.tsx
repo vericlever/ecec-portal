@@ -13,6 +13,12 @@ import {
   setStaffAccessTier,
   setStaffJobRole,
 } from "./actions";
+import {
+  permanentlyDeleteStaff,
+  setStaffActive,
+  updateStaffEmail,
+  updateStaffName,
+} from "./account-actions";
 
 type Table =
   | "wwcc_checks"
@@ -461,6 +467,214 @@ export function PasswordResetControl({
           ({lastReset.source === "admin" ? "sent by a leader" : "self-service"})
         </p>
       )}
+    </div>
+  );
+}
+
+export function NameControl({
+  profileId,
+  value,
+}: {
+  profileId: string;
+  value: string;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const dirty = name.trim() !== value;
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Full name</span>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={pending}
+          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+        />
+        <button
+          type="button"
+          disabled={!dirty || pending}
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              setMsg(null);
+              const r = await updateStaffName(profileId, name);
+              if (r.ok) {
+                setMsg("Saved");
+                router.refresh();
+              } else {
+                setError(r.error);
+              }
+            })
+          }
+          className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+        {msg && <span className="text-xs text-green-700">{msg}</span>}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+export function EmailControl({
+  profileId,
+  value,
+}: {
+  profileId: string;
+  value: string;
+}) {
+  const router = useRouter();
+  const [email, setEmail] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const dirty = email.trim().toLowerCase() !== value.toLowerCase();
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Email</span>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Also their login. Takes effect immediately - there is no confirmation
+        step, so check the address before saving.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={pending}
+          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+        />
+        <button
+          type="button"
+          disabled={!dirty || pending}
+          onClick={() => {
+            if (
+              !confirm(
+                `Change this account's email to ${email.trim()}? This takes effect immediately.`,
+              )
+            )
+              return;
+            start(async () => {
+              setError(null);
+              setMsg(null);
+              const r = await updateStaffEmail(profileId, email);
+              if (r.ok) {
+                setMsg("Saved");
+                router.refresh();
+              } else {
+                setError(r.error);
+              }
+            });
+          }}
+          className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+        {msg && <span className="text-xs text-green-700">{msg}</span>}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+export function ActiveControl({
+  profileId,
+  isActive,
+}: {
+  profileId: string;
+  isActive: boolean;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Account status</span>
+      <p className="mt-0.5 text-xs text-slate-500">
+        {isActive
+          ? "Active. Can sign in and appears in the active staff list, NQAITS export and reminders."
+          : "Inactive. Cannot sign in, greyed out at the bottom of the staff list, and excluded from NQAITS export and all outbound comms. Reactivating restores all of it."}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            const question = isActive
+              ? "Mark this staff member inactive? Their login is revoked immediately."
+              : "Reactivate this staff member? Their login is restored immediately.";
+            if (!confirm(question)) return;
+            start(async () => {
+              setError(null);
+              const r = await setStaffActive(profileId, !isActive);
+              if (r.ok) router.refresh();
+              else setError(r.error);
+            });
+          }}
+          className={`rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-40 ${
+            isActive
+              ? "border border-slate-300 text-slate-700"
+              : "bg-slate-900 text-white"
+          }`}
+        >
+          {pending ? "Saving…" : isActive ? "Mark inactive" : "Reactivate"}
+        </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+const DELETE_PHRASE = "permanently delete user";
+
+export function DeleteAccountControl({ profileId }: { profileId: string }) {
+  const router = useRouter();
+  const [phrase, setPhrase] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  return (
+    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm">
+      <span className="font-medium text-red-800">Permanently delete this account</span>
+      <p className="mt-0.5 text-xs text-red-700">
+        No undo. Removes the account and everything linked to it - sign-offs,
+        credentials, contracts and identity documents included - even if
+        that record has genuine verification history attached.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input
+          value={phrase}
+          onChange={(e) => setPhrase(e.target.value)}
+          disabled={pending}
+          placeholder={DELETE_PHRASE}
+          className="rounded-md border border-red-300 px-2 py-1 text-sm"
+        />
+        <button
+          type="button"
+          disabled={phrase.trim() !== DELETE_PHRASE || pending}
+          onClick={() => {
+            if (!confirm("This cannot be undone. Delete this account permanently?")) return;
+            start(async () => {
+              setError(null);
+              const r = await permanentlyDeleteStaff(profileId, phrase);
+              if (r && !r.ok) setError(r.error);
+              else router.push("/admin/staff");
+            });
+          }}
+          className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+        >
+          {pending ? "Deleting…" : "Delete permanently"}
+        </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
     </div>
   );
 }
