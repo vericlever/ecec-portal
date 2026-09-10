@@ -3,6 +3,7 @@ import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SOP_TIER_LABELS } from "@/lib/constants";
 import { reviewState } from "@/lib/sop-review";
+import { sopReviewStatusMap } from "@/lib/sop-review-status";
 
 export const dynamic = "force-dynamic";
 
@@ -40,16 +41,17 @@ export default async function AdminSopsPage() {
   await requireContentEditor();
   const supabase = createClient();
 
-  const [{ data: sops }, { data: services }, { data: roleLinks }] =
+  const [{ data: sops }, { data: services }, { data: roleLinks }, reviewStatus] =
     await Promise.all([
       supabase
         .from("sops")
         .select(
-          "id, name, target_tier, signoff_type, priority, body, published_body, published_version, service_id, next_review_date",
+          "id, name, target_tier, signoff_type, priority, body, published_body, published_version, service_id",
         )
         .order("name"),
       supabase.from("services").select("id, name"),
       supabase.from("job_role_sops").select("sop_id"),
+      sopReviewStatusMap(supabase),
     ]);
 
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
@@ -57,7 +59,10 @@ export default async function AdminSopsPage() {
   for (const l of roleLinks ?? [])
     roleCount.set(l.sop_id, (roleCount.get(l.sop_id) ?? 0) + 1);
 
-  const rows = (sops ?? []) as SopRow[];
+  const rows = (sops ?? []).map((s) => ({
+    ...s,
+    next_review_date: reviewStatus.get(s.id as string)?.nextReviewDate ?? null,
+  })) as SopRow[];
   const publishedCount = rows.filter((s) => s.published_version).length;
   const needsContent = rows.filter((s) => statusOf(s).label === "Needs content").length;
   const reviewOverdue = rows.filter(

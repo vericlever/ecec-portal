@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { documentTags } from "@/lib/document-tags";
+import { sopReviewStatusFor } from "@/lib/sop-review-status";
 import { SopEditor } from "./sop-editor";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,7 @@ export default async function SopDetailPage({
 
   const linkedRoleIds = new Set((links ?? []).map((l) => l.job_role_id));
   const tags = await documentTags(supabase, "sop", params.id);
+  const reviewStatus = await sopReviewStatusFor(supabase, params.id);
 
   return (
     <div className="max-w-2xl">
@@ -91,7 +93,7 @@ export default async function SopDetailPage({
           published_version: sop.published_version,
           published_at: sop.published_at,
           review_period_months: sop.review_period_months ?? 6,
-          next_review_date: sop.next_review_date ?? null,
+          next_review_date: reviewStatus.nextReviewDate,
           suggested_evidence: sop.suggested_evidence ?? "",
         }}
         history={historyRows}

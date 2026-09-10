@@ -47,7 +47,7 @@ async function ownedSop(id: string) {
   const { data } = await supabase
     .from("sops")
     .select(
-      "id, organisation_id, name, body, published_body, published_version, review_period_months, next_review_date",
+      "id, organisation_id, name, body, published_body, published_version, review_period_months",
     )
     .eq("id", id)
     .maybeSingle();

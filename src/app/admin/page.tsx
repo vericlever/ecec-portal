@@ -12,6 +12,7 @@ import { expiringCredentials } from "@/lib/credentials";
 import { contractAlerts } from "@/lib/contracts";
 import { unsignedAgreementsByProfile } from "@/lib/agreements";
 import { reviewState, HISTORY_EVENT_LABELS } from "@/lib/sop-review";
+import { sopReviewStatusMap } from "@/lib/sop-review-status";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
     { data: pubPolicies },
     { data: sopLinks },
     { data: history },
+    sopReviewStatus,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -56,7 +58,7 @@ export default async function DashboardPage() {
     supabase.from("services").select("id, name").order("name"),
     supabase
       .from("sops")
-      .select("id, name, next_review_date")
+      .select("id, name")
       .not("published_version", "is", null),
     supabase
       .from("policies")
@@ -79,6 +81,7 @@ export default async function DashboardPage() {
             created_at: string;
           }[],
         }),
+    sopReviewStatusMap(supabase),
   ]);
 
   const { data: unsignedContracts } = await supabase
@@ -139,11 +142,11 @@ export default async function DashboardPage() {
     (p) => (stats.get(p.id)?.outstanding ?? 0) > 0,
   ).length;
 
-  // --- review cycle (Steps 20 & 21) ------------------------------------
+  // --- review cycle (Review cycle v2) -----------------------------------
   type ReviewItem = { id: string; name: string; kind: "Procedure" | "Policy"; label: string; overdue: boolean };
   const reviewItems: ReviewItem[] = [];
   for (const s of pubSops ?? []) {
-    const r = reviewState(s.next_review_date as string | null);
+    const r = reviewState(sopReviewStatus.get(s.id as string)?.nextReviewDate ?? null);
     if (r.status === "overdue" || r.status === "soon")
       reviewItems.push({
         id: s.id as string,

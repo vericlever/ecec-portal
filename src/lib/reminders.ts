@@ -111,6 +111,7 @@ export async function runReminders(opts?: {
     { data: profiles },
     { data: roleSops },
     { data: pubSops },
+    { data: sopReviewStatusRows },
     { data: pubPolicies },
     { data: signOffs },
     { data: policyViews },
@@ -133,8 +134,9 @@ export async function runReminders(opts?: {
     admin.from("job_role_sops").select("job_role_id, sop_id"),
     admin
       .from("sops")
-      .select("id, name, organisation_id, published_version, signoff_type, next_review_date")
+      .select("id, name, organisation_id, published_version, signoff_type")
       .not("published_version", "is", null),
+    admin.from("sop_review_status").select("sop_id, next_review_date"),
     admin
       .from("policies")
       .select("id, name, organisation_id, service_id, published_version, next_review_date")
@@ -375,9 +377,12 @@ export async function runReminders(opts?: {
   // --- manager digests -------------------------------------------------
 
   // review-due SOPs and policies per org (content editors only)
+  const sopNextReviewDate = new Map(
+    (sopReviewStatusRows ?? []).map((r) => [r.sop_id as string, r.next_review_date as string | null]),
+  );
   const reviewDueByOrg = new Map<string, string[]>();
   for (const s of pubSops ?? []) {
-    const d = s.next_review_date as string | null;
+    const d = sopNextReviewDate.get(s.id as string) ?? null;
     if (!d || daysUntil(d) > REVIEW_WINDOW_DAYS) continue;
     const list = reviewDueByOrg.get(s.organisation_id as string) ?? [];
     list.push(`Procedure: ${s.name} (${reviewPhrase(d)})`);

@@ -85,7 +85,8 @@ const TABLES = {
   notification_rules: "organisation_id",
   password_reset_requests: "organisation_id",
   sop_history: "organisation_id",
-  sop_observations: "organisation_id",
+  sop_reviews: "organisation_id",
+  sop_review_actions: "organisation_id",
   staff_import_records: "organisation_id",
   comprehension_questions: "organisation_id",
   credential_types: null,
@@ -291,7 +292,7 @@ const APP_SCENARIOS = [
     expectOk: true,
     setup: async (c) => {
       await c.query(
-        `update public.sops set published_version=1, published_body='test', next_review_date=null where id=$1`,
+        `update public.sops set published_version=1, published_body='test' where id=$1`,
         [SELF_AND_MANAGER_SOP],
       );
       await c.query(
@@ -316,7 +317,7 @@ const APP_SCENARIOS = [
     expectOk: false,
     setup: async (c) => {
       await c.query(
-        `update public.sops set published_version=1, published_body='test', next_review_date=null where id=$1`,
+        `update public.sops set published_version=1, published_body='test' where id=$1`,
         [SELF_AND_MANAGER_SOP],
       );
       const s = await c.query(
@@ -339,7 +340,7 @@ const APP_SCENARIOS = [
     expectOk: false,
     setup: async (c) => {
       await c.query(
-        `update public.sops set published_version=1, published_body='test', next_review_date=null where id=$1`,
+        `update public.sops set published_version=1, published_body='test' where id=$1`,
         [SELF_AND_MANAGER_SOP],
       );
       const s = await c.query(
@@ -441,6 +442,114 @@ const APP_SCENARIOS = [
       const r = await c.query(`select count(*)::int n from storage.objects where bucket_id='documents'`);
       return { rowCount: r.rows[0].n };
     },
+  },
+
+  // sop_reviews / sop_review_actions (migrations 0039-0040, Review cycle v2).
+  {
+    label: "manager completes a review (sop_reviews insert)",
+    expectOk: true,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','stands')`,
+        [RSG, RSG_SOP, MANAGER],
+      ),
+  },
+  {
+    label: "plain staff attempts to complete a review",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','stands')`,
+        [RSG, RSG_SOP, STAFF],
+      ),
+  },
+  {
+    label: "manager spoofs reviewed_by to someone else",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','stands')`,
+        [RSG, RSG_SOP, STAFF],
+      ),
+  },
+  {
+    label: "SK admin inserts a review against an RSG sop",
+    expectOk: false,
+    as: SK_ADMIN,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','stands')`,
+        [RSG, RSG_SOP, SK_ADMIN],
+      ),
+  },
+  {
+    label: "manager raises a review action",
+    expectOk: true,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','needs_revision') returning id`,
+        [RSG, RSG_SOP, MANAGER],
+      );
+      c._reviewId = r.rows[0].id;
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_review_actions (organisation_id, review_id, sop_id, description, raised_from, owner_id, due_date)
+         values ($1,$2,$3,'Refresh training','practice',$4,current_date + 14)`,
+        [RSG, c._reviewId, RSG_SOP, STAFF],
+      ),
+  },
+  {
+    label: "action owner (plain staff) marks their own action done",
+    expectOk: true,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','needs_revision') returning id`,
+        [RSG, RSG_SOP, MANAGER],
+      );
+      const a = await c.query(
+        `insert into public.sop_review_actions (organisation_id, review_id, sop_id, description, raised_from, owner_id, due_date)
+         values ($1,$2,$3,'Refresh training','practice',$4,current_date + 14) returning id`,
+        [RSG, r.rows[0].id, RSG_SOP, STAFF],
+      );
+      c._actionId = a.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) =>
+      c.query(`update public.sop_review_actions set status='done', completed_by=$1, completed_at=now() where id=$2`, [
+        STAFF,
+        c._actionId,
+      ]),
+  },
+  {
+    label: "unrelated staff (not owner, not manager) updates someone else's action",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','needs_revision') returning id`,
+        [RSG, RSG_SOP, MANAGER],
+      );
+      const a = await c.query(
+        `insert into public.sop_review_actions (organisation_id, review_id, sop_id, description, raised_from, owner_id, due_date)
+         values ($1,$2,$3,'Refresh training','practice',$4,current_date + 14) returning id`,
+        [RSG, r.rows[0].id, RSG_SOP, MANAGER],
+      );
+      c._actionId = a.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) =>
+      c.query(`update public.sop_review_actions set status='cancelled' where id=$1`, [c._actionId]),
   },
 ];
 
