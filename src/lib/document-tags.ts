@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   MAX_QUALITY_AREAS,
   MAX_CHILD_SAFE_STANDARDS,
@@ -28,9 +27,12 @@ const CAP_LABEL: Record<TagKind, string> = {
 };
 
 // Attach or detach one tag on one document. The caller must already have
-// verified the document belongs to `organisationId` and that the actor may edit
-// content. Uses the admin client (writes bypass RLS); the DB cap trigger is the
-// final backstop, and its raise is turned into a friendly error here.
+// verified the document belongs to `organisationId`. Writes go through the
+// caller's own RLS-scoped client - document_quality_areas_write /
+// document_child_safe_standards_write both require can_edit_content(), so this
+// still fails for anyone who isn't a content editor even if a caller forgot
+// its own check. The DB cap trigger is the final backstop, and its raise is
+// turned into a friendly error here.
 export async function writeDocumentTag(opts: {
   kind: TagKind;
   documentType: DocumentTagType;
@@ -40,12 +42,12 @@ export async function writeDocumentTag(opts: {
   attach: boolean;
   actorId: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const admin = createAdminClient();
+  const supabase = createClient();
   const table = TABLE[opts.kind];
   const col = TAG_COLUMN[opts.kind];
 
   if (!opts.attach) {
-    const { error } = await admin
+    const { error } = await supabase
       .from(table)
       .delete()
       .eq("document_type", opts.documentType)
@@ -55,7 +57,7 @@ export async function writeDocumentTag(opts: {
     return { ok: true };
   }
 
-  const { error } = await admin.from(table).insert({
+  const { error } = await supabase.from(table).insert({
     organisation_id: opts.organisationId,
     document_type: opts.documentType,
     document_id: opts.documentId,

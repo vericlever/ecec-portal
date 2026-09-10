@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { cleanReviewPeriod } from "@/lib/constants";
 import { reviewDateFromNow } from "@/lib/sop-review";
@@ -14,7 +13,7 @@ type Result = { ok: true; id?: string } | { ok: false; error: string };
 type SopEvent = "edit" | "period_change" | "review";
 
 async function logSopEvent(
-  admin: ReturnType<typeof createAdminClient>,
+  db: ReturnType<typeof createClient>,
   opts: {
     organisationId: string;
     sopId: string;
@@ -24,7 +23,7 @@ async function logSopEvent(
     detail?: Record<string, unknown>;
   },
 ) {
-  await admin.from("sop_history").insert({
+  await db.from("sop_history").insert({
     organisation_id: opts.organisationId,
     sop_id: opts.sopId,
     event_type: opts.eventType,
@@ -68,8 +67,8 @@ export async function createSop(input: {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "A name is required." };
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
+  const db = createClient();
+  const { data, error } = await db
     .from("sops")
     .insert({
       organisation_id: me.organisation_id,
@@ -118,8 +117,8 @@ export async function updateSopMeta(
     return { ok: false, error: "Priority must be a number." };
   }
 
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("sops")
     .update({
       name,
@@ -153,8 +152,8 @@ export async function updateSopSuggestedEvidence(
 ): Promise<Result> {
   const owned = await ownedSop(id);
   if (!owned) return { ok: false, error: "Procedure not found." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("sops")
     .update({ suggested_evidence: text.trim() || null, updated_by: owned.me.id })
     .eq("id", id);
@@ -171,7 +170,7 @@ export async function updateSopBody(
 ): Promise<Result> {
   const owned = await ownedSop(id);
   if (!owned) return { ok: false, error: "Procedure not found." };
-  const admin = createAdminClient();
+  const db = createClient();
 
   const patch: Record<string, unknown> = {
     body: body.trim() || null,
@@ -184,10 +183,10 @@ export async function updateSopBody(
     patch.next_review_date = newDue;
   }
 
-  const { error } = await admin.from("sops").update(patch).eq("id", id);
+  const { error } = await db.from("sops").update(patch).eq("id", id);
   if (error) return { ok: false, error: error.message };
 
-  await logSopEvent(admin, {
+  await logSopEvent(db, {
     organisationId: owned.sop.organisation_id,
     sopId: id,
     eventType: "edit",
@@ -228,8 +227,8 @@ export async function updateSopReview(
   const prevDate = (owned.sop.next_review_date as string | null) ?? null;
   if (period === prevPeriod && date === prevDate) return { ok: true };
 
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("sops")
     .update({
       review_period_months: period,
@@ -245,7 +244,7 @@ export async function updateSopReview(
   if (date !== prevDate)
     parts.push(`next review ${prevDate ?? "unset"} → ${date ?? "unset"}`);
 
-  await logSopEvent(admin, {
+  await logSopEvent(db, {
     organisationId: owned.sop.organisation_id,
     sopId: id,
     eventType: "period_change",
@@ -276,8 +275,8 @@ export async function markSopReviewed(
   const period = cleanReviewPeriod(owned.sop.review_period_months);
   const newDue = reviewDateFromNow(period);
 
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("sops")
     // Recording a review also clears any needs-review flag a practice
     // observation raised (Step 21).
@@ -289,7 +288,7 @@ export async function markSopReviewed(
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
-  await logSopEvent(admin, {
+  await logSopEvent(db, {
     organisationId: owned.sop.organisation_id,
     sopId: id,
     eventType: "review",
@@ -315,9 +314,9 @@ export async function publishSop(id: string): Promise<Result> {
   if (!owned.sop.body || !owned.sop.body.trim()) {
     return { ok: false, error: "Add the procedure text before publishing." };
   }
-  const admin = createAdminClient();
+  const db = createClient();
   const next = (owned.sop.published_version ?? 0) + 1;
-  const { error } = await admin
+  const { error } = await db
     .from("sops")
     .update({
       published_version: next,
@@ -339,8 +338,8 @@ export async function publishSop(id: string): Promise<Result> {
 export async function unpublishSop(id: string): Promise<Result> {
   const owned = await ownedSop(id);
   if (!owned) return { ok: false, error: "Procedure not found." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("sops")
     .update({ published_version: null, published_at: null, published_body: null })
     .eq("id", id);
@@ -354,14 +353,14 @@ export async function unpublishSop(id: string): Promise<Result> {
 export async function deleteSop(id: string): Promise<Result> {
   const owned = await ownedSop(id);
   if (!owned) return { ok: false, error: "Procedure not found." };
-  const admin = createAdminClient();
-  const { data: docs } = await admin
+  const db = createClient();
+  const { data: docs } = await db
     .from("documents")
     .select("id")
     .eq("owner_type", "sop")
     .eq("owner_id", id);
   for (const d of docs ?? []) await deleteDocument(d.id);
-  const { error } = await admin.from("sops").delete().eq("id", id);
+  const { error } = await db.from("sops").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/sops");
   return { ok: true };
@@ -378,8 +377,8 @@ export async function uploadSopDocument(
     return { ok: false, error: "Choose a file." };
   }
 
-  const admin = createAdminClient();
-  const { data: existing } = await admin
+  const db = createClient();
+  const { data: existing } = await db
     .from("documents")
     .select("id")
     .eq("owner_type", "sop")
@@ -405,7 +404,7 @@ export async function uploadSopDocument(
   if ((!owned.sop.body || !owned.sop.body.trim()) && stored.document.extracted_text) {
     patch.body = stored.document.extracted_text;
   }
-  await admin.from("sops").update(patch).eq("id", id);
+  await db.from("sops").update(patch).eq("id", id);
 
   revalidatePath(`/admin/sops/${id}`);
   return { ok: true };
@@ -418,10 +417,10 @@ export async function setJobRole(
 ): Promise<Result> {
   const owned = await ownedSop(sopId);
   if (!owned) return { ok: false, error: "Procedure not found." };
-  const admin = createAdminClient();
+  const db = createClient();
 
   if (attach) {
-    const { data: role } = await admin
+    const { data: role } = await db
       .from("job_roles")
       .select("id, organisation_id")
       .eq("id", jobRoleId)
@@ -429,7 +428,7 @@ export async function setJobRole(
     if (!role || role.organisation_id !== owned.sop.organisation_id) {
       return { ok: false, error: "That job role is not in your organisation." };
     }
-    const { error } = await admin.from("job_role_sops").insert({
+    const { error } = await db.from("job_role_sops").insert({
       organisation_id: owned.sop.organisation_id,
       job_role_id: jobRoleId,
       sop_id: sopId,
@@ -438,7 +437,7 @@ export async function setJobRole(
       return { ok: false, error: error.message };
     }
   } else {
-    const { error } = await admin
+    const { error } = await db
       .from("job_role_sops")
       .delete()
       .eq("sop_id", sopId)
@@ -446,11 +445,11 @@ export async function setJobRole(
     if (error) return { ok: false, error: error.message };
   }
 
-  const { count } = await admin
+  const { count } = await db
     .from("job_role_sops")
     .select("sop_id", { count: "exact", head: true })
     .eq("job_role_id", jobRoleId);
-  await admin
+  await db
     .from("job_roles")
     .update({ is_placeholder: (count ?? 0) === 0 })
     .eq("id", jobRoleId);
@@ -533,12 +532,12 @@ export async function bulkImportSops(
     ? String(formData.get("newSignoffType"))
     : "self";
 
-  const admin = createAdminClient();
+  const db = createClient();
 
   // Validate the chosen roles belong to this org up front.
   let validRoleIds: string[] = [];
   if (newRoleIds.length) {
-    const { data: roles } = await admin
+    const { data: roles } = await db
       .from("job_roles")
       .select("id")
       .eq("organisation_id", me.organisation_id)
@@ -551,7 +550,7 @@ export async function bulkImportSops(
   for (const file of files) {
     const sopName = file.name.replace(/\.[A-Za-z0-9]+$/, "").trim();
     try {
-      const { data: existing } = await admin
+      const { data: existing } = await db
         .from("sops")
         .select("id, body")
         .eq("organisation_id", me.organisation_id)
@@ -564,7 +563,7 @@ export async function bulkImportSops(
         sopId = existing.id;
         attached = true;
       } else {
-        const { data: created, error } = await admin
+        const { data: created, error } = await db
           .from("sops")
           .insert({
             organisation_id: me.organisation_id,
@@ -589,7 +588,7 @@ export async function bulkImportSops(
 
         // Attach the new SOP to the chosen job roles.
         for (const roleId of validRoleIds) {
-          await admin.from("job_role_sops").insert({
+          await db.from("job_role_sops").insert({
             organisation_id: me.organisation_id,
             job_role_id: roleId,
             sop_id: sopId,
@@ -622,7 +621,7 @@ export async function bulkImportSops(
       if (!hadBody && gotText) {
         patch.body = stored.document.extracted_text;
       }
-      await admin.from("sops").update(patch).eq("id", sopId);
+      await db.from("sops").update(patch).eq("id", sopId);
 
       outcomes.push({
         fileName: file.name,
@@ -644,11 +643,11 @@ export async function bulkImportSops(
 
   // A role that just gained SOPs is no longer a placeholder.
   for (const roleId of validRoleIds) {
-    const { count } = await admin
+    const { count } = await db
       .from("job_role_sops")
       .select("sop_id", { count: "exact", head: true })
       .eq("job_role_id", roleId);
-    await admin
+    await db
       .from("job_roles")
       .update({ is_placeholder: (count ?? 0) === 0 })
       .eq("id", roleId);
@@ -689,27 +688,27 @@ export async function finishBulkSops(
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
   if (items.length === 0) return { ok: false, error: "Nothing to publish." };
 
-  const admin = createAdminClient();
+  const db = createClient();
   const ids = items.map((i) => i.sopId);
-  const { data: rows } = await admin
+  const { data: rows } = await db
     .from("sops")
     .select("id, name, organisation_id, body, published_version")
     .in("id", ids);
   const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
 
-  const { data: policies } = await admin
+  const { data: policies } = await db
     .from("policies")
     .select("id")
     .eq("organisation_id", me.organisation_id);
   const validPolicy = new Set((policies ?? []).map((p) => p.id as string));
 
-  const { data: roles } = await admin
+  const { data: roles } = await db
     .from("job_roles")
     .select("id")
     .eq("organisation_id", me.organisation_id);
   const validRole = new Set((roles ?? []).map((r) => r.id as string));
 
-  const { data: currentLinks } = await admin
+  const { data: currentLinks } = await db
     .from("job_role_sops")
     .select("sop_id, job_role_id")
     .in("sop_id", ids);
@@ -748,7 +747,7 @@ export async function finishBulkSops(
       update.current_version = next;
     }
 
-    const { error } = await admin
+    const { error } = await db
       .from("sops")
       .update(update)
       .eq("id", item.sopId);
@@ -762,7 +761,7 @@ export async function finishBulkSops(
     const have = rolesBySop.get(item.sopId) ?? new Set<string>();
     for (const roleId of want) {
       if (!have.has(roleId)) {
-        await admin.from("job_role_sops").insert({
+        await db.from("job_role_sops").insert({
           organisation_id: me.organisation_id,
           job_role_id: roleId,
           sop_id: item.sopId,
@@ -772,7 +771,7 @@ export async function finishBulkSops(
     }
     for (const roleId of have) {
       if (!want.has(roleId)) {
-        await admin
+        await db
           .from("job_role_sops")
           .delete()
           .eq("sop_id", item.sopId)
@@ -783,7 +782,7 @@ export async function finishBulkSops(
 
     for (const pid of item.linkedPolicyIds) {
       if (!validPolicy.has(pid)) continue;
-      const { error: linkErr } = await admin.from("policy_sop_links").insert({
+      const { error: linkErr } = await db.from("policy_sop_links").insert({
         organisation_id: me.organisation_id,
         policy_id: pid,
         sop_id: item.sopId,
@@ -799,11 +798,11 @@ export async function finishBulkSops(
 
   // A role that gained or lost SOPs may no longer (or now) be a placeholder.
   for (const roleId of touchedRoles) {
-    const { count } = await admin
+    const { count } = await db
       .from("job_role_sops")
       .select("sop_id", { count: "exact", head: true })
       .eq("job_role_id", roleId);
-    await admin
+    await db
       .from("job_roles")
       .update({ is_placeholder: (count ?? 0) === 0 })
       .eq("id", roleId);

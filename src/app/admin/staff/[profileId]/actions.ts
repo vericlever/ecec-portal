@@ -192,8 +192,8 @@ export async function uploadContract(
   // upload, based on the document they are looking at.
   const isDeed = formData.get("is_deed") === "on";
 
-  const admin = createAdminClient();
-  const { data: contract, error } = await admin
+  const supabase = createClient();
+  const { data: contract, error } = await supabase
     .from("contracts")
     .insert({
       organisation_id: gate.organisationId,
@@ -223,10 +223,10 @@ export async function uploadContract(
     uploadedBy: gate.me.id,
   });
   if (!stored.ok) {
-    await admin.from("contracts").delete().eq("id", contract.id);
+    await supabase.from("contracts").delete().eq("id", contract.id);
     return { ok: false, error: stored.error };
   }
-  await admin
+  await supabase
     .from("contracts")
     .update({ document_id: stored.document.id })
     .eq("id", contract.id);
@@ -237,10 +237,12 @@ export async function uploadContract(
 }
 
 // A staff member reads and accepts their own active contract by typing their
-// full legal name (Step 39 - replaces the tick-box). Verified in code (the
-// staff member is not in contracts_write RLS) then written with the admin
-// client, recording their name, their profile id, the time, and a hash of the
-// exact document they were shown. A deed is never signed this way.
+// full legal name (Step 39 - replaces the tick-box). sign_own_contract is a
+// SECURITY DEFINER function (migration 0044): contracts_write RLS doesn't
+// cover a self-write at all (only admin / hr_manager-at-service may write that
+// table), and this operation must only ever be able to touch the signature
+// fields, never the contract's terms - not something a table policy can
+// express, so it goes through the function's own checks instead.
 export async function signOwnContract(
   contractId: string,
   typedName: string,
@@ -250,8 +252,8 @@ export async function signOwnContract(
   const name = typedName.trim();
   if (!name) return { ok: false, error: "Type your full legal name to sign." };
 
-  const admin = createAdminClient();
-  const { data: contract } = await admin
+  const supabase = createClient();
+  const { data: contract } = await supabase
     .from("contracts")
     .select("id, profile_id, superseded_at, signed_at, is_deed, document_id")
     .eq("id", contractId)
@@ -271,15 +273,11 @@ export async function signOwnContract(
   if (contract.signed_at) return { ok: true };
 
   const hash = await documentSha256(contract.document_id);
-  const { error } = await admin
-    .from("contracts")
-    .update({
-      signed_at: new Date().toISOString(),
-      signed_name: name,
-      signed_by: me.id,
-      signed_content_hash: hash,
-    })
-    .eq("id", contractId);
+  const { error } = await supabase.rpc("sign_own_contract", {
+    p_contract_id: contractId,
+    p_signed_name: name,
+    p_signed_content_hash: hash,
+  });
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/onboarding");
@@ -288,8 +286,9 @@ export async function signOwnContract(
 }
 
 // HR manager or Admin countersigns, independent of the employee slot -
-// gated the same as canManageContractFor (contracts_write RLS: Admin
-// org-wide, HR manager at the worker's own service).
+// countersign_contract is the SECURITY DEFINER counterpart to
+// sign_own_contract, gated the same as contracts_write (Admin org-wide, HR
+// manager at the worker's own service).
 export async function countersignContract(
   contractId: string,
   typedName: string,
@@ -301,24 +300,24 @@ export async function countersignContract(
   const name = typedName.trim();
   if (!name) return { ok: false, error: "Type your full legal name to countersign." };
 
-  const admin = createAdminClient();
-  const { data: contract } = await admin
+  const supabase = createClient();
+  const { data: contract } = await supabase
     .from("contracts")
-    .select("id, profile_id, superseded_at, is_deed, document_id, countersigned_at")
+    .select("id, profile_id, organisation_id, superseded_at, is_deed, document_id, countersigned_at")
     .eq("id", contractId)
     .maybeSingle();
-  if (!contract) return { ok: false, error: "Contract not found." };
-
-  const { data: worker } = await admin
-    .from("profiles")
-    .select("organisation_id, service_id")
-    .eq("id", contract.profile_id)
-    .maybeSingle();
-  if (!worker || worker.organisation_id !== me.organisation_id) {
+  if (!contract || contract.organisation_id !== me.organisation_id) {
     return { ok: false, error: "Contract not found." };
   }
-  if (!isAdmin(me.access_tier) && worker.service_id !== me.service_id) {
-    return { ok: false, error: "That staff member is not at your service." };
+  if (!isAdmin(me.access_tier) && contract.profile_id) {
+    const { data: worker } = await supabase
+      .from("profiles")
+      .select("service_id")
+      .eq("id", contract.profile_id)
+      .maybeSingle();
+    if (!worker || worker.service_id !== me.service_id) {
+      return { ok: false, error: "That staff member is not at your service." };
+    }
   }
   if (contract.superseded_at) {
     return { ok: false, error: "This contract has been replaced." };
@@ -332,15 +331,11 @@ export async function countersignContract(
   if (contract.countersigned_at) return { ok: true };
 
   const hash = await documentSha256(contract.document_id);
-  const { error } = await admin
-    .from("contracts")
-    .update({
-      countersigned_at: new Date().toISOString(),
-      countersigned_name: name,
-      countersigned_by: me.id,
-      countersigned_content_hash: hash,
-    })
-    .eq("id", contractId);
+  const { error } = await supabase.rpc("countersign_contract", {
+    p_contract_id: contractId,
+    p_signed_name: name,
+    p_signed_content_hash: hash,
+  });
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/staff", "layout");
@@ -353,8 +348,8 @@ export async function deleteContract(contractId: string): Promise<Result> {
   if (!me || !isHrManager(me)) {
     return { ok: false, error: "You are not allowed to manage contracts." };
   }
-  const admin = createAdminClient();
-  const { data: contract } = await admin
+  const supabase = createClient();
+  const { data: contract } = await supabase
     .from("contracts")
     .select("id, profile_id, organisation_id, document_id")
     .eq("id", contractId)
@@ -366,18 +361,18 @@ export async function deleteContract(contractId: string): Promise<Result> {
   if (!gate.ok) return gate;
 
   if (contract.document_id) await deleteDocument(contract.document_id);
-  await admin.from("contracts").delete().eq("id", contractId);
+  await supabase.from("contracts").delete().eq("id", contractId);
 
   // Restore the most recent remaining period as the active one, so a mistaken
   // upload can be undone cleanly.
-  const { data: remaining } = await admin
+  const { data: remaining } = await supabase
     .from("contracts")
     .select("id")
     .eq("profile_id", contract.profile_id)
     .order("created_at", { ascending: false })
     .limit(1);
   if (remaining && remaining.length > 0) {
-    await admin
+    await supabase
       .from("contracts")
       .update({ superseded_at: null })
       .eq("id", remaining[0].id);
@@ -454,7 +449,7 @@ export async function uploadIdentityDocument(
     uploadedBy: me.id,
   });
   if (!stored.ok) {
-    await createAdminClient().from("identity_documents").delete().eq("id", row.id);
+    await supabase.from("identity_documents").delete().eq("id", row.id);
     return { ok: false, error: stored.error };
   }
   await supabase
@@ -471,8 +466,8 @@ export async function uploadIdentityDocument(
 export async function deleteIdentityDocument(id: string): Promise<Result> {
   const me = await getProfile();
   if (!me) return { ok: false, error: "Sign in." };
-  const admin = createAdminClient();
-  const { data: row } = await admin
+  const supabase = createClient();
+  const { data: row } = await supabase
     .from("identity_documents")
     .select("id, profile_id, organisation_id, document_id, sighted_at")
     .eq("id", id)
@@ -486,7 +481,7 @@ export async function deleteIdentityDocument(id: string): Promise<Result> {
   }
   if (row.profile_id !== me.id && !isHrManager(me)) {
     // fall through to worker managers at the same service
-    const { data: target } = await admin
+    const { data: target } = await supabase
       .from("profiles")
       .select("service_id")
       .eq("id", row.profile_id)
@@ -497,7 +492,7 @@ export async function deleteIdentityDocument(id: string): Promise<Result> {
   }
 
   if (row.document_id) await deleteDocument(row.document_id);
-  await admin.from("identity_documents").delete().eq("id", id);
+  await supabase.from("identity_documents").delete().eq("id", id);
 
   revalidatePath("/admin/staff", "layout");
   revalidatePath("/admin/verification");
@@ -562,9 +557,9 @@ export async function setStaffJobRole(
 ): Promise<Result> {
   const me = await getProfile();
   if (!me) return { ok: false, error: "Sign in." };
-  const admin = createAdminClient();
+  const supabase = createClient();
 
-  const { data: person } = await admin
+  const { data: person } = await supabase
     .from("profiles")
     .select("id, organisation_id, service_id")
     .eq("id", profileId)
@@ -580,7 +575,7 @@ export async function setStaffJobRole(
   }
 
   if (jobRoleId) {
-    const { data: role } = await admin
+    const { data: role } = await supabase
       .from("job_roles")
       .select("id, organisation_id")
       .eq("id", jobRoleId)
@@ -590,7 +585,7 @@ export async function setStaffJobRole(
     }
   }
 
-  const { error } = await admin
+  const { error } = await supabase
     .from("profiles")
     .update({ job_role_id: jobRoleId })
     .eq("id", profileId);
@@ -619,8 +614,8 @@ export async function setStaffAccessTier(
     return { ok: false, error: "You cannot change your own access level." };
   }
 
-  const admin = createAdminClient();
-  const { data: person } = await admin
+  const supabase = createClient();
+  const { data: person } = await supabase
     .from("profiles")
     .select("id, organisation_id, access_tier")
     .eq("id", profileId)
@@ -632,7 +627,7 @@ export async function setStaffAccessTier(
 
   // Demoting the last admin would lock the organisation out.
   if (person.access_tier === "admin" && tier !== "admin") {
-    const { count } = await admin
+    const { count } = await supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .eq("organisation_id", me.organisation_id)
@@ -645,7 +640,7 @@ export async function setStaffAccessTier(
     }
   }
 
-  const { error } = await admin
+  const { error } = await supabase
     .from("profiles")
     .update({ access_tier: tier as AccessTier })
     .eq("id", profileId);
@@ -658,7 +653,10 @@ export async function setStaffAccessTier(
 // Trigger a password reset email for a staff member. Admin anywhere in the
 // organisation, or an HR manager for staff at their own service. The person who
 // triggers it never sees or sets the password - Supabase mints the token and
-// the staff member follows the emailed link.
+// the staff member follows the emailed link. generatePasswordResetLink needs
+// auth.admin.generateLink, which only the service-role client can call, so
+// this one stays on it rather than swapping - there is no RLS-equivalent for
+// an operation against Supabase's own auth schema.
 export async function sendPasswordResetForStaff(
   profileId: string,
 ): Promise<Result> {

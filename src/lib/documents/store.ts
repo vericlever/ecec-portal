@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractDocument } from "@/lib/documents/extract";
 
@@ -20,8 +21,12 @@ function safeName(name: string): string {
 }
 
 // Store an uploaded file: put the bytes in the private bucket, extract text,
-// and write one row in documents. Uses the service-role client - callers must
-// already have checked the user is allowed to do this.
+// and write one row in documents. The bucket itself has no per-object RLS
+// (Storage policies are a separate, wider piece of work), so file storage
+// stays on the service-role client - but the documents *row* goes through the
+// caller's own RLS-scoped client, so documents_write (migration 0044) is the
+// real gate on who may attach a file to what, per owner_type, not just this
+// function's callers remembering to check first.
 export async function storeDocument(opts: {
   organisationId: string;
   ownerType:
@@ -63,7 +68,8 @@ export async function storeDocument(opts: {
       (e instanceof Error ? e.message : "unknown error");
   }
 
-  const { data, error } = await admin
+  const supabase = createClient();
+  const { data, error } = await supabase
     .from("documents")
     .insert({
       organisation_id: opts.organisationId,
@@ -88,7 +94,9 @@ export async function storeDocument(opts: {
 }
 
 // A short-lived signed URL to download the original file. The caller must
-// already have confirmed the user may see the owning record.
+// already have confirmed the user may see the owning record - this stays on
+// the service-role client because it always runs after that check, and the
+// bucket read itself has no separate RLS to hand it to anyway.
 export async function signedDocumentUrl(
   documentId: string,
 ): Promise<{ url: string; fileName: string } | null> {

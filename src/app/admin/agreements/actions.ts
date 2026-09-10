@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -28,8 +27,8 @@ export async function createAgreement(input: {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "A name is required." };
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
+  const db = createClient();
+  const { data, error } = await db
     .from("hr_agreements")
     .insert({
       organisation_id: me.organisation_id,
@@ -61,10 +60,10 @@ export async function updateAgreementMeta(
   const name = input.name.trim();
   if (!name) return { ok: false, error: "A name is required." };
 
-  const admin = createAdminClient();
+  const db = createClient();
 
   if (input.linkedPolicyId) {
-    const { data: policy } = await admin
+    const { data: policy } = await db
       .from("policies")
       .select("id, organisation_id")
       .eq("id", input.linkedPolicyId)
@@ -74,7 +73,7 @@ export async function updateAgreementMeta(
     }
   }
 
-  const { error } = await admin
+  const { error } = await db
     .from("hr_agreements")
     .update({
       name,
@@ -102,8 +101,8 @@ export async function updateAgreementBody(
 ): Promise<Result> {
   const owned = await ownedAgreement(id);
   if (!owned) return { ok: false, error: "Agreement not found." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("hr_agreements")
     .update({ body: body.trim() || null, updated_by: owned.me.id })
     .eq("id", id);
@@ -118,9 +117,9 @@ export async function publishAgreement(id: string): Promise<Result> {
   if (!owned.agreement.body || !owned.agreement.body.trim()) {
     return { ok: false, error: "Add the agreement text before publishing." };
   }
-  const admin = createAdminClient();
+  const db = createClient();
   const next = (owned.agreement.published_version ?? 0) + 1;
-  const { error } = await admin
+  const { error } = await db
     .from("hr_agreements")
     .update({
       published_version: next,
@@ -139,8 +138,8 @@ export async function publishAgreement(id: string): Promise<Result> {
 export async function unpublishAgreement(id: string): Promise<Result> {
   const owned = await ownedAgreement(id);
   if (!owned) return { ok: false, error: "Agreement not found." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("hr_agreements")
     .update({ published_version: null, published_at: null, published_body: null })
     .eq("id", id);
@@ -154,8 +153,8 @@ export async function unpublishAgreement(id: string): Promise<Result> {
 export async function deleteAgreement(id: string): Promise<Result> {
   const owned = await ownedAgreement(id);
   if (!owned) return { ok: false, error: "Agreement not found." };
-  const admin = createAdminClient();
-  const { error } = await admin.from("hr_agreements").delete().eq("id", id);
+  const db = createClient();
+  const { error } = await db.from("hr_agreements").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/agreements");
   return { ok: true };
@@ -168,10 +167,10 @@ export async function setAgreementJobRole(
 ): Promise<Result> {
   const owned = await ownedAgreement(agreementId);
   if (!owned) return { ok: false, error: "Agreement not found." };
-  const admin = createAdminClient();
+  const db = createClient();
 
   if (attach) {
-    const { data: role } = await admin
+    const { data: role } = await db
       .from("job_roles")
       .select("id, organisation_id")
       .eq("id", jobRoleId)
@@ -179,7 +178,7 @@ export async function setAgreementJobRole(
     if (!role || role.organisation_id !== owned.agreement.organisation_id) {
       return { ok: false, error: "That job role is not in your organisation." };
     }
-    const { error } = await admin.from("hr_agreement_job_roles").insert({
+    const { error } = await db.from("hr_agreement_job_roles").insert({
       organisation_id: owned.agreement.organisation_id,
       agreement_id: agreementId,
       job_role_id: jobRoleId,
@@ -188,7 +187,7 @@ export async function setAgreementJobRole(
       return { ok: false, error: error.message };
     }
   } else {
-    const { error } = await admin
+    const { error } = await db
       .from("hr_agreement_job_roles")
       .delete()
       .eq("agreement_id", agreementId)

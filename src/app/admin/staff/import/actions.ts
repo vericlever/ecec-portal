@@ -121,11 +121,11 @@ export async function runImport(
 
   const ctx = await loadContext();
   const validated = validateAll(parsed.records, ctx);
-  const admin = createAdminClient();
+  const supabase = createClient();
   const org = me.organisation_id;
   const source = format === "json" ? "json" : "csv";
 
-  const { data: orgRow } = await createClient()
+  const { data: orgRow } = await supabase
     .from("organisations")
     .select("name")
     .eq("id", org)
@@ -137,7 +137,7 @@ export async function runImport(
 
   for (const r of validated) {
     if (!r.ok) {
-      await admin.from("staff_import_records").insert({
+      await supabase.from("staff_import_records").insert({
         organisation_id: org,
         source,
         raw_data: r.rec.values,
@@ -154,8 +154,8 @@ export async function runImport(
       continue;
     }
 
-    const result = await importOne(admin, org, r.worker);
-    await admin.from("staff_import_records").insert({
+    const result = await importOne(supabase, org, r.worker);
+    await supabase.from("staff_import_records").insert({
       organisation_id: org,
       source,
       raw_data: r.rec.values,
@@ -215,12 +215,17 @@ type OneResult =
   | { ok: false; error: string };
 
 async function importOne(
-  admin: ReturnType<typeof createAdminClient>,
+  supabase: ReturnType<typeof createClient>,
   org: string,
   w: ParsedWorker,
 ): Promise<OneResult> {
   const tempPassword = "vc-" + randomBytes(6).toString("base64url");
 
+  // Creating the actual auth user is the one step with no RLS equivalent -
+  // auth.admin.createUser only exists on the service-role client. Everything
+  // else in this function is a table write by an already-authenticated admin
+  // (requireAdmin gates the caller), so it goes through their own client.
+  const admin = createAdminClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: w.email,
     password: tempPassword,
@@ -237,7 +242,7 @@ async function importOne(
   }
   const userId = created.user.id;
 
-  const { error: profileErr } = await admin.from("profiles").insert({
+  const { error: profileErr } = await supabase.from("profiles").insert({
     id: userId,
     organisation_id: org,
     service_id: w.service_id,
@@ -257,7 +262,7 @@ async function importOne(
   // gap from the staff record rather than re-create the account.
   const problems: string[] = [];
 
-  const { error: wdErr } = await admin.from("worker_details").insert({
+  const { error: wdErr } = await supabase.from("worker_details").insert({
     profile_id: userId,
     organisation_id: org,
     ...w.worker_details,
@@ -268,7 +273,7 @@ async function importOne(
   if (wdErr) problems.push(`worker details: ${wdErr.message}`);
 
   if (w.wwcc) {
-    const { error } = await admin.from("wwcc_checks").insert({
+    const { error } = await supabase.from("wwcc_checks").insert({
       profile_id: userId,
       organisation_id: org,
       check_number: w.wwcc.check_number,
@@ -281,7 +286,7 @@ async function importOne(
   }
 
   if (w.teacher) {
-    const { error } = await admin.from("teacher_registrations").insert({
+    const { error } = await supabase.from("teacher_registrations").insert({
       profile_id: userId,
       organisation_id: org,
       check_number: w.teacher.check_number,
@@ -294,7 +299,7 @@ async function importOne(
   }
 
   if (w.qualification) {
-    const { error } = await admin.from("qualifications").insert({
+    const { error } = await supabase.from("qualifications").insert({
       profile_id: userId,
       organisation_id: org,
       qualification_type: w.qualification.qualification_type,
@@ -311,7 +316,7 @@ async function importOne(
   }
 
   for (const t of w.training) {
-    const { error } = await admin.from("training_records").insert({
+    const { error } = await supabase.from("training_records").insert({
       profile_id: userId,
       organisation_id: org,
       training_type: t.training_type,

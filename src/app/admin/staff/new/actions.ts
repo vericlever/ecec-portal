@@ -53,10 +53,10 @@ export async function createStaff(
     : "staff";
   const serviceId = isAdmin(me.access_tier) ? serviceInput : me.service_id;
 
-  const admin = createAdminClient();
+  const supabase = createClient();
 
   if (serviceId) {
-    const { data: service } = await admin
+    const { data: service } = await supabase
       .from("services")
       .select("id")
       .eq("id", serviceId)
@@ -68,7 +68,7 @@ export async function createStaff(
   }
 
   if (jobRoleId) {
-    const { data: role } = await admin
+    const { data: role } = await supabase
       .from("job_roles")
       .select("id")
       .eq("id", jobRoleId)
@@ -81,6 +81,9 @@ export async function createStaff(
 
   const password = tempPassword();
 
+  // Creating the actual auth user is the one step with no RLS equivalent -
+  // auth.admin.createUser only exists on the service-role client.
+  const admin = createAdminClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
@@ -97,8 +100,11 @@ export async function createStaff(
     };
   }
 
-  // organisation_id comes from the caller's own profile, never the form.
-  const { error: profileErr } = await admin.from("profiles").insert({
+  // organisation_id comes from the caller's own profile, never the form. This
+  // goes through the caller's own RLS-scoped client: profiles_write already
+  // allows an admin org-wide or a manager creating a staff-tier row at their
+  // own service, matching the gate above.
+  const { error: profileErr } = await supabase.from("profiles").insert({
     id: created.user.id,
     organisation_id: me.organisation_id,
     service_id: serviceId,
@@ -122,7 +128,7 @@ export async function createStaff(
   if (link.ok) {
     inviteLink = link.link;
     if (emailEnabled()) {
-      const { data: org } = await createClient()
+      const { data: org } = await supabase
         .from("organisations")
         .select("name")
         .eq("id", me.organisation_id)

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getProfile, isManager } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { cleanReviewPeriod } from "@/lib/constants";
 import { reviewDateFromNow } from "@/lib/sop-review";
 import { storeDocument } from "@/lib/documents/store";
@@ -34,8 +34,8 @@ export async function logSopObservation(
     return { ok: false, error: "Choose an outcome." };
   }
 
-  const admin = createAdminClient();
-  const { data: sop } = await admin
+  const supabase = createClient();
+  const { data: sop } = await supabase
     .from("sops")
     .select(
       "id, organisation_id, name, review_period_months, next_review_date, published_version",
@@ -72,7 +72,7 @@ export async function logSopObservation(
     evidenceDocumentId = stored.document.id;
   }
 
-  const { error: obsErr } = await admin.from("sop_observations").insert({
+  const { error: obsErr } = await supabase.from("sop_observations").insert({
     organisation_id: me.organisation_id,
     sop_id: sopId,
     observed_by_profile_id: me.id,
@@ -84,14 +84,21 @@ export async function logSopObservation(
   });
   if (obsErr) return { ok: false, error: obsErr.message };
 
-  const sopPatch: Record<string, unknown> = { updated_by: me.id };
-  if (outcome === "needs_review") sopPatch.needs_review = true;
-  if (newDue) sopPatch.next_review_date = newDue;
-  await admin.from("sops").update(sopPatch).eq("id", sopId);
+  // needs_review / next_review_date live behind can_edit_content() on
+  // sops_write, but a plain manager (not a content editor) is allowed to flag
+  // a review from an observation - flag_sop_needs_review is the narrow,
+  // SECURITY DEFINER carve-out for exactly that, and nothing else on the row.
+  const { error: flagErr } = await supabase.rpc("flag_sop_needs_review", {
+    p_sop_id: sopId,
+    p_needs_review: outcome === "needs_review",
+    p_next_review_date: newDue,
+    p_updated_by: me.id,
+  });
+  if (flagErr) return { ok: false, error: flagErr.message };
 
   const excerpt =
     evidence.length > 120 ? evidence.slice(0, 117) + "…" : evidence;
-  await admin.from("sop_history").insert({
+  await supabase.from("sop_history").insert({
     organisation_id: me.organisation_id,
     sop_id: sopId,
     event_type: "review",

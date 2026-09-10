@@ -9,7 +9,6 @@ import {
   canEditContent,
 } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -31,8 +30,8 @@ export async function createJobRole(name: string): Promise<Result> {
   const clean = name.trim();
   if (!clean) return { ok: false, error: "A name is required." };
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
+  const db = createClient();
+  const { data, error } = await db
     .from("job_roles")
     .insert({
       organisation_id: me.organisation_id,
@@ -58,8 +57,8 @@ export async function renameJobRole(id: string, name: string): Promise<Result> {
   if (!owned) return { ok: false, error: "Job role not found." };
   const clean = name.trim();
   if (!clean) return { ok: false, error: "A name is required." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("job_roles")
     .update({ name: clean })
     .eq("id", id);
@@ -79,8 +78,8 @@ export async function renameJobRole(id: string, name: string): Promise<Result> {
 export async function deleteJobRole(id: string): Promise<Result> {
   const owned = await ownedRole(id);
   if (!owned) return { ok: false, error: "Job role not found." };
-  const admin = createAdminClient();
-  const { count } = await admin
+  const db = createClient();
+  const { count } = await db
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("job_role_id", id);
@@ -90,7 +89,7 @@ export async function deleteJobRole(id: string): Promise<Result> {
       error: `${count} staff member${count === 1 ? " is" : "s are"} assigned this role. Move them to another role first.`,
     };
   }
-  const { error } = await admin.from("job_roles").delete().eq("id", id);
+  const { error } = await db.from("job_roles").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/job-roles");
   return { ok: true };
@@ -103,10 +102,10 @@ export async function setSopInRole(
 ): Promise<Result> {
   const owned = await ownedRole(roleId);
   if (!owned) return { ok: false, error: "Job role not found." };
-  const admin = createAdminClient();
+  const db = createClient();
 
   if (attach) {
-    const { data: sop } = await admin
+    const { data: sop } = await db
       .from("sops")
       .select("id, organisation_id")
       .eq("id", sopId)
@@ -114,7 +113,7 @@ export async function setSopInRole(
     if (!sop || sop.organisation_id !== owned.role.organisation_id) {
       return { ok: false, error: "That procedure is not in your organisation." };
     }
-    const { error } = await admin.from("job_role_sops").insert({
+    const { error } = await db.from("job_role_sops").insert({
       organisation_id: owned.role.organisation_id,
       job_role_id: roleId,
       sop_id: sopId,
@@ -123,7 +122,7 @@ export async function setSopInRole(
       return { ok: false, error: error.message };
     }
   } else {
-    const { error } = await admin
+    const { error } = await db
       .from("job_role_sops")
       .delete()
       .eq("job_role_id", roleId)
@@ -131,7 +130,7 @@ export async function setSopInRole(
     if (error) return { ok: false, error: error.message };
   }
 
-  await syncPlaceholder(admin, roleId);
+  await syncPlaceholder(db, roleId);
   revalidatePath(`/admin/job-roles/${roleId}`);
   revalidatePath("/admin/job-roles");
   revalidatePath("/admin/sops");
@@ -155,10 +154,10 @@ export async function assignStaffToRole(
   roleId: string,
   profileId: string,
 ): Promise<Result> {
-  const admin = createAdminClient();
+  const db = createClient();
   const [{ data: role }, { data: person }] = await Promise.all([
-    admin.from("job_roles").select("id, organisation_id").eq("id", roleId).maybeSingle(),
-    admin
+    db.from("job_roles").select("id, organisation_id").eq("id", roleId).maybeSingle(),
+    db
       .from("profiles")
       .select("id, organisation_id, service_id")
       .eq("id", profileId)
@@ -172,7 +171,7 @@ export async function assignStaffToRole(
     return { ok: false, error: "You cannot assign staff to this role." };
   }
 
-  const { error } = await admin
+  const { error } = await db
     .from("profiles")
     .update({ job_role_id: roleId })
     .eq("id", profileId);
@@ -188,8 +187,8 @@ export async function removeStaffFromRole(
   roleId: string,
   profileId: string,
 ): Promise<Result> {
-  const admin = createAdminClient();
-  const { data: person } = await admin
+  const db = createClient();
+  const { data: person } = await db
     .from("profiles")
     .select("id, organisation_id, service_id, job_role_id")
     .eq("id", profileId)
@@ -202,7 +201,7 @@ export async function removeStaffFromRole(
     return { ok: false, error: "You cannot change this person's role." };
   }
 
-  const { error } = await admin
+  const { error } = await db
     .from("profiles")
     .update({ job_role_id: null })
     .eq("id", profileId);
@@ -215,14 +214,14 @@ export async function removeStaffFromRole(
 }
 
 async function syncPlaceholder(
-  admin: ReturnType<typeof createAdminClient>,
+  db: ReturnType<typeof createClient>,
   roleId: string,
 ) {
-  const { count } = await admin
+  const { count } = await db
     .from("job_role_sops")
     .select("sop_id", { count: "exact", head: true })
     .eq("job_role_id", roleId);
-  await admin
+  await db
     .from("job_roles")
     .update({ is_placeholder: (count ?? 0) === 0 })
     .eq("id", roleId);

@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
 import { cleanReviewPeriod } from "@/lib/constants";
 import { reviewDateFromNow } from "@/lib/sop-review";
@@ -15,13 +14,13 @@ type Result = { ok: true; id?: string } | { ok: false; error: string };
 // When replace is true, any category not in the list is removed. Falls back to
 // the "general" category when nothing valid is given and the policy has none.
 async function applyCategories(
-  admin: ReturnType<typeof createAdminClient>,
+  db: ReturnType<typeof createClient>,
   org: string,
   policyId: string,
   categoryIds: string[],
   opts: { replace: boolean },
 ) {
-  const { data: cats } = await admin
+  const { data: cats } = await db
     .from("policy_categories")
     .select("id, slug")
     .eq("organisation_id", org);
@@ -29,7 +28,7 @@ async function applyCategories(
   let wanted = categoryIds.filter((id) => valid.has(id));
 
   if (wanted.length === 0) {
-    const { data: existing } = await admin
+    const { data: existing } = await db
       .from("policy_category_links")
       .select("category_id")
       .eq("policy_id", policyId);
@@ -39,7 +38,7 @@ async function applyCategories(
     }
   }
 
-  const { data: current } = await admin
+  const { data: current } = await db
     .from("policy_category_links")
     .select("category_id")
     .eq("policy_id", policyId);
@@ -47,7 +46,7 @@ async function applyCategories(
 
   const toAdd = wanted.filter((id) => !have.has(id));
   if (toAdd.length) {
-    await admin.from("policy_category_links").insert(
+    await db.from("policy_category_links").insert(
       toAdd.map((id) => ({
         organisation_id: org,
         policy_id: policyId,
@@ -58,7 +57,7 @@ async function applyCategories(
   if (opts.replace) {
     const toRemove = [...have].filter((id) => !wanted.includes(id));
     for (const id of toRemove) {
-      await admin
+      await db
         .from("policy_category_links")
         .delete()
         .eq("policy_id", policyId)
@@ -91,8 +90,8 @@ export async function createPolicy(input: {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "A name is required." };
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
+  const db = createClient();
+  const { data, error } = await db
     .from("policies")
     .insert({
       organisation_id: me.organisation_id,
@@ -112,7 +111,7 @@ export async function createPolicy(input: {
         : error.message,
     };
   }
-  await applyCategories(admin, me.organisation_id, data.id, input.categoryIds, {
+  await applyCategories(db, me.organisation_id, data.id, input.categoryIds, {
     replace: false,
   });
   revalidatePath("/admin/policies");
@@ -126,18 +125,18 @@ export async function setPolicyCategory(
 ): Promise<Result> {
   const owned = await ownedPolicy(policyId);
   if (!owned) return { ok: false, error: "Policy not found." };
-  const admin = createAdminClient();
+  const db = createClient();
 
   if (attach) {
     await applyCategories(
-      admin,
+      db,
       owned.policy.organisation_id,
       policyId,
       [categoryId],
       { replace: false },
     );
   } else {
-    await admin
+    await db
       .from("policy_category_links")
       .delete()
       .eq("policy_id", policyId)
@@ -203,8 +202,8 @@ export async function updatePolicyMeta(
   const name = input.name.trim();
   if (!name) return { ok: false, error: "A name is required." };
 
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("policies")
     .update({
       name,
@@ -222,9 +221,9 @@ export async function updatePolicyMeta(
   }
 
   // Keep the targeting table in step with the policy's own site scope.
-  await admin.from("policy_audiences").delete().eq("policy_id", id).is("job_role_id", null);
+  await db.from("policy_audiences").delete().eq("policy_id", id).is("job_role_id", null);
   if (input.serviceId) {
-    await admin.from("policy_audiences").insert({
+    await db.from("policy_audiences").insert({
       organisation_id: owned.policy.organisation_id,
       policy_id: id,
       job_role_id: null,
@@ -243,8 +242,8 @@ export async function updatePolicyBody(
 ): Promise<Result> {
   const owned = await ownedPolicy(id);
   if (!owned) return { ok: false, error: "Policy not found." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("policies")
     .update({ body: body.trim() || null, updated_by: owned.me.id })
     .eq("id", id);
@@ -259,9 +258,9 @@ export async function publishPolicy(id: string): Promise<Result> {
   if (!owned.policy.body || !owned.policy.body.trim()) {
     return { ok: false, error: "Add the policy text before publishing." };
   }
-  const admin = createAdminClient();
+  const db = createClient();
   const next = (owned.policy.published_version ?? 0) + 1;
-  const { error } = await admin
+  const { error } = await db
     .from("policies")
     .update({
       published_version: next,
@@ -281,8 +280,8 @@ export async function publishPolicy(id: string): Promise<Result> {
 export async function unpublishPolicy(id: string): Promise<Result> {
   const owned = await ownedPolicy(id);
   if (!owned) return { ok: false, error: "Policy not found." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("policies")
     .update({ published_version: null, published_at: null, published_body: null })
     .eq("id", id);
@@ -305,8 +304,8 @@ export async function updatePolicyReview(
   const date = /^\d{4}-\d{2}-\d{2}$/.test(input.nextReviewDate)
     ? input.nextReviewDate
     : null;
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("policies")
     .update({
       review_period_months: cleanReviewPeriod(input.reviewPeriod),
@@ -324,8 +323,8 @@ export async function markPolicyReviewed(id: string): Promise<Result> {
   const owned = await ownedPolicy(id);
   if (!owned) return { ok: false, error: "Policy not found." };
   const period = cleanReviewPeriod(owned.policy.review_period_months);
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("policies")
     .update({
       next_review_date: reviewDateFromNow(period),
@@ -341,14 +340,14 @@ export async function markPolicyReviewed(id: string): Promise<Result> {
 export async function deletePolicy(id: string): Promise<Result> {
   const owned = await ownedPolicy(id);
   if (!owned) return { ok: false, error: "Policy not found." };
-  const admin = createAdminClient();
-  const { data: docs } = await admin
+  const db = createClient();
+  const { data: docs } = await db
     .from("documents")
     .select("id")
     .eq("owner_type", "policy")
     .eq("owner_id", id);
   for (const d of docs ?? []) await deleteDocument(d.id);
-  const { error } = await admin.from("policies").delete().eq("id", id);
+  const { error } = await db.from("policies").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/policies");
   return { ok: true };
@@ -365,9 +364,9 @@ export async function uploadPolicyDocument(
     return { ok: false, error: "Choose a file." };
   }
 
-  const admin = createAdminClient();
+  const db = createClient();
   // Replace any existing source document.
-  const { data: existing } = await admin
+  const { data: existing } = await db
     .from("documents")
     .select("id")
     .eq("owner_type", "policy")
@@ -398,7 +397,7 @@ export async function uploadPolicyDocument(
   ) {
     patch.body = stored.document.extracted_text;
   }
-  await admin.from("policies").update(patch).eq("id", id);
+  await db.from("policies").update(patch).eq("id", id);
 
   revalidatePath(`/admin/policies/${id}`);
   return { ok: true };
@@ -407,8 +406,8 @@ export async function uploadPolicyDocument(
 export async function linkSop(policyId: string, sopId: string): Promise<Result> {
   const owned = await ownedPolicy(policyId);
   if (!owned) return { ok: false, error: "Policy not found." };
-  const admin = createAdminClient();
-  const { data: sop } = await admin
+  const db = createClient();
+  const { data: sop } = await db
     .from("sops")
     .select("id, organisation_id")
     .eq("id", sopId)
@@ -416,7 +415,7 @@ export async function linkSop(policyId: string, sopId: string): Promise<Result> 
   if (!sop || sop.organisation_id !== owned.policy.organisation_id) {
     return { ok: false, error: "That procedure is not in your organisation." };
   }
-  const { error } = await admin.from("policy_sop_links").insert({
+  const { error } = await db.from("policy_sop_links").insert({
     organisation_id: owned.policy.organisation_id,
     policy_id: policyId,
     sop_id: sopId,
@@ -431,8 +430,8 @@ export async function linkSop(policyId: string, sopId: string): Promise<Result> 
 export async function unlinkSop(policyId: string, sopId: string): Promise<Result> {
   const owned = await ownedPolicy(policyId);
   if (!owned) return { ok: false, error: "Policy not found." };
-  const admin = createAdminClient();
-  const { error } = await admin
+  const db = createClient();
+  const { error } = await db
     .from("policy_sop_links")
     .delete()
     .eq("policy_id", policyId)
@@ -472,13 +471,13 @@ export async function bulkImportPolicies(
     .map((v) => String(v))
     .filter(Boolean);
 
-  const admin = createAdminClient();
+  const db = createClient();
   const outcomes: BulkOutcome[] = [];
 
   for (const file of files) {
     const policyName = file.name.replace(/\.[A-Za-z0-9]+$/, "").trim();
     try {
-      const { data: existing } = await admin
+      const { data: existing } = await db
         .from("policies")
         .select("id, body")
         .eq("organisation_id", me.organisation_id)
@@ -491,7 +490,7 @@ export async function bulkImportPolicies(
         policyId = existing.id;
         attached = true;
       } else {
-        const { data: created, error } = await admin
+        const { data: created, error } = await db
           .from("policies")
           .insert({
             organisation_id: me.organisation_id,
@@ -512,7 +511,7 @@ export async function bulkImportPolicies(
         }
         policyId = created.id;
         await applyCategories(
-          admin,
+          db,
           me.organisation_id,
           policyId,
           categoryIds,
@@ -552,7 +551,7 @@ export async function bulkImportPolicies(
       if (!hadBody && gotText) {
         patch.body = stored.document.extracted_text;
       }
-      await admin.from("policies").update(patch).eq("id", policyId);
+      await db.from("policies").update(patch).eq("id", policyId);
 
       outcomes.push({
         fileName: file.name,
@@ -605,15 +604,15 @@ export async function finishBulkPolicies(
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
   if (items.length === 0) return { ok: false, error: "Nothing to publish." };
 
-  const admin = createAdminClient();
+  const db = createClient();
   const ids = items.map((i) => i.policyId);
-  const { data: rows } = await admin
+  const { data: rows } = await db
     .from("policies")
     .select("id, name, organisation_id, body, published_version")
     .in("id", ids);
   const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
 
-  const { data: sops } = await admin
+  const { data: sops } = await db
     .from("sops")
     .select("id")
     .eq("organisation_id", me.organisation_id);
@@ -628,7 +627,7 @@ export async function finishBulkPolicies(
     if (!policy || policy.organisation_id !== me.organisation_id) continue;
 
     await applyCategories(
-      admin,
+      db,
       me.organisation_id,
       item.policyId,
       item.categoryIds,
@@ -654,7 +653,7 @@ export async function finishBulkPolicies(
       update.current_version = next;
     }
 
-    const { error } = await admin
+    const { error } = await db
       .from("policies")
       .update(update)
       .eq("id", item.policyId);
@@ -665,7 +664,7 @@ export async function finishBulkPolicies(
 
     for (const sid of item.linkedSopIds) {
       if (!validSop.has(sid)) continue;
-      const { error: linkErr } = await admin.from("policy_sop_links").insert({
+      const { error: linkErr } = await db.from("policy_sop_links").insert({
         organisation_id: me.organisation_id,
         policy_id: item.policyId,
         sop_id: sid,
