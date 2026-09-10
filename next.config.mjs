@@ -24,7 +24,7 @@ const nextConfig = {
     // (which reads straight from the full node_modules on disk). This forces
     // those font files to be included alongside the report routes.
     outputFileTracingIncludes: {
-      "/reports/**": ["./node_modules/pdfkit/js/standard-fonts/*.cjs"],
+      "/reports/**": ["./node_modules/pdfkit/js/standard-fonts/**/*.cjs"],
     },
   },
 };
