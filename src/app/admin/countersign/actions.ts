@@ -33,11 +33,20 @@ export async function countersignSop(signOffId: string): Promise<Result> {
     return { ok: false, error: "This procedure does not need a manager countersign." };
   }
 
-  const { error } = await supabase
+  // sign_offs_update (migration 0045) only allows a covering manager or admin
+  // to affect a row - a manager outside that scope gets 0 rows back, not an
+  // error, so that has to be checked explicitly rather than trusting a lack
+  // of `error` to mean the write happened.
+  const { data: updated, error } = await supabase
     .from("sign_offs")
     .update({ verified_by: me.id, verified_at: new Date().toISOString() })
-    .eq("id", signOffId);
+    .eq("id", signOffId)
+    .select("id")
+    .maybeSingle();
   if (error) return { ok: false, error: error.message };
+  if (!updated) {
+    return { ok: false, error: "You do not cover this staff member's service." };
+  }
 
   revalidatePath("/admin/countersign");
   revalidatePath("/admin/staff", "layout");

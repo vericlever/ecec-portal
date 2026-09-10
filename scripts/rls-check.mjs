@@ -5,7 +5,11 @@
 //   node scripts/rls-check.mjs
 //
 // Reads DATABASE_URL from .env.local (same as run-sql.mjs). Read-only: every
-// probe runs inside a transaction that is rolled back.
+// probe runs inside a transaction that is rolled back - including the second
+// section below, which exercises specific application write paths (not just
+// "is this table admittable") and asserts on rows actually affected, since a
+// blocked update or delete returns success with zero rows rather than an
+// error - a plain try/catch around the statement would call that a pass.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -31,6 +35,20 @@ const USERS = [
   { label: "SK staff (Educator)", uid: "f504ce94-e3c0-4584-8ac7-64cbe810a889", org: SK },
   { label: "anon (no JWT)", uid: null, org: null },
 ];
+
+// Named test identities and fixtures reused by the app-write-path probes below.
+const ADMIN = "92ce67f0-463b-4689-baff-663668f66b9f"; // Pot pots, RSG admin
+const MANAGER = "bfb97d5e-e176-484a-bc94-b9fd8c3c8d3f"; // Jamie, RSG manager_staff, Timboon
+const STAFF = "a5895163-3db5-4029-86f1-c9ad7e06271b"; // Sam Rivers, RSG staff, Timboon, role Educator
+const SK_ADMIN = "e6e5394f-c492-4ef8-b2c0-68ba66f40b67";
+const TIMBOON = "b0000000-0000-4000-8000-000000000001"; // Sam & Jamie's service
+const MORTLAKE = "b0000000-0000-4000-8000-000000000002"; // the "other" RSG service
+const EDUCATOR_ROLE = "9749aa24-8c74-4359-83f0-83c75e45fbbf"; // Sam's job role
+const SELF_AND_MANAGER_SOP = "8a61bf03-443a-4ff3-bc2b-7f5a7105adee"; // one of the 9, currently a draft
+const RSG_SOP = "46f2280d-7e73-4365-bd57-9b617c2c6702"; // any published RSG sop
+const RSG_POLICY = "c7be62dc-117a-413b-940b-3fb98241c8cd"; // any published RSG policy
+const SK_SOP = "1652ad78-50c1-487e-9e24-59b56bf7b291"; // any SK sop
+const RSG_WWCC = "b77efe6f-4a35-41d1-ad79-9f61825be818"; // Sam's WWCC row, already sighted
 
 // table -> the column that carries the tenant boundary (null = no org column)
 const TABLES = {
@@ -80,6 +98,7 @@ const client = new pg.Client({
 });
 
 const problems = [];
+const notes = [];
 
 async function probe(user) {
   await client.query("begin");
@@ -166,6 +185,32 @@ const WRITE_PROBES = [
     sql: `update public.worker_payroll set bank_bsb='000000' where organisation_id=$1`,
     params: [RSG],
   },
+  {
+    label: "SK admin writes an RSG sop",
+    uid: SK_ADMIN,
+    sql: `update public.sops set name = name where id = $1`,
+    params: [RSG_SOP],
+  },
+  {
+    label: "RSG admin writes an SK sop",
+    uid: ADMIN,
+    sql: `update public.sops set name = name where id = $1`,
+    params: [SK_SOP],
+  },
+  {
+    label: "staff inserts sign_offs for someone else",
+    uid: STAFF,
+    sql: `insert into public.sign_offs (organisation_id, service_id, user_id, sop_id, sop_version)
+          values ($1,$2,$3,$4,1)`,
+    params: [RSG, TIMBOON, MANAGER, RSG_SOP],
+  },
+  {
+    label: "staff inserts policy_views for someone else",
+    uid: STAFF,
+    sql: `insert into public.policy_views (organisation_id, user_id, policy_id, policy_version)
+          values ($1,$2,$3,1)`,
+    params: [RSG, MANAGER, RSG_POLICY],
+  },
 ];
 
 async function writeProbe(p) {
@@ -190,16 +235,278 @@ async function writeProbe(p) {
   console.log(`  ${p.label.padEnd(42)} ${outcome}`);
 }
 
+// --- application write-path scenarios --------------------------------------
+// Each scenario runs in its own begin/rollback transaction. `setup` (if given)
+// runs BEFORE the identity switch, as the connection's normal unrestricted
+// role - it exists to put fixture data in a state the test needs (an admin
+// having already made someone a content editor, published a draft SOP so it
+// can be signed, etc.), not to test anything itself. `probe` runs AFTER the
+// switch, as the actual identity under test, and its return value must carry
+// a `rowCount` (or the scenario can't tell a block from a success). expectOk
+// says whether the security model SHOULD allow it; a mismatch is a real
+// finding, not just a script bug, and is reported either way.
+async function as(uid) {
+  await client.query("set local role authenticated");
+  await client.query(`select set_config('request.jwt.claims', $1, true)`, [
+    JSON.stringify({ sub: uid, role: "authenticated" }),
+  ]);
+}
+
+async function scenario(label, { setup, as: uid, probe: run, expectOk, note }) {
+  await client.query("begin");
+  let ok = false;
+  let detail = "";
+  try {
+    if (setup) await setup(client);
+    await as(uid);
+    const result = await run(client);
+    const rowCount = result?.rowCount;
+    ok = rowCount === undefined ? true : rowCount > 0;
+    detail = rowCount === undefined ? "ran" : `${rowCount} row(s)`;
+  } catch (e) {
+    ok = false;
+    detail = e.message.slice(0, 90);
+  } finally {
+    await client.query("rollback");
+  }
+  const good = ok === expectOk;
+  if (!good) {
+    problems.push(
+      `app write path: ${label} - expected ${expectOk ? "allowed" : "blocked"}, got ${ok ? "allowed" : "blocked"} (${detail})`,
+    );
+  }
+  if (note) notes.push(`${label}: ${note}`);
+  console.log(
+    `  [${good ? "OK" : "MISMATCH"}] ${label.padEnd(58)} expected ${expectOk ? "allowed" : "blocked"}, got ${ok ? "allowed" : "blocked"} (${detail})`,
+  );
+}
+
+const APP_SCENARIOS = [
+  // Manager cosign on the self_and_manager suite. All nine are still drafts
+  // (published_version is null) as of this run, so the setup step publishes
+  // one for the duration of the transaction only - there is otherwise no
+  // published self_and_manager SOP to test the real flow against at all.
+  {
+    label: "covering manager (same service) countersigns a self-sign",
+    expectOk: true,
+    setup: async (c) => {
+      await c.query(
+        `update public.sops set published_version=1, published_body='test', next_review_date=null where id=$1`,
+        [SELF_AND_MANAGER_SOP],
+      );
+      await c.query(
+        `insert into public.job_role_sops (organisation_id, job_role_id, sop_id) values ($1,$2,$3) on conflict do nothing`,
+        [RSG, EDUCATOR_ROLE, SELF_AND_MANAGER_SOP],
+      );
+      const s = await c.query(
+        `insert into public.sign_offs (organisation_id, service_id, user_id, sop_id, sop_version) values ($1,$2,$3,$4,1) returning id`,
+        [RSG, TIMBOON, STAFF, SELF_AND_MANAGER_SOP],
+      );
+      c._signOffId = s.rows[0].id;
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `update public.sign_offs set verified_by=$1, verified_at=now() where id=$2`,
+        [MANAGER, c._signOffId],
+      ),
+  },
+  {
+    label: "non-covering manager (different service) countersigns",
+    expectOk: false,
+    setup: async (c) => {
+      await c.query(
+        `update public.sops set published_version=1, published_body='test', next_review_date=null where id=$1`,
+        [SELF_AND_MANAGER_SOP],
+      );
+      const s = await c.query(
+        `insert into public.sign_offs (organisation_id, service_id, user_id, sop_id, sop_version) values ($1,$2,$3,$4,1) returning id`,
+        [RSG, TIMBOON, STAFF, SELF_AND_MANAGER_SOP],
+      );
+      c._signOffId = s.rows[0].id;
+      // move the manager to Mortlake for this probe only - Sam stays at Timboon.
+      await c.query(`update public.profiles set service_id=$1 where id=$2`, [MORTLAKE, MANAGER]);
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `update public.sign_offs set verified_by=$1, verified_at=now() where id=$2`,
+        [MANAGER, c._signOffId],
+      ),
+  },
+  {
+    label: "staff countersigns their own sign-off directly (migration 0045 closes this)",
+    expectOk: false,
+    setup: async (c) => {
+      await c.query(
+        `update public.sops set published_version=1, published_body='test', next_review_date=null where id=$1`,
+        [SELF_AND_MANAGER_SOP],
+      );
+      const s = await c.query(
+        `insert into public.sign_offs (organisation_id, service_id, user_id, sop_id, sop_version) values ($1,$2,$3,$4,1) returning id`,
+        [RSG, TIMBOON, STAFF, SELF_AND_MANAGER_SOP],
+      );
+      c._signOffId = s.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `update public.sign_offs set verified_by=$1, verified_at=now() where id=$2`,
+        [STAFF, c._signOffId],
+      ),
+  },
+
+  // WWCC / teacher registration sighting (migration 0017). The table's own
+  // _rw RLS policy (can_manage_worker) would, on its own, let any same-service
+  // manager through - not just a verifier. What actually closes that is the
+  // protect_sighted_fields() trigger (migration 0017), which is verifier-only
+  // for the sighting columns specifically and predates this round of changes
+  // entirely - confirming it still holds, not reporting a gap.
+  {
+    label: "non-verifier manager (not admin/hr_manager) sights a WWCC check",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(`update public.wwcc_checks set sighted_at=now(), sighted_by='Provider' where id=$1`, [
+        RSG_WWCC,
+      ]),
+    note: "blocked by protect_sighted_fields() (migration 0017, a BEFORE trigger), not by the table's own RLS policy - can_manage_worker() alone would have allowed it. Column-level protection like this is exactly what migration 0044's new SECURITY DEFINER functions do for contracts/sops; worth knowing this table already had its own version of the same idea.",
+  },
+  {
+    label: "admin sights a WWCC check",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) =>
+      c.query(`update public.wwcc_checks set sighted_at=now(), sighted_by='Provider' where id=$1`, [
+        RSG_WWCC,
+      ]),
+  },
+
+  // Bulk staff import writes worker_details as part of onboarding a new
+  // worker (importOne in staff/import/actions.ts). The UI entry point is
+  // admin-only (requireAdmin), but the underlying table allows a manager to
+  // manage a worker's details at their own service, matching setProbation's
+  // design - this checks that table's own RLS backstop directly. (A fresh
+  // profiles INSERT can't be simulated here without a real auth.users row to
+  // satisfy profiles_id_fkey - that row only ever gets created via
+  // auth.admin.createUser, which is exactly why account creation stays on the
+  // service-role client.)
+  {
+    label: "manager upserts worker_details for staff at their OWN service",
+    expectOk: true,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.worker_details (profile_id, organisation_id, on_probation)
+         values ($1,$2,false)
+         on conflict (profile_id) do update set on_probation = excluded.on_probation`,
+        [STAFF, RSG],
+      ),
+  },
+  {
+    label: "manager upserts worker_details for staff at a DIFFERENT service",
+    expectOk: false,
+    setup: async (c) => {
+      await c.query(`update public.profiles set service_id=$1 where id=$2`, [MORTLAKE, MANAGER]);
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.worker_details (profile_id, organisation_id, on_probation)
+         values ($1,$2,false)
+         on conflict (profile_id) do update set on_probation = excluded.on_probation`,
+        [STAFF, RSG],
+      ),
+  },
+
+  // Private documents Storage bucket: a separate policy set from table RLS.
+  // No storage.objects policies exist for it (confirmed directly against
+  // storage.buckets / pg_policies), so an authenticated user gets nothing -
+  // only the service-role client can reach it, which is by design.
+  {
+    label: "authenticated user uploads directly into the documents bucket",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into storage.objects (bucket_id, name, owner) values ('documents','rls-test/x.txt',$1)`,
+        [STAFF],
+      ),
+  },
+  {
+    label: "authenticated user lists the documents bucket",
+    expectOk: false,
+    as: STAFF,
+    probe: async (c) => {
+      const r = await c.query(`select count(*)::int n from storage.objects where bucket_id='documents'`);
+      return { rowCount: r.rows[0].n };
+    },
+  },
+];
+
 await client.connect();
 for (const u of USERS) await probe(u);
 console.log("\n=== write probes (all should be rejected or no-op) ===");
 for (const p of WRITE_PROBES) await writeProbe(p);
+console.log("\n=== application write-path scenarios ===");
+for (const s of APP_SCENARIOS) await scenario(s.label, s);
+
+// Sanity checks for the two server tasks that are meant to keep the
+// service-role key: run as the connection's own unrestricted role (no
+// `set local role authenticated`), so this exercises the same privilege
+// level runReminders() and a service-role-invoked import_documents() call
+// actually run under, without sending a real cron run's real emails.
+console.log("\n=== service-role tasks still work (reminders cron, document importer) ===");
+await client.query("begin");
+try {
+  const before = await client.query(`select count(*)::int n from public.notification_log`);
+  await client.query(
+    `insert into public.notification_log (organisation_id, recipient_profile_id, recipient_email, kind, detail)
+     values ($1,$2,'rls-test@example.invalid','staff_digest','{}'::jsonb)`,
+    [RSG, STAFF],
+  );
+  const after = await client.query(`select count(*)::int n from public.notification_log`);
+  const ok = after.rows[0].n === before.rows[0].n + 1;
+  console.log(`  notification_log insert (service role path)      ${ok ? "OK" : "FAILED"}`);
+  if (!ok) problems.push("service role: notification_log insert did not take");
+} catch (e) {
+  problems.push(`service role: notification_log insert threw: ${e.message.slice(0, 80)}`);
+  console.log(`  notification_log insert (service role path)      FAILED: ${e.message.slice(0, 80)}`);
+} finally {
+  await client.query("rollback");
+}
+
+await client.query("begin");
+try {
+  const r = await client.query(`select public.import_documents($1, '{}'::jsonb) as result`, [RSG]);
+  const result = r.rows[0].result;
+  const ok =
+    result &&
+    result.policies_upserted === 0 &&
+    result.sops_upserted === 0 &&
+    result.links_upserted === 0;
+  console.log(`  import_documents(org, {}) still callable          ${ok ? "OK" : "FAILED"}`);
+  if (!ok) problems.push(`service role: import_documents returned unexpected shape: ${JSON.stringify(result)}`);
+} catch (e) {
+  problems.push(`service role: import_documents threw: ${e.message.slice(0, 80)}`);
+  console.log(`  import_documents(org, {}) still callable          FAILED: ${e.message.slice(0, 80)}`);
+} finally {
+  await client.query("rollback");
+}
+notes.push(
+  "The reminders cron itself was not run live end-to-end (dryRun=1 still requires CRON_SECRET in production and a non-dry run would email real staff) - the check above confirms the exact insert shape it uses still succeeds under the service-role path; check Vercel's cron logs for the next scheduled run for full confirmation.",
+);
+
 await client.end();
 
 console.log("\n" + "=".repeat(50));
 if (problems.length === 0) {
-  console.log("PASS: no cross-tenant row visibility detected.");
+  console.log("PASS: no cross-tenant row visibility detected, no unexpected write-path result.");
 } else {
   console.log(`FAIL: ${problems.length} issue(s):`);
   for (const p of problems) console.log("  - " + p);
+}
+if (notes.length) {
+  console.log("\nNotes:");
+  for (const n of notes) console.log("  - " + n);
 }
