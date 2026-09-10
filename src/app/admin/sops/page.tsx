@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireContentEditor } from "@/lib/auth";
+import { requireManager, canEditContent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SOP_TIER_LABELS } from "@/lib/constants";
 import { reviewState } from "@/lib/sop-review";
@@ -39,7 +39,8 @@ const TONE: Record<string, string> = {
 };
 
 export default async function AdminSopsPage() {
-  await requireContentEditor();
+  const me = await requireManager();
+  const canEdit = canEditContent(me.access_tier);
   const supabase = createClient();
 
   const [{ data: sops }, { data: services }, { data: roleLinks }, reviewStatus] =
@@ -76,20 +77,22 @@ export default async function AdminSopsPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Procedures</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/admin/sops/bulk"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Bulk upload
-          </Link>
-          <Link
-            href="/admin/sops/new"
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
-          >
-            New Procedure
-          </Link>
-        </div>
+        {canEdit && (
+          <div className="flex gap-2">
+            <Link
+              href="/admin/sops/bulk"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Bulk upload
+            </Link>
+            <Link
+              href="/admin/sops/new"
+              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+            >
+              New Procedure
+            </Link>
+          </div>
+        )}
       </div>
 
       <p className="mt-1 text-sm text-slate-500">

@@ -9,7 +9,7 @@ import {
   SOP_TIER_LABELS,
   SOP_TIER_ORDER,
 } from "@/lib/constants";
-import { HISTORY_EVENT_LABELS, reviewState } from "@/lib/sop-review";
+import { HISTORY_EVENT_LABELS, fmtReviewDate, reviewState } from "@/lib/sop-review";
 import {
   deleteSop,
   publishSop,
@@ -21,6 +21,7 @@ import {
   updateSopMeta,
   uploadSopDocument,
 } from "../actions";
+import { setActionStatus } from "./review/actions";
 import { TagPicker } from "@/app/admin/_tags/tag-picker";
 import {
   CHILD_SAFE_STANDARDS,
@@ -43,6 +44,7 @@ type Sop = {
   published_at: string | null;
   review_period_months: number;
   next_review_date: string | null;
+  last_reviewed_at: string | null;
   latest_decision: "stands" | "needs_revision" | null;
   suggested_evidence: string;
 };
@@ -55,8 +57,16 @@ type HistoryRow = {
   actor: string;
 };
 
+type OpenAction = {
+  id: string;
+  description: string;
+  ownerName: string;
+  dueDate: string;
+};
+
 export function SopEditor({
   sop,
+  canEdit,
   services,
   jobRoles,
   linkedRoleIds,
@@ -65,8 +75,10 @@ export function SopEditor({
   signOffCount,
   sourceDoc,
   history,
+  openActions,
 }: {
   sop: Sop;
+  canEdit: boolean;
   services: { id: string; name: string }[];
   jobRoles: { id: string; name: string; is_placeholder: boolean }[];
   linkedRoleIds: string[];
@@ -80,6 +92,7 @@ export function SopEditor({
     extraction_note: string | null;
   } | null;
   history: HistoryRow[];
+  openActions: OpenAction[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -119,252 +132,314 @@ export function SopEditor({
 
   return (
     <div className="mt-3 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{sop.name}</h1>
-          <p className="mt-1 text-xs text-slate-500">
-            {published
-              ? `Published v${sop.published_version}` +
-                (sop.published_at
-                  ? ` on ${new Date(sop.published_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}`
-                  : "") +
-                (dirty ? " · unpublished changes below" : "")
-              : "Not published — staff cannot see this yet"}
-            {signOffCount > 0 && ` · ${signOffCount} sign-off${signOffCount === 1 ? "" : "s"} recorded`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              act(
-                () => publishSop(sop.id),
-                published ? "Published new version" : "Published",
-              )
-            }
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
-          >
-            {published ? (dirty ? "Publish changes" : "Re-publish") : "Publish"}
-          </button>
-          {published && (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => act(() => unpublishSop(sop.id), "Unpublished")}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-40"
-            >
-              Unpublish
-            </button>
+      {/* 1. Status header */}
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">{sop.name}</h1>
+            <p className="mt-1 text-xs text-slate-500">
+              {published
+                ? `Published v${sop.published_version}` +
+                  (sop.published_at
+                    ? ` on ${new Date(sop.published_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}`
+                    : "") +
+                  (canEdit && dirty ? " · unpublished changes below" : "")
+                : "Not published — staff cannot see this yet"}
+              {signOffCount > 0 && ` · ${signOffCount} sign-off${signOffCount === 1 ? "" : "s"} recorded`}
+            </p>
+          </div>
+          {canEdit && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  act(
+                    () => publishSop(sop.id),
+                    published ? "Published new version" : "Published",
+                  )
+                }
+                className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {published ? (dirty ? "Publish changes" : "Re-publish") : "Publish"}
+              </button>
+              {published && (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => act(() => unpublishSop(sop.id), "Unpublished")}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-40"
+                >
+                  Unpublish
+                </button>
+              )}
+            </div>
           )}
         </div>
+
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-slate-100 pt-3 text-sm sm:grid-cols-4">
+          <div>
+            <dt className="text-xs text-slate-400">Last review</dt>
+            <dd className="text-slate-700">
+              {sop.last_reviewed_at ? fmtReviewDate(sop.last_reviewed_at) : "Never"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-400">Next review due</dt>
+            <dd
+              className={
+                review.status === "overdue"
+                  ? "font-medium text-red-700"
+                  : review.status === "soon"
+                    ? "font-medium text-amber-700"
+                    : "text-slate-700"
+              }
+            >
+              {sop.next_review_date ? fmtReviewDate(sop.next_review_date) : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-400">Last decision</dt>
+            <dd className={sop.latest_decision === "needs_revision" ? "font-medium text-red-700" : "text-slate-700"}>
+              {sop.latest_decision === "needs_revision"
+                ? "Needs revision"
+                : sop.latest_decision === "stands"
+                  ? "Stands as written"
+                  : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-400">Open actions</dt>
+            <dd className={openActions.length > 0 ? "font-medium text-amber-700" : "text-slate-700"}>
+              {openActions.length}
+            </dd>
+          </div>
+        </dl>
+
+        {canEdit && published && dirty && (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+            Publishing changes bumps the version. Every staff member who signed the
+            old version has to read and sign again.
+          </p>
+        )}
       </div>
 
-      {published && dirty && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
-          Publishing changes bumps the version. Every staff member who signed the
-          old version has to read and sign again.
-        </p>
-      )}
       {msg && <p className="text-sm text-green-700">{msg}</p>}
       {err && <p className="text-sm text-red-600">{err}</p>}
 
-      {/* Details */}
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Details
-        </h2>
-        <div className="mt-3 space-y-3">
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Sign-off</span>
-              <select
-                value={signoffType}
-                onChange={(e) => setSignoffType(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+      {/* 2. The procedure */}
+      {canEdit ? (
+        <>
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Details
+            </h2>
+            <div className="mt-3 space-y-3">
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Name</span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Sign-off</span>
+                  <select
+                    value={signoffType}
+                    onChange={(e) => setSignoffType(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    <option value="self">Staff sign-off</option>
+                    <option value="self_and_manager">Staff and manager sign-off</option>
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Category</span>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    <option value="">None</option>
+                    {SOP_TIER_ORDER.map((t) => (
+                      <option key={t} value={t}>
+                        {SOP_TIER_LABELS[t]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">
+                    Priority <span className="font-normal text-slate-400">(optional)</span>
+                  </span>
+                  <input
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    inputMode="numeric"
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Site</span>
+                  <select
+                    value={serviceId}
+                    onChange={(e) => setServiceId(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    <option value="">All sites</option>
+                    {services.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} only
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Review every</span>
+                <select
+                  value={reviewPeriod}
+                  onChange={(e) => setReviewPeriod(Number(e.target.value))}
+                  className="mt-1 w-full max-w-[12rem] rounded-md border border-slate-300 px-3 py-2 text-sm"
+                >
+                  {REVIEW_PERIODS.map((p) => (
+                    <option key={p} value={p}>
+                      {REVIEW_PERIOD_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">
+                  Internal notes <span className="font-normal text-slate-400">(not shown to staff)</span>
+                </span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  act(
+                    () =>
+                      updateSopMeta(sop.id, {
+                        name,
+                        signoffType,
+                        category,
+                        priority,
+                        notes,
+                        serviceId: serviceId || null,
+                        reviewPeriod,
+                      }),
+                    "Details saved",
+                  )
+                }
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
               >
-                <option value="self">Staff sign-off</option>
-                <option value="self_and_manager">Staff and manager sign-off</option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Category</span>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="">None</option>
-                {SOP_TIER_ORDER.map((t) => (
-                  <option key={t} value={t}>
-                    {SOP_TIER_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">
-                Priority <span className="font-normal text-slate-400">(optional)</span>
-              </span>
-              <input
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                inputMode="numeric"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Site</span>
-              <select
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="">All sites</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} only
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Review every</span>
-            <select
-              value={reviewPeriod}
-              onChange={(e) => setReviewPeriod(Number(e.target.value))}
-              className="mt-1 w-full max-w-[12rem] rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {REVIEW_PERIODS.map((p) => (
-                <option key={p} value={p}>
-                  {REVIEW_PERIOD_LABELS[p]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">
-              Internal notes <span className="font-normal text-slate-400">(not shown to staff)</span>
-            </span>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              act(
-                () =>
-                  updateSopMeta(sop.id, {
-                    name,
-                    signoffType,
-                    category,
-                    priority,
-                    notes,
-                    serviceId: serviceId || null,
-                    reviewPeriod,
-                  }),
-                "Details saved",
-              )
-            }
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
-          >
-            Save details
-          </button>
-        </div>
-      </section>
+                Save details
+              </button>
+            </div>
+          </section>
 
-      {/* Document */}
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Source document
-        </h2>
-        {sourceDoc ? (
-          <p className="mt-2 text-sm">
-            <a
-              href={`/api/documents/${sourceDoc.id}`}
-              className="font-medium text-slate-800 underline"
-            >
-              {sourceDoc.file_name}
-            </a>
-            {sourceDoc.byte_size != null && (
-              <span className="text-slate-400">
-                {" "}
-                · {(sourceDoc.byte_size / 1024).toFixed(0)} KB
-              </span>
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Source document
+            </h2>
+            {sourceDoc ? (
+              <p className="mt-2 text-sm">
+                <a
+                  href={`/api/documents/${sourceDoc.id}`}
+                  className="font-medium text-slate-800 underline"
+                >
+                  {sourceDoc.file_name}
+                </a>
+                {sourceDoc.byte_size != null && (
+                  <span className="text-slate-400">
+                    {" "}
+                    · {(sourceDoc.byte_size / 1024).toFixed(0)} KB
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">No document uploaded.</p>
             )}
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">No document uploaded.</p>
-        )}
-        {sourceDoc?.extraction_note && (
-          <p className="mt-1 text-xs text-amber-700">{sourceDoc.extraction_note}</p>
-        )}
-        <form
-          className="mt-3 flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const f = fileRef.current?.files?.[0];
-            if (!f) return;
-            const fd = new FormData();
-            fd.append("file", f);
-            act(() => uploadSopDocument(sop.id, fd), "Document uploaded");
-            if (fileRef.current) fileRef.current.value = "";
-          }}
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".docx,.pdf,.txt,.md,.html,.htm"
-            className="text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-slate-50 file:px-3 file:py-1.5 file:text-xs file:font-medium"
-          />
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
-          >
-            Upload / replace
-          </button>
-        </form>
-      </section>
+            {sourceDoc?.extraction_note && (
+              <p className="mt-1 text-xs text-amber-700">{sourceDoc.extraction_note}</p>
+            )}
+            <form
+              className="mt-3 flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const f = fileRef.current?.files?.[0];
+                if (!f) return;
+                const fd = new FormData();
+                fd.append("file", f);
+                act(() => uploadSopDocument(sop.id, fd), "Document uploaded");
+                if (fileRef.current) fileRef.current.value = "";
+              }}
+            >
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".docx,.pdf,.txt,.md,.html,.htm"
+                className="text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-slate-50 file:px-3 file:py-1.5 file:text-xs file:font-medium"
+              />
+              <button
+                type="submit"
+                disabled={pending}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+              >
+                Upload / replace
+              </button>
+            </form>
+          </section>
 
-      {/* Text */}
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Procedure text staff read and sign
-        </h2>
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={16}
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
-        />
-        <button
-          type="button"
-          disabled={pending || body === sop.body}
-          onClick={() => act(() => updateSopBody(sop.id, body), "Text saved")}
-          className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
-        >
-          Save text
-        </button>
-      </section>
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Procedure text staff read and sign
+            </h2>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={16}
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+            />
+            <button
+              type="button"
+              disabled={pending || body === sop.body}
+              onClick={() => act(() => updateSopBody(sop.id, body), "Text saved")}
+              className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+            >
+              Save text
+            </button>
+          </section>
+        </>
+      ) : (
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            The procedure
+          </h2>
+          {published ? (
+            <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 font-mono text-xs text-slate-700">
+              {sop.published_body}
+            </pre>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">
+              Not published yet. Only a content editor can add or publish the text.
+            </p>
+          )}
+        </section>
+      )}
 
-      {/* Review */}
+      {/* 3. Review */}
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Review
@@ -380,28 +455,51 @@ export function SopEditor({
         >
           {review.label}
         </p>
-        {sop.latest_decision === "needs_revision" && (
-          <p className="mt-1 text-sm text-red-700">
-            The last review decided this procedure needs revision.
-          </p>
-        )}
         <Link
           href={`/admin/sops/${sop.id}/review`}
           className="mt-3 inline-block rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"
         >
           Review now
         </Link>
+
+        {openActions.length > 0 && (
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Open actions
+            </p>
+            <ul className="mt-2 space-y-2">
+              {openActions.map((a) => (
+                <li key={a.id} className="flex items-start justify-between gap-3 text-sm">
+                  <div>
+                    <p className="text-slate-700">{a.description}</p>
+                    <p className="text-xs text-slate-400">
+                      {a.ownerName} · due {fmtReviewDate(a.dueDate)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      act(() => setActionStatus(a.id, "done"), "Action marked done")
+                    }
+                    className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 disabled:opacity-40"
+                  >
+                    Mark done
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
-      {/* Review history */}
+      {/* 4. History - one timeline, no period_change rows */}
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Review history
+          History
         </h2>
         {history.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">
-            No edits or reviews recorded yet.
-          </p>
+          <p className="mt-2 text-sm text-slate-500">Nothing recorded yet.</p>
         ) : (
           <ul className="mt-2 divide-y divide-slate-100 text-sm">
             {history.map((h) => (
@@ -427,92 +525,94 @@ export function SopEditor({
         )}
       </section>
 
-      {/* Job roles */}
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Job roles that must complete this procedure
-        </h2>
-        <div className="mt-2 space-y-1.5">
-          {jobRoles.map((r) => (
-            <label key={r.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={linked.has(r.id)}
+      {canEdit && (
+        <>
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Job roles that must complete this procedure
+            </h2>
+            <div className="mt-2 space-y-1.5">
+              {jobRoles.map((r) => (
+                <label key={r.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={linked.has(r.id)}
+                    disabled={pending}
+                    onChange={(e) =>
+                      act(
+                        () => setJobRole(sop.id, r.id, e.target.checked),
+                        e.target.checked ? "Added to role" : "Removed from role",
+                      )
+                    }
+                  />
+                  <span>
+                    {r.name}
+                    {r.is_placeholder && (
+                      <span className="text-slate-400"> (no procedures attached yet)</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Quality areas and child safe standards
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Used by the coverage report and the child safety and quality area
+              reports. Not shown to staff.
+            </p>
+            <div className="mt-3 space-y-5">
+              <TagPicker
+                legend="NQS quality areas"
+                options={NQS_QUALITY_AREAS}
+                selectedIds={qualityAreaIds}
+                max={MAX_QUALITY_AREAS}
                 disabled={pending}
-                onChange={(e) =>
+                onToggle={(id, checked) =>
                   act(
-                    () => setJobRole(sop.id, r.id, e.target.checked),
-                    e.target.checked ? "Added to role" : "Removed from role",
+                    () => setSopQualityArea(sop.id, id, checked),
+                    checked ? "Quality area added" : "Quality area removed",
                   )
                 }
               />
-              <span>
-                {r.name}
-                {r.is_placeholder && (
-                  <span className="text-slate-400"> (no procedures attached yet)</span>
-                )}
-              </span>
-            </label>
-          ))}
-        </div>
-      </section>
+              <TagPicker
+                legend="Child safe standards"
+                options={CHILD_SAFE_STANDARDS}
+                selectedIds={childSafeStandardIds}
+                max={MAX_CHILD_SAFE_STANDARDS}
+                disabled={pending}
+                onToggle={(id, checked) =>
+                  act(
+                    () => setSopChildSafeStandard(sop.id, id, checked),
+                    checked ? "Standard added" : "Standard removed",
+                  )
+                }
+              />
+            </div>
+          </section>
 
-      {/* Quality areas and child safe standards */}
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Quality areas and child safe standards
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Used by the coverage report and the child safety and quality area
-          reports. Not shown to staff.
-        </p>
-        <div className="mt-3 space-y-5">
-          <TagPicker
-            legend="NQS quality areas"
-            options={NQS_QUALITY_AREAS}
-            selectedIds={qualityAreaIds}
-            max={MAX_QUALITY_AREAS}
-            disabled={pending}
-            onToggle={(id, checked) =>
-              act(
-                () => setSopQualityArea(sop.id, id, checked),
-                checked ? "Quality area added" : "Quality area removed",
-              )
-            }
-          />
-          <TagPicker
-            legend="Child safe standards"
-            options={CHILD_SAFE_STANDARDS}
-            selectedIds={childSafeStandardIds}
-            max={MAX_CHILD_SAFE_STANDARDS}
-            disabled={pending}
-            onToggle={(id, checked) =>
-              act(
-                () => setSopChildSafeStandard(sop.id, id, checked),
-                checked ? "Standard added" : "Standard removed",
-              )
-            }
-          />
-        </div>
-      </section>
-
-      <section>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            if (!confirm(`Delete "${sop.name}"? This cannot be undone.`)) return;
-            start(async () => {
-              const r = await deleteSop(sop.id);
-              if (r.ok) router.push("/admin/sops");
-              else setErr(r.error ?? "Could not delete.");
-            });
-          }}
-          className="text-xs font-medium text-red-600 underline"
-        >
-          Delete this procedure
-        </button>
-      </section>
+          <section>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                if (!confirm(`Delete "${sop.name}"? This cannot be undone.`)) return;
+                start(async () => {
+                  const r = await deleteSop(sop.id);
+                  if (r.ok) router.push("/admin/sops");
+                  else setErr(r.error ?? "Could not delete.");
+                });
+              }}
+              className="text-xs font-medium text-red-600 underline"
+            >
+              Delete this procedure
+            </button>
+          </section>
+        </>
+      )}
     </div>
   );
 }

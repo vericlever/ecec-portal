@@ -51,17 +51,20 @@ export function ManageMenu({
     }
     groups.push({ label: "Staff", items });
   }
-  // Library: content editors get the full editing set.
-  if (canEditContent) {
-    groups.push({
-      label: "Library",
-      items: [
-        { href: "/admin/policies", label: "Policies" },
-        { href: "/admin/sops", label: "Procedures" },
+  // Library: content editors get the full editing set. Any manager keeps
+  // Procedures too - Review cycle v2 lets manager_staff complete a review
+  // even though only a content editor may revise and republish the text.
+  if (canEditContent || canCountersign) {
+    const items: Item[] = [];
+    if (canEditContent) items.push({ href: "/admin/policies", label: "Policies" });
+    items.push({ href: "/admin/sops", label: "Procedures" });
+    if (canEditContent) {
+      items.push(
         { href: "/admin/agreements", label: "Agreements" },
         { href: "/admin/job-roles", label: "Job roles" },
-      ],
-    });
+      );
+    }
+    groups.push({ label: "Library", items });
   }
 
   const active = pathname.startsWith("/admin");

@@ -99,7 +99,9 @@ export function reviewDateFromNow(months: number): string {
 }
 
 export const HISTORY_EVENT_LABELS: Record<string, string> = {
-  edit: "Content edited",
+  edit: "Revised",
+  published: "Republished",
   period_change: "Review schedule changed",
   review: "Reviewed",
+  reviewed: "Reviewed",
 };

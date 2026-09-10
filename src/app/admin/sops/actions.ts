@@ -9,7 +9,7 @@ import { writeDocumentTag } from "@/lib/document-tags";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
-type SopEvent = "edit";
+type SopEvent = "edit" | "published";
 
 async function logSopEvent(
   db: ReturnType<typeof createClient>,
@@ -212,6 +212,15 @@ export async function publishSop(id: string): Promise<Result> {
     })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  await logSopEvent(db, {
+    organisationId: owned.sop.organisation_id,
+    sopId: id,
+    eventType: "published",
+    actorId: owned.me.id,
+    note: `Published v${next}`,
+  });
+
   revalidatePath("/admin/sops");
   revalidatePath(`/admin/sops/${id}`);
   revalidatePath("/sops");
