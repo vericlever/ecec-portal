@@ -496,6 +496,15 @@ const APP_SCENARIOS = [
     as: ADMIN,
     probe: (c) => c.query(`delete from public.profiles where id=$1`, [STAFF]),
   },
+  {
+    label: "RSG admin deletes a profile in a DIFFERENT org (Science Kinder)",
+    expectOk: false,
+    as: ADMIN,
+    probe: (c) => {
+      const SK_STAFF = "f504ce94-e3c0-4584-8ac7-64cbe810a889"; // SK staff (Educator)
+      return c.query(`delete from public.profiles where id=$1`, [SK_STAFF]);
+    },
+  },
 ];
 
 await client.connect();
