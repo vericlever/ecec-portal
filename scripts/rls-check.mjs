@@ -490,6 +490,17 @@ const APP_SCENARIOS = [
       ),
   },
   {
+    label: "RSG manager inserts a review against an SK sop",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_reviews (organisation_id, sop_id, reviewed_by, practice_reflection, outcome_reflection, decision)
+         values ($1,$2,$3,'Practice notes.','Outcome notes.','stands')`,
+        [SK, SK_SOP, MANAGER],
+      ),
+  },
+  {
     label: "manager raises a review action",
     expectOk: true,
     setup: async (c) => {
