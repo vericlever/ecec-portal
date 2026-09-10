@@ -501,6 +501,23 @@ const APP_SCENARIOS = [
       ),
   },
   {
+    // Regression check: sop_history_event_type_check silently rejected the
+    // 'published' event publishSop writes (migration 0050 fixed it) - RLS
+    // wasn't the blocker here, the CHECK constraint was, but a broken write
+    // is a broken write regardless of which layer caused it, and this is
+    // exactly the kind of thing that only shows up by hitting the database
+    // directly rather than trusting the app layer.
+    label: "content editor logs a 'published' sop_history event",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_history (organisation_id, sop_id, event_type, actor_profile_id, note)
+         values ($1,$2,'published',$3,'Published v2')`,
+        [RSG, RSG_SOP, ADMIN],
+      ),
+  },
+  {
     label: "manager raises a review action",
     expectOk: true,
     setup: async (c) => {

@@ -1,4 +1,4 @@
--- 0039_review_event.sql
+-- 0046_review_event.sql
 --
 -- Review cycle v2 (REVISION_REVIEW_CYCLE_V2.md), section 2: the review event.
 -- Creates sop_reviews and drops the three things it replaces - sops.needs_review,

@@ -85,7 +85,7 @@ export default async function SopDetailPage({
   // period_change rows - those stay in the audit log, not the report or this
   // view). "Revised" and "republished" both live in sop_history ("edit" /
   // "published"); "reviewed" lives in sop_reviews, a separate table since
-  // migration 0039 - merged here by timestamp.
+  // migration 0046 - merged here by timestamp.
   const historyRows = [
     ...(editHistory ?? []).map((h) => ({
       id: h.id as string,

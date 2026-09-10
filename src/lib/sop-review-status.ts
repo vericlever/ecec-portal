@@ -1,4 +1,4 @@
-// sops.next_review_date does not exist (Review cycle v2, migration 0039) - it
+// sops.next_review_date does not exist (Review cycle v2, migration 0046) - it
 // is derived from last_reviewed_at + review_period_months in the
 // sop_review_status view. This is the one place that view gets queried, so
 // every caller (the SOP list, the dashboard, reports, reminders) reads the

@@ -1,4 +1,4 @@
--- 0040_review_actions.sql
+-- 0047_review_actions.sql
 --
 -- Review cycle v2, section 2 (continued): actions raised by a review. Optional
 -- on a review - a decision of 'stands' with no findings raises none.

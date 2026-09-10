@@ -165,7 +165,7 @@ export async function updateSopSuggestedEvidence(
 }
 
 // The review clock is no longer touched from here. It derives entirely from
-// sop_reviews (migration 0039) - a content edit no longer resets it, and
+// sop_reviews (migration 0046) - a content edit no longer resets it, and
 // there is no longer a "reset the clock while you're at it" prompt, matching
 // Review cycle v2's rule that nothing but a completed review may move the
 // due date.

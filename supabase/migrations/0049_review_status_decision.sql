@@ -1,4 +1,4 @@
--- 0042_review_status_decision.sql
+-- 0049_review_status_decision.sql
 --
 -- Review cycle v2, section 3 (review event): the doc asks that a
 -- needs_revision decision "surface the procedure in the content editor's
