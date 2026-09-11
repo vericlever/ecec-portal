@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Runs on every request: refreshes the Supabase session cookie and gates
 // access. Unauthenticated requests to anything other than /login are redirected
-// to /login; an authenticated request to /login is sent on to /sops.
+// to /login; an authenticated request to /login is sent on to the same
+// leader/staff landing split as the root page and the login action.
 
 const PUBLIC_PATHS = new Set([
   "/",
@@ -56,8 +57,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && path === "/login") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("access_tier, hr_manager")
+      .eq("id", user.id)
+      .maybeSingle();
+    const leader =
+      profile != null &&
+      (["manager_staff", "manager_policy", "admin"].includes(
+        profile.access_tier,
+      ) ||
+        profile.hr_manager);
     const url = request.nextUrl.clone();
-    url.pathname = "/sops";
+    url.pathname = leader ? "/admin" : "/home";
     return NextResponse.redirect(url);
   }
 

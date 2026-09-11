@@ -48,11 +48,13 @@ export function OnboardingForm({
   completed,
   wwccLocked,
   teacherLocked,
+  landingHref,
 }: {
   initial: OnboardingPayload;
   completed: boolean;
   wwccLocked: LockedCheck | null;
   teacherLocked: LockedCheck | null;
+  landingHref: string;
 }) {
   const [data, setData] = useState<OnboardingPayload>(initial);
   const [stepIndex, setStepIndex] = useState(0);
@@ -132,7 +134,7 @@ export function OnboardingForm({
         setError(result.error);
         return;
       }
-      window.location.assign("/sops");
+      window.location.assign(landingHref);
       return;
     }
     if (await persist()) setStepIndex((i) => Math.min(i + 1, steps.length - 1));

@@ -1,4 +1,4 @@
-import { requireProfile } from "@/lib/auth";
+import { requireProfile, isManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CORE_TRAINING_TYPES } from "@/lib/nqaits";
 import { OnboardingForm } from "./onboarding-form";
@@ -212,6 +212,9 @@ export default async function OnboardingPage() {
         completed={completed}
         wwccLocked={lockedCheck(wwcc.locked)}
         teacherLocked={lockedCheck(teacher.locked)}
+        landingHref={
+          isManager(profile.access_tier) || profile.hr_manager ? "/admin" : "/home"
+        }
       />
 
       <section className="mt-8">

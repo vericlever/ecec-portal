@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isManager } from "@/lib/roles";
 
 export type SetPasswordState = { error: string | null };
 
@@ -30,5 +31,16 @@ export async function setPassword(
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
 
-  redirect("/sops");
+  // Same leader/staff landing split as the login action and root page -
+  // a leader who sets their password (first-login invite or a routine
+  // change from /account/password) should still land on the overview, not
+  // the staff worklist.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("access_tier, hr_manager")
+    .eq("id", user.id)
+    .maybeSingle();
+  const leader =
+    profile != null && (isManager(profile.access_tier) || profile.hr_manager);
+  redirect(leader ? "/admin" : "/home");
 }
