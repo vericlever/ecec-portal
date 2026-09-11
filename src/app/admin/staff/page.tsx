@@ -7,7 +7,7 @@ import {
   TIER_LABELS,
   type AccessTier,
 } from "@/lib/auth";
-import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
+import { staffStatsByProfile, summariseTeam, type StaffStat } from "@/lib/staff-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,10 @@ export default async function StaffPage() {
 
   const rows = (staff ?? []) as StaffRow[];
   const stats = await staffStatsByProfile(supabase, rows, me.id);
+  // Mark inactive greys the record and moves it to its own section at the
+  // bottom of the list (build addendum item 1), separate from sort order.
+  const activeRows = rows.filter((p) => p.is_active);
+  const inactiveRows = rows.filter((p) => !p.is_active);
 
   // Team-wide compliance roll-up for the people in view. Managers see their own
   // service, admins the whole organisation, so the summary always matches the
@@ -130,68 +134,109 @@ export default async function StaffPage() {
       )}
 
       <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-        {rows.map((p) => {
-          const stat = stats.get(p.id);
-          return (
-            <li key={p.id}>
-              <Link
-                href={`/admin/staff/${p.id}`}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 hover:bg-slate-50"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">
-                    {p.full_name}
-                    {!p.is_active && (
-                      <span className="ml-2 text-xs font-normal text-slate-400">
-                        inactive
-                      </span>
-                    )}
-                    {p.hr_manager && (
-                      <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                        HR manager
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-500">{p.email}</div>
-                  <div className="text-xs text-slate-400">
-                    {TIER_LABELS[p.access_tier]}
-                    {" · "}
-                    {p.job_role_id
-                      ? (jobRoleName.get(p.job_role_id) ?? "—")
-                      : "no job role"}
-                    {" · "}
-                    {p.service_id
-                      ? (serviceName.get(p.service_id) ?? "—")
-                      : "all services"}
-                  </div>
-                </div>
-
-                {stat && (
-                  <div className="flex shrink-0 gap-2">
-                    <StatBox
-                      label="Procedure"
-                      value={stat.sopPct === null ? "—" : `${stat.sopPct}%`}
-                    />
-                    <StatBox
-                      label="Policy"
-                      value={
-                        stat.policyPct === null ? "—" : `${stat.policyPct}%`
-                      }
-                    />
-                    <StatBox
-                      label="Outstanding"
-                      value={String(stat.outstanding)}
-                      big
-                      alert={stat.outstanding > 0}
-                    />
-                  </div>
-                )}
-              </Link>
-            </li>
-          );
-        })}
+        {activeRows.map((p) => (
+          <StaffRowItem
+            key={p.id}
+            person={p}
+            stat={stats.get(p.id)}
+            serviceName={serviceName}
+            jobRoleName={jobRoleName}
+          />
+        ))}
       </ul>
+
+      {inactiveRows.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Inactive ({inactiveRows.length})
+          </h2>
+          <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-slate-50">
+            {inactiveRows.map((p) => (
+              <StaffRowItem
+                key={p.id}
+                person={p}
+                stat={stats.get(p.id)}
+                serviceName={serviceName}
+                jobRoleName={jobRoleName}
+                inactive
+              />
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StaffRowItem({
+  person: p,
+  stat,
+  serviceName,
+  jobRoleName,
+  inactive = false,
+}: {
+  person: StaffRow;
+  stat: StaffStat | undefined;
+  serviceName: Map<string, string>;
+  jobRoleName: Map<string, string>;
+  inactive?: boolean;
+}) {
+  return (
+    <li>
+      <Link
+        href={`/admin/staff/${p.id}`}
+        className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 hover:bg-slate-100 ${
+          inactive ? "opacity-60" : ""
+        }`}
+      >
+        <div className="min-w-0">
+          <div className="text-sm font-medium">
+            {p.full_name}
+            {inactive && (
+              <span className="ml-2 text-xs font-normal text-slate-400">
+                inactive
+              </span>
+            )}
+            {p.hr_manager && (
+              <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                HR manager
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-slate-500">{p.email}</div>
+          <div className="text-xs text-slate-400">
+            {TIER_LABELS[p.access_tier]}
+            {" · "}
+            {p.job_role_id
+              ? (jobRoleName.get(p.job_role_id) ?? "—")
+              : "no job role"}
+            {" · "}
+            {p.service_id
+              ? (serviceName.get(p.service_id) ?? "—")
+              : "all services"}
+          </div>
+        </div>
+
+        {stat && (
+          <div className="flex shrink-0 gap-2">
+            <StatBox
+              label="Procedure"
+              value={stat.sopPct === null ? "—" : `${stat.sopPct}%`}
+            />
+            <StatBox
+              label="Policy"
+              value={stat.policyPct === null ? "—" : `${stat.policyPct}%`}
+            />
+            <StatBox
+              label="Outstanding"
+              value={String(stat.outstanding)}
+              big
+              alert={stat.outstanding > 0}
+            />
+          </div>
+        )}
+      </Link>
+    </li>
   );
 }
 
