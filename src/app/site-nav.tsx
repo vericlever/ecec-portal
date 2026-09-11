@@ -44,18 +44,30 @@ export function SiteNav(props: SiteNavProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const primary: Item[] = [
-    ...(isLeader ? [{ href: "/admin", label: "Overview" }] : []),
-    { href: "/sops", label: "Procedures" },
-    { href: "/policies", label: "Policies" },
-    ...(canViewReports ? [{ href: "/reports", label: "Reports" }] : []),
-    ...(isWorker
-      ? [
-          { href: "/agreements", label: "Agreements" },
-          { href: "/onboarding", label: "My details" },
-        ]
-      : []),
-  ];
+  // Plain staff (build addendum item 2): exactly Home, My details, Procedures.
+  // Policies is deliberately not a standalone tab here - reachable only via
+  // the Step 15 click-through from a procedure to its source policy, so the
+  // two-tier architecture (staff train on procedures, never touch policy
+  // directly) holds in the nav as well as the data model. Leaders keep the
+  // existing nav unchanged, Overview included.
+  const primary: Item[] = isLeader
+    ? [
+        { href: "/admin", label: "Overview" },
+        { href: "/sops", label: "Procedures" },
+        { href: "/policies", label: "Policies" },
+        ...(canViewReports ? [{ href: "/reports", label: "Reports" }] : []),
+        ...(isWorker
+          ? [
+              { href: "/agreements", label: "Agreements" },
+              { href: "/onboarding", label: "My details" },
+            ]
+          : []),
+      ]
+    : [
+        { href: "/home", label: "Home" },
+        { href: "/onboarding", label: "My details" },
+        { href: "/sops", label: "Procedures" },
+      ];
 
   const manageGroups: { label: string; items: Item[] }[] = [];
   if (canManageStaff || canCountersign || canEditContent) {
@@ -116,7 +128,7 @@ export function SiteNav(props: SiteNavProps) {
     >
       <div className="flex items-center gap-6">
         <Link
-          href={isLeader ? "/admin" : "/sops"}
+          href={isLeader ? "/admin" : "/home"}
           className="flex items-center gap-2.5 text-ink hover:text-ink"
         >
           <LogoMark size={24} />
