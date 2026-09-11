@@ -11,6 +11,15 @@ function fmtDate(v: string) {
   return new Date(v).toLocaleDateString("en-AU", { dateStyle: "medium" });
 }
 
+type WorklistItem = { label: string; href: string };
+
+const CHAIN_STAGES = [
+  { stage: "policy", label: "Policy", caption: "Set by your service" },
+  { stage: "procedure", label: "Procedure", caption: "What you train on" },
+  { stage: "training", label: "Training", caption: "Your sign-off" },
+  { stage: "outcomes", label: "Outcomes", caption: "Your evidence on file" },
+] as const;
+
 export default async function StaffHomePage() {
   const me = await requireProfile();
   const supabase = createClient();
@@ -42,8 +51,8 @@ export default async function StaffHomePage() {
   // Procedure sign-off state: the same suite-and-sign-off shapes as
   // /sops/page.tsx, so "outstanding" here always matches what that page would
   // show as not-yet-signed.
-  const unsignedSops: string[] = [];
-  const awaitingCosignSops: string[] = [];
+  const unsignedSops: WorklistItem[] = [];
+  const awaitingCosignSops: WorklistItem[] = [];
   let sopTotal = 0;
   if (me.job_role_id) {
     const { data: suite } = await supabase
@@ -70,10 +79,11 @@ export default async function StaffHomePage() {
       sopTotal = published.length;
       for (const s of published) {
         const so = signOffFor.get(`${s.id}:${s.published_version}`);
+        const item = { label: s.name as string, href: `/sops/${s.id}` };
         if (!so) {
-          unsignedSops.push(s.name as string);
+          unsignedSops.push(item);
         } else if (s.signoff_type === "self_and_manager" && !so.verified_at) {
-          awaitingCosignSops.push(s.name as string);
+          awaitingCosignSops.push(item);
         }
       }
     }
@@ -89,21 +99,23 @@ export default async function StaffHomePage() {
     }[],
     visaExpiry: wd?.visa_expiry ?? null,
   });
-  const credentialItems = credentialAlerts.map((a) => {
+  const credentialItems: WorklistItem[] = credentialAlerts.map((a) => {
     const when =
       a.daysLeft < 0
         ? `expired ${Math.abs(a.daysLeft)} ${Math.abs(a.daysLeft) === 1 ? "day" : "days"} ago`
         : a.daysLeft === 0
           ? "expires today"
           : `expires in ${a.daysLeft} ${a.daysLeft === 1 ? "day" : "days"}`;
-    return `${a.label} — ${fmtDate(a.expiryDate)} (${when})`;
+    return { label: `${a.label} — ${fmtDate(a.expiryDate)} (${when})`, href: "/onboarding" };
   });
 
   const agreements = await agreementsForProfile(supabase, {
     id: me.id,
     job_role_id: me.job_role_id,
   });
-  const unsignedAgreements = agreements.filter((a) => !a.signed).map((a) => a.name);
+  const unsignedAgreements: WorklistItem[] = agreements
+    .filter((a) => !a.signed)
+    .map((a) => ({ label: a.name, href: `/agreements/${a.id}` }));
 
   const onboardingOutstanding = Boolean(me.job_role_id && !wd?.onboarding_completed_at);
 
@@ -123,32 +135,22 @@ export default async function StaffHomePage() {
       </p>
 
       <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-3 sm:gap-5">
-          <StageArc stage="policy" size={36} muted />
-          <ChainLink />
-          <StageArc stage="procedure" size={36} />
-          <ChainLink />
-          <StageArc stage="training" size={36} />
-          <ChainLink />
-          <StageArc stage="outcomes" size={36} />
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
-          <div className="text-slate-400">
-            <div className="font-medium">Policy</div>
-            <div>Set by your service</div>
-          </div>
-          <div className="text-slate-700">
-            <div className="font-medium">Procedure</div>
-            <div className="text-slate-500">What you train on</div>
-          </div>
-          <div className="text-slate-700">
-            <div className="font-medium">Training</div>
-            <div className="text-slate-500">Your sign-off</div>
-          </div>
-          <div className="text-slate-700">
-            <div className="font-medium">Outcomes</div>
-            <div className="text-slate-500">Your evidence on file</div>
-          </div>
+        <div className="relative grid grid-cols-4">
+          <div
+            className="pointer-events-none absolute inset-x-[12.5%] top-[18px] h-px bg-slate-200"
+            aria-hidden="true"
+          />
+          {CHAIN_STAGES.map((s) => (
+            <div key={s.stage} className="flex flex-col items-center gap-2 text-center text-xs">
+              <div className="relative z-10 flex h-9 w-9 items-center justify-center bg-white">
+                <StageArc stage={s.stage} size={36} />
+              </div>
+              <div>
+                <div className="font-medium text-slate-700">{s.label}</div>
+                <div className="text-slate-500">{s.caption}</div>
+              </div>
+            </div>
+          ))}
         </div>
         <p className="mt-4 text-xs leading-relaxed text-slate-400">
           Policy sets the rule your service works to, and procedures carry the actual
@@ -172,28 +174,21 @@ export default async function StaffHomePage() {
             <div className="space-y-4">
               <WorklistGroup
                 title="Onboarding questionnaire"
-                items={onboardingOutstanding ? ["Not completed"] : []}
-                href="/onboarding"
+                items={
+                  onboardingOutstanding
+                    ? [{ label: "Not completed", href: "/onboarding" }]
+                    : []
+                }
               />
-              <WorklistGroup
-                title="Procedures not signed"
-                items={unsignedSops}
-                href="/sops"
-              />
+              <WorklistGroup title="Procedures not signed" items={unsignedSops} />
               <WorklistGroup
                 title="Procedures waiting on a manager countersignature"
                 items={awaitingCosignSops}
-                href="/sops"
               />
-              <WorklistGroup
-                title="Agreements not signed"
-                items={unsignedAgreements}
-                href="/agreements"
-              />
+              <WorklistGroup title="Agreements not signed" items={unsignedAgreements} />
               <WorklistGroup
                 title="Credentials expired or expiring"
                 items={credentialItems}
-                href="/onboarding"
               />
             </div>
           )}
@@ -213,19 +208,7 @@ export default async function StaffHomePage() {
   );
 }
 
-function ChainLink() {
-  return <div className="h-px w-4 shrink-0 bg-slate-300 sm:w-8" aria-hidden="true" />;
-}
-
-function WorklistGroup({
-  title,
-  items,
-  href,
-}: {
-  title: string;
-  items: string[];
-  href: string;
-}) {
+function WorklistGroup({ title, items }: { title: string; items: WorklistItem[] }) {
   if (items.length === 0) return null;
   return (
     <div>
@@ -233,14 +216,15 @@ function WorklistGroup({
         <span className="font-medium text-slate-700">{title}</span>
         <span className="text-slate-400">({items.length})</span>
       </div>
-      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
+      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
         {items.map((it, i) => (
-          <li key={i}>{it}</li>
+          <li key={i}>
+            <Link href={it.href} className="text-slate-600 underline hover:text-slate-900">
+              {it.label}
+            </Link>
+          </li>
         ))}
       </ul>
-      <Link href={href} className="mt-1 inline-block text-xs font-medium text-slate-500 underline">
-        Go there
-      </Link>
     </div>
   );
 }
