@@ -10,6 +10,7 @@ import {
   updateAgreementBody,
   updateAgreementMeta,
 } from "../actions";
+import { fmtDateTime } from "@/lib/format-date";
 
 type Agreement = {
   id: string;
@@ -28,12 +29,14 @@ export function AgreementEditor({
   policies,
   linkedRoleIds,
   roster,
+  timezone,
 }: {
   agreement: Agreement;
   jobRoles: { id: string; name: string }[];
   policies: { id: string; name: string }[];
   linkedRoleIds: string[];
   roster: { id: string; name: string; signedAt: string | null }[];
+  timezone: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -78,7 +81,7 @@ export function AgreementEditor({
             {published
               ? `Published v${agreement.published_version}` +
                 (agreement.published_at
-                  ? ` on ${new Date(agreement.published_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}`
+                  ? ` on ${fmtDateTime(agreement.published_at, timezone)}`
                   : "") +
                 (dirty ? " · unpublished changes below" : "")
               : "Not published — staff cannot see this yet"}
@@ -249,10 +252,7 @@ export function AgreementEditor({
                 <span className="text-slate-700">{r.name}</span>
                 {r.signedAt ? (
                   <span className="text-xs text-green-700">
-                    signed{" "}
-                    {new Date(r.signedAt).toLocaleDateString("en-AU", {
-                      dateStyle: "medium",
-                    })}
+                    signed {fmtDateTime(r.signedAt, timezone)}
                   </span>
                 ) : (
                   <span className="text-xs text-amber-700">not signed</span>

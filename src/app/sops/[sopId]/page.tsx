@@ -5,6 +5,7 @@ import { requireProfile } from "@/lib/auth";
 import { assignedJobRoleIds } from "@/lib/staff-job-roles";
 import { SignForm } from "./sign-form";
 import { ReadAloud } from "./read-aloud";
+import { fmtDateTime } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +13,6 @@ const SIGNOFF_LABELS: Record<string, string> = {
   self: "Self sign-off",
   self_and_manager: "Staff and manager sign-off",
 };
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 
 export default async function SopDetailPage({
   params,
@@ -128,15 +122,15 @@ export default async function SopDetailPage({
       {signOff ? (
         needsManager && !signOff.verified_at ? (
           <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            You signed this on {formatDate(signOff.signed_at)}. It now needs a
+            You signed this on {fmtDateTime(signOff.signed_at, profile.organisation_timezone, { time: true })}. It now needs a
             manager to countersign with you.
           </div>
         ) : (
           <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-            Signed on {formatDate(signOff.signed_at)} (version{" "}
+            Signed on {fmtDateTime(signOff.signed_at, profile.organisation_timezone, { time: true })} (version{" "}
             {sop.published_version}).
             {signOff.verified_at &&
-              ` Countersigned by a manager on ${formatDate(signOff.verified_at)}.`}
+              ` Countersigned by a manager on ${fmtDateTime(signOff.verified_at, profile.organisation_timezone, { time: true })}.`}
           </div>
         )
       ) : isInSuite ? (

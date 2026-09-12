@@ -5,9 +5,11 @@ import type { ServiceOverview } from "@/lib/reports";
 export function ServiceOverviewPdf({
   orgName,
   data,
+  timezone,
 }: {
   orgName: string;
   data: ServiceOverview;
+  timezone: string;
 }) {
   const stat = (label: string, value: string, sub?: string) => (
     <View style={{ width: "25%" }}>
@@ -18,7 +20,7 @@ export function ServiceOverviewPdf({
   );
 
   return (
-    <ReportShell orgName={orgName} title="Service overview" subtitle={data.serviceName}>
+    <ReportShell orgName={orgName} title="Service overview" subtitle={data.serviceName} timezone={timezone}>
       <View style={[styles.section, { flexDirection: "row" }]}>
         {stat("Staff", String(data.staffTotal))}
         {stat("Fully compliant", `${data.fullyCompliant} of ${data.staffTotal}`)}

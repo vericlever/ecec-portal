@@ -31,6 +31,7 @@ import {
 } from "@/lib/contracts";
 import { agreementsForProfile } from "@/lib/agreements";
 import { assignedJobRoles, sopSuiteIdsForRoles } from "@/lib/staff-job-roles";
+import { fmtDate as fmtDateOnly, fmtDateTime } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ const WORK_ELIGIBILITY_LABEL = {
 
 function fmtDate(v: string | null | undefined) {
   if (!v) return "—";
-  return new Date(v).toLocaleDateString("en-AU", { dateStyle: "medium" });
+  return fmtDateOnly(v);
 }
 
 function ynLabel(v: boolean | null | undefined) {
@@ -522,6 +523,7 @@ export default async function StaffRecordPage({
             profileId={person.id}
             email={person.email}
             lastReset={lastReset}
+            timezone={me.organisation_timezone}
           />
           {person.id !== me.id && (
             <ActiveControl profileId={person.id} isActive={person.is_active} />
@@ -670,6 +672,7 @@ export default async function StaffRecordPage({
           profileId={person.id}
           contracts={contracts}
           canManage={canManageContract}
+          timezone={me.organisation_timezone}
         />
       </section>
 
@@ -748,7 +751,7 @@ export default async function StaffRecordPage({
                     </p>
                   </div>
                   <p className="text-xs text-slate-400">
-                    Answered {fmtDate(screening.answered_at.slice(0, 10))}
+                    Answered {fmtDateTime(screening.answered_at, me.organisation_timezone)}
                   </p>
                 </div>
               ) : (

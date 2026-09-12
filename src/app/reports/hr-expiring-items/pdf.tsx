@@ -6,13 +6,15 @@ export function HrExpiringItemsPdf({
   orgName,
   scopeLabel,
   people,
+  timezone,
 }: {
   orgName: string;
   scopeLabel: string;
   people: HrExpiringPerson[];
+  timezone: string;
 }) {
   return (
-    <ReportShell orgName={orgName} title="HR expiring items report" subtitle={scopeLabel}>
+    <ReportShell orgName={orgName} title="HR expiring items report" subtitle={scopeLabel} timezone={timezone}>
       {people.length === 0 ? (
         <Text style={styles.emptyState}>Nothing expired or expiring within 60 days.</Text>
       ) : (

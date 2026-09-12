@@ -19,6 +19,7 @@ import {
   updateStaffEmail,
   updateStaffName,
 } from "./account-actions";
+import { fmtDate, fmtDateTime } from "@/lib/format-date";
 
 type Table =
   | "wwcc_checks"
@@ -49,7 +50,7 @@ export function SightingControl({
     return (
       <div className="flex items-center justify-between text-sm">
         <span className="text-green-700">
-          Sighted {new Date(sightedAt).toLocaleDateString("en-AU", { dateStyle: "medium" })}
+          Sighted {fmtDate(sightedAt)}
           {sightedBy ? ` by ${sightedBy}` : ""}
         </span>
         {canVerify && (
@@ -108,10 +109,6 @@ export function SightingControl({
       {error && <span className="text-red-600">{error}</span>}
     </div>
   );
-}
-
-function fmtDate(v: string) {
-  return new Date(v).toLocaleDateString("en-AU", { dateStyle: "medium" });
 }
 
 export function ProbationControl({
@@ -428,10 +425,12 @@ export function PasswordResetControl({
   profileId,
   email,
   lastReset,
+  timezone,
 }: {
   profileId: string;
   email: string;
   lastReset: { at: string; source: "self" | "admin" } | null;
+  timezone: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -471,10 +470,7 @@ export function PasswordResetControl({
       </div>
       {lastReset && (
         <p className="mt-1 text-xs text-slate-400">
-          Last reset{" "}
-          {new Date(lastReset.at).toLocaleDateString("en-AU", {
-            dateStyle: "medium",
-          })}{" "}
+          Last reset {fmtDateTime(lastReset.at, timezone)}{" "}
           ({lastReset.source === "admin" ? "sent by a leader" : "self-service"})
         </p>
       )}

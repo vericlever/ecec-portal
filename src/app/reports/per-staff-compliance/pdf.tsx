@@ -1,19 +1,23 @@
 import { Text, View } from "@react-pdf/renderer";
 import { ReportShell, styles } from "../_pdf/shell";
 import type { PerStaffCompliance } from "@/lib/reports";
+import { fmtDateTime } from "@/lib/format-date";
 
 export function PerStaffCompliancePdf({
   orgName,
   data,
+  timezone,
 }: {
   orgName: string;
   data: PerStaffCompliance;
+  timezone: string;
 }) {
   return (
     <ReportShell
       orgName={orgName}
       title="Per-staff compliance report"
       subtitle={`${data.fullName} — ${data.serviceName}${data.jobRoleName ? ` — ${data.jobRoleName}` : ""}`}
+      timezone={timezone}
     >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -93,12 +97,12 @@ export function PerStaffCompliancePdf({
               <>
                 <Text style={styles.cell}>
                   {data.contract.signed_at
-                    ? `Signed by ${data.contract.signed_name} on ${new Date(data.contract.signed_at).toLocaleDateString("en-AU")}`
+                    ? `Signed by ${data.contract.signed_name} on ${fmtDateTime(data.contract.signed_at, timezone)}`
                     : "Not yet signed"}
                 </Text>
                 <Text style={styles.cell}>
                   {data.contract.countersigned_at
-                    ? `Countersigned by ${data.contract.countersigned_name} on ${new Date(data.contract.countersigned_at).toLocaleDateString("en-AU")}`
+                    ? `Countersigned by ${data.contract.countersigned_name} on ${fmtDateTime(data.contract.countersigned_at, timezone)}`
                     : "Not yet countersigned"}
                 </Text>
               </>

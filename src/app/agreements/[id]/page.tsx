@@ -3,16 +3,10 @@ import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { assignedJobRoleIds } from "@/lib/staff-job-roles";
+import { fmtDateTime } from "@/lib/format-date";
 import { AgreementSignForm } from "./sign-form";
 
 export const dynamic = "force-dynamic";
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 
 export default async function AgreementDetailPage({
   params,
@@ -98,7 +92,8 @@ export default async function AgreementDetailPage({
 
       {signoff ? (
         <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-          Signed on {formatDate(signoff.signed_at)} (version{" "}
+          Signed on {fmtDateTime(signoff.signed_at, profile.organisation_timezone, { time: true })}{" "}
+          (version{" "}
           {agreement.published_version}).
         </div>
       ) : applies ? (

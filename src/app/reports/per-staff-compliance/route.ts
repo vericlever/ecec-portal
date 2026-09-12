@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   if (!data) return new Response("Not found", { status: 404 });
 
   return pdfResponse(
-    PerStaffCompliancePdf({ orgName, data }),
+    PerStaffCompliancePdf({ orgName, data, timezone: profile.organisation_timezone }),
     `Compliance report - ${data.fullName}.pdf`,
   );
 }

@@ -93,6 +93,7 @@ export default async function AgreementDetailPage({
         policies={(policies ?? []) as { id: string; name: string }[]}
         linkedRoleIds={linkedRoleIds}
         roster={roster}
+        timezone={me.organisation_timezone}
       />
     </div>
   );

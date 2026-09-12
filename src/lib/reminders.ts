@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailEnabled, esc } from "@/lib/email";
+import { fmtDate } from "@/lib/format-date";
 
 // Step 19 reminder engine. Run once a day by the Vercel cron at
 // /api/cron/reminders. Builds one digest per person (staff or manager) covering
@@ -51,15 +52,6 @@ function startOfToday(): Date {
 function daysUntil(isoDate: string): number {
   const d = new Date(isoDate + (isoDate.length === 10 ? "T00:00:00" : ""));
   return Math.round((d.getTime() - startOfToday().getTime()) / 86_400_000);
-}
-
-function fmtDate(isoDate: string): string {
-  const d = new Date(isoDate + (isoDate.length === 10 ? "T00:00:00" : ""));
-  return d.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function expiryPhrase(isoDate: string): string {

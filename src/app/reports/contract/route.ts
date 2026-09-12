@@ -43,6 +43,7 @@ export async function GET(req: Request) {
       orgName,
       staffName: worker.full_name as string,
       contract: contract as ContractRow,
+      timezone: me.organisation_timezone,
     }),
     `Contract - ${worker.full_name}.pdf`,
   );

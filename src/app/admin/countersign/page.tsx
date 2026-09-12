@@ -59,6 +59,7 @@ export default async function CountersignPage() {
               staffName={q.staffName}
               sopName={q.sopName}
               signedAt={q.signedAt}
+              timezone={me.organisation_timezone}
             />
           ))}
         </ul>

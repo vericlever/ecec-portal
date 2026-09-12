@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       : "Not assigned to a service";
 
   return pdfResponse(
-    HrExpiringItemsPdf({ orgName, scopeLabel, people }),
+    HrExpiringItemsPdf({ orgName, scopeLabel, people, timezone: profile.organisation_timezone }),
     `HR expiring items - ${scopeLabel}.pdf`,
   );
 }

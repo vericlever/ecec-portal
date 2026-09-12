@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   ]);
 
   return pdfResponse(
-    ServiceOverviewPdf({ orgName, data }),
+    ServiceOverviewPdf({ orgName, data, timezone: profile.organisation_timezone }),
     `Service overview - ${data.serviceName}.pdf`,
   );
 }

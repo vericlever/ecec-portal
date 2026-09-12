@@ -32,7 +32,7 @@ export async function GET(req: Request) {
       : "Not assigned to a service";
 
   return pdfResponse(
-    ReviewCalendarPdf({ orgName, scopeLabel, items }),
+    ReviewCalendarPdf({ orgName, scopeLabel, items, timezone: profile.organisation_timezone }),
     `Review calendar - ${scopeLabel}.pdf`,
   );
 }

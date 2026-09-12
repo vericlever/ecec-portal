@@ -1,6 +1,8 @@
 // Review-cycle helpers, shared by the SOP list, the SOP editor and the policy
 // editor. Pure functions, safe on the client.
 
+import { fmtDate, fmtDateLong } from "@/lib/format-date";
+
 export type ReviewStatus = "none" | "ok" | "soon" | "overdue";
 
 export type ReviewState = {
@@ -23,13 +25,10 @@ export function daysUntil(isoDate: string): number {
   return Math.round((d.getTime() - startOfToday().getTime()) / 86_400_000);
 }
 
+// next_review_date is a plain calendar date (Step 43) - delegates to the
+// shared date-only formatter so it is never timezone-converted.
 export function fmtReviewDate(isoDate: string): string {
-  const d = new Date(isoDate.length === 10 ? isoDate + "T00:00:00" : isoDate);
-  return d.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return fmtDate(isoDate);
 }
 
 // Report rule 3 (Review cycle v2): day month year, no ordinal suffix, no
@@ -37,12 +36,7 @@ export function fmtReviewDate(isoDate: string): string {
 // only in generated report output, never in-app UI (fmtReviewDate covers
 // that, with its shorter month form).
 export function fmtReportDate(isoDate: string): string {
-  const d = new Date(isoDate.length === 10 ? isoDate + "T00:00:00" : isoDate);
-  return d.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return fmtDateLong(isoDate);
 }
 
 export function reviewState(nextReviewDate: string | null): ReviewState {

@@ -6,16 +6,19 @@ export function ReviewCalendarPdf({
   orgName,
   scopeLabel,
   items,
+  timezone,
 }: {
   orgName: string;
   scopeLabel: string;
   items: ReviewCalendarItem[];
+  timezone: string;
 }) {
   return (
     <ReportShell
       orgName={orgName}
       title="Policy & procedure review calendar"
       subtitle={scopeLabel}
+      timezone={timezone}
     >
       {items.length === 0 ? (
         <Text style={styles.emptyState}>No published policies or procedures on the review clock yet.</Text>

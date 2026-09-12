@@ -6,12 +6,9 @@ import { agreementsForProfile } from "@/lib/agreements";
 import { assignedJobRoles } from "@/lib/staff-job-roles";
 import { StageArc } from "@/components/bauhaus";
 import { OutcomeFlagForm } from "./outcome-flag-form";
+import { fmtDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
-
-function fmtDate(v: string) {
-  return new Date(v).toLocaleDateString("en-AU", { dateStyle: "medium" });
-}
 
 type WorklistItem = { label: string; href: string };
 

@@ -17,7 +17,12 @@ export async function GET() {
   ]);
 
   return pdfResponse(
-    TagReportPdf({ orgName, title: "Child safety standards report", sections }),
+    TagReportPdf({
+      orgName,
+      title: "Child safety standards report",
+      sections,
+      timezone: auth.profile.organisation_timezone,
+    }),
     "Child safety standards report.pdf",
   );
 }

@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
+import { fmtNow } from "@/lib/format-date";
 
 // Shared chrome for every generated report: org name, report title, a
 // generated-at timestamp, and page numbers. Every report builds its body with
@@ -59,17 +60,19 @@ export function ReportShell({
   orgName,
   title,
   subtitle,
+  timezone,
   children,
 }: {
   orgName: string;
   title: string;
   subtitle?: string;
+  // Step 43: a report printed for an assessment visit with UTC timestamps
+  // is worse than no report - it must render in organisation time, not
+  // server time (Vercel runs UTC).
+  timezone: string;
   children: ReactNode;
 }) {
-  const generatedAt = new Date().toLocaleString("en-AU", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const generatedAt = fmtNow(timezone);
   return (
     <Document>
       <Page size="A4" style={styles.page}>

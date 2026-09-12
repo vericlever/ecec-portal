@@ -32,13 +32,15 @@ export function TagReportPdf({
   orgName,
   title,
   sections,
+  timezone,
 }: {
   orgName: string;
   title: string;
   sections: TagSection[];
+  timezone: string;
 }) {
   return (
-    <ReportShell orgName={orgName} title={title}>
+    <ReportShell orgName={orgName} title={title} timezone={timezone}>
       {sections.map((section) => (
         <View key={section.option.id} style={styles.section} wrap={false}>
           <Text style={styles.sectionTitle}>

@@ -11,12 +11,14 @@ import {
   signOwnContract,
   countersignContract,
 } from "./actions";
+import { fmtDate as fmtDateOnly, fmtDateTime } from "@/lib/format-date";
 
+// start_date/expiry_date are plain calendar dates (Step 43), never
+// timezone-converted; this just adds the null-handling the shared helper
+// doesn't need to care about.
 function fmtDate(v: string | null) {
   if (!v) return "—";
-  return new Date(v + "T00:00:00").toLocaleDateString("en-AU", {
-    dateStyle: "medium",
-  });
+  return fmtDateOnly(v);
 }
 
 function RenewalBadge({ contract }: { contract: ContractRow }) {
@@ -38,12 +40,14 @@ export function ContractPanel({
   contracts,
   canManage,
   canSign = false,
+  timezone,
 }: {
   profileId: string;
   contracts: ContractRow[];
   canManage: boolean;
   // The contract owner viewing their own record (the onboarding page) can sign.
   canSign?: boolean;
+  timezone: string;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -142,13 +146,13 @@ export function ContractPanel({
                 <dt className="text-slate-500">Signed by staff member</dt>
                 <dd className="text-slate-800">
                   {active.signed_at
-                    ? `${active.signed_name ?? "Yes"} · ${fmtDate(active.signed_at.slice(0, 10))}`
+                    ? `${active.signed_name ?? "Yes"} · ${fmtDateTime(active.signed_at, timezone)}`
                     : "Not signed yet"}
                 </dd>
                 <dt className="text-slate-500">Countersigned</dt>
                 <dd className="text-slate-800">
                   {active.countersigned_at
-                    ? `${active.countersigned_name ?? "Yes"} · ${fmtDate(active.countersigned_at.slice(0, 10))}`
+                    ? `${active.countersigned_name ?? "Yes"} · ${fmtDateTime(active.countersigned_at, timezone)}`
                     : "Not yet"}
                 </dd>
               </>

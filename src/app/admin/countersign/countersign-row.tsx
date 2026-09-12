@@ -3,17 +3,20 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { countersignSop } from "./actions";
+import { fmtDateTime } from "@/lib/format-date";
 
 export function CountersignRow({
   id,
   staffName,
   sopName,
   signedAt,
+  timezone,
 }: {
   id: string;
   staffName: string;
   sopName: string;
   signedAt: string;
+  timezone: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -25,8 +28,7 @@ export function CountersignRow({
         <span className="font-medium">{staffName}</span>
         <span className="text-slate-400"> · {sopName}</span>
         <div className="text-xs text-slate-400">
-          signed{" "}
-          {new Date(signedAt).toLocaleDateString("en-AU", { dateStyle: "medium" })}
+          signed {fmtDateTime(signedAt, timezone)}
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>

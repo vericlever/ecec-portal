@@ -17,7 +17,11 @@ export async function GET() {
   ]);
 
   return pdfResponse(
-    StakeholderNotificationsPdf({ orgName, notifications }),
+    StakeholderNotificationsPdf({
+      orgName,
+      notifications,
+      timezone: auth.profile.organisation_timezone,
+    }),
     "Stakeholder notification report.pdf",
   );
 }

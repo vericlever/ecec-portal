@@ -7,6 +7,7 @@ import {
   canEditContent,
   canViewReports,
 } from "@/lib/roles";
+import { DEFAULT_ORG_TIMEZONE } from "@/lib/format-date";
 
 export * from "@/lib/roles";
 
@@ -19,6 +20,12 @@ export type Profile = {
   email: string;
   access_tier: AccessTier;
   hr_manager: boolean;
+  // The organisation's IANA timezone (Step 43) - every user-facing timestamp
+  // renders in this, not server time. Threaded through here so every
+  // already-authenticated page has it without an extra query. Falls back to
+  // the same default the column itself defaults to, for the org-less case
+  // (there shouldn't be one, but Profile.organisation_id is nullable).
+  organisation_timezone: string;
 };
 
 export async function getProfile(): Promise<Profile | null> {
@@ -31,12 +38,21 @@ export async function getProfile(): Promise<Profile | null> {
   const { data } = await supabase
     .from("profiles")
     .select(
-      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager",
+      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, organisations(timezone)",
     )
     .eq("id", user.id)
     .maybeSingle();
 
-  return (data as Profile) ?? null;
+  if (!data) return null;
+  const org = data.organisations as { timezone: string } | { timezone: string }[] | null;
+  const timezone = Array.isArray(org) ? org[0]?.timezone : org?.timezone;
+  const { organisations: _organisations, ...rest } = data as typeof data & {
+    organisations: unknown;
+  };
+  return {
+    ...(rest as Omit<Profile, "organisation_timezone">),
+    organisation_timezone: timezone ?? DEFAULT_ORG_TIMEZONE,
+  };
 }
 
 // An HR manager: an admin, or anyone with the hr_manager flag. Gates document

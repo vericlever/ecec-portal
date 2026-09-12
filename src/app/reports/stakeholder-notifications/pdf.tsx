@@ -5,12 +5,14 @@ import type { StakeholderNotification } from "@/lib/reports";
 export function StakeholderNotificationsPdf({
   orgName,
   notifications,
+  timezone,
 }: {
   orgName: string;
   notifications: StakeholderNotification[];
+  timezone: string;
 }) {
   return (
-    <ReportShell orgName={orgName} title="Stakeholder Notification Report">
+    <ReportShell orgName={orgName} title="Stakeholder Notification Report" timezone={timezone}>
       {notifications.length === 0 ? (
         <View style={styles.section}>
           <Text style={styles.emptyState}>

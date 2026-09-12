@@ -2,14 +2,9 @@ import Link from "next/link";
 import { requireStaffAccess, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { expiringCredentials } from "@/lib/credentials";
+import { fmtDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
-
-function fmtDate(v: string) {
-  return new Date(v + "T00:00:00").toLocaleDateString("en-AU", {
-    dateStyle: "medium",
-  });
-}
 
 function whenLabel(daysLeft: number) {
   if (daysLeft < 0) {

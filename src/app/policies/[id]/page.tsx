@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { fmtDateTime } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ export default async function PolicyViewPage({
         {policy.is_parent_facing && "Parent-facing · "}
         Version {policy.published_version}
         {policy.published_at &&
-          ` · published ${new Date(policy.published_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}`}
+          ` · published ${fmtDateTime(policy.published_at, profile.organisation_timezone)}`}
         {" · "}
         <span className="text-green-700">viewed</span>
       </p>

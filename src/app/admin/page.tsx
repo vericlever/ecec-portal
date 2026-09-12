@@ -13,6 +13,7 @@ import { contractAlerts } from "@/lib/contracts";
 import { unsignedAgreementsByProfile } from "@/lib/agreements";
 import { reviewState, HISTORY_EVENT_LABELS } from "@/lib/sop-review";
 import { sopReviewStatusMap } from "@/lib/sop-review-status";
+import { fmtDateTime } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -546,10 +547,7 @@ export default async function DashboardPage() {
                       h.event_type}
                   </Link>
                   <span className="text-xs text-slate-400">
-                    {new Date(h.created_at as string).toLocaleString("en-AU", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
+                    {fmtDateTime(h.created_at as string, me.organisation_timezone, { time: true })}
                   </span>
                 </div>
                 {h.note && (

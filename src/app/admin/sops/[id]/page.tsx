@@ -152,6 +152,7 @@ export default async function SopDetailPage({
         history={historyRows}
         categories={categories}
         openActions={openActionRows}
+        timezone={me.organisation_timezone}
         services={(services ?? []) as { id: string; name: string }[]}
         jobRoles={
           (jobRoles ?? []) as {

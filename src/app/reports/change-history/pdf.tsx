@@ -1,19 +1,23 @@
 import { Text, View } from "@react-pdf/renderer";
 import { ReportShell, styles } from "../_pdf/shell";
 import type { ChangeHistoryEntry } from "@/lib/reports";
+import { fmtDateTime } from "@/lib/format-date";
 
 export function ChangeHistoryPdf({
   orgName,
   entries,
+  timezone,
 }: {
   orgName: string;
   entries: ChangeHistoryEntry[];
+  timezone: string;
 }) {
   return (
     <ReportShell
       orgName={orgName}
       title="Version & change history report"
       subtitle="Procedure history is a full edit log. Policies have no per-edit log yet, so the policy rows below show the latest published version only."
+      timezone={timezone}
     >
       {entries.length === 0 ? (
         <Text style={styles.emptyState}>No history recorded yet.</Text>
@@ -33,7 +37,7 @@ export function ChangeHistoryPdf({
               <Text style={[styles.cell, { width: "20%" }]}>{e.eventLabel}</Text>
               <Text style={[styles.cell, { width: "22%" }]}>{e.actor}</Text>
               <Text style={[styles.cell, { width: "20%" }]}>
-                {new Date(e.at).toLocaleDateString("en-AU", { dateStyle: "medium" })}
+                {fmtDateTime(e.at, timezone)}
               </Text>
             </View>
           ))}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { PolicyCategory } from "@/lib/policy-categories";
 import { REVIEW_PERIODS, REVIEW_PERIOD_LABELS } from "@/lib/constants";
 import { fmtReviewDate, reviewDateFromNow, reviewState } from "@/lib/sop-review";
+import { fmtDateTime } from "@/lib/format-date";
 import {
   deletePolicy,
   linkSop,
@@ -51,6 +52,7 @@ export function PolicyEditor({
   sourceDoc,
   allSops,
   linkedSops,
+  timezone,
 }: {
   policy: Policy;
   categories: PolicyCategory[];
@@ -66,6 +68,7 @@ export function PolicyEditor({
   } | null;
   allSops: { id: string; name: string }[];
   linkedSops: { id: string; name: string }[];
+  timezone: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -115,7 +118,7 @@ export function PolicyEditor({
             {published
               ? `Published v${policy.published_version}` +
                 (policy.published_at
-                  ? ` on ${new Date(policy.published_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}`
+                  ? ` on ${fmtDateTime(policy.published_at, timezone)}`
                   : "") +
                 (dirty ? " · unpublished changes below" : "")
               : "Not published — staff cannot see this yet"}

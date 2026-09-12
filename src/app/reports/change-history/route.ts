@@ -17,7 +17,7 @@ export async function GET() {
   ]);
 
   return pdfResponse(
-    ChangeHistoryPdf({ orgName, entries }),
+    ChangeHistoryPdf({ orgName, entries, timezone: auth.profile.organisation_timezone }),
     "Version and change history report.pdf",
   );
 }

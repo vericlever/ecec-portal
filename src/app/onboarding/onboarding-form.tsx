@@ -15,6 +15,7 @@ import {
   submitOnboarding,
   type OnboardingPayload,
 } from "./actions";
+import { fmtDate } from "@/lib/format-date";
 
 type FieldKey = keyof OnboardingPayload;
 
@@ -645,9 +646,7 @@ function LockedCheckPanel({
   kind: string;
   locked: LockedCheck;
 }) {
-  const sighted = locked.sighted_at
-    ? new Date(locked.sighted_at).toLocaleDateString("en-AU", { dateStyle: "medium" })
-    : null;
+  const sighted = locked.sighted_at ? fmtDate(locked.sighted_at) : null;
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
       <p className="font-medium text-slate-700">Sighted {kind}</p>
@@ -656,9 +655,7 @@ function LockedCheckPanel({
         <dd>{locked.check_number || "—"}</dd>
         <dt className="text-slate-500">Expiry</dt>
         <dd>
-          {locked.expiry_date
-            ? new Date(locked.expiry_date).toLocaleDateString("en-AU", { dateStyle: "medium" })
-            : "—"}
+          {locked.expiry_date ? fmtDate(locked.expiry_date) : "—"}
         </dd>
         <dt className="text-slate-500">State of issue</dt>
         <dd>{locked.state_of_issue || "—"}</dd>

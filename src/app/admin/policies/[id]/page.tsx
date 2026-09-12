@@ -93,6 +93,7 @@ export default async function PolicyDetailPage({
           id: id as string,
           name: sopName.get(id) ?? "Procedure",
         }))}
+        timezone={me.organisation_timezone}
       />
     </div>
   );

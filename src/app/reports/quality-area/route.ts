@@ -17,7 +17,12 @@ export async function GET() {
   ]);
 
   return pdfResponse(
-    TagReportPdf({ orgName, title: "Quality area report", sections }),
+    TagReportPdf({
+      orgName,
+      title: "Quality area report",
+      sections,
+      timezone: auth.profile.organisation_timezone,
+    }),
     "Quality area report.pdf",
   );
 }

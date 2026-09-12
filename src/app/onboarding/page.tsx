@@ -242,6 +242,7 @@ export default async function OnboardingPage() {
             contracts={contracts}
             canManage={false}
             canSign
+            timezone={profile.organisation_timezone}
           />
         </section>
       )}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { REVIEW_PERIODS, REVIEW_PERIOD_LABELS } from "@/lib/constants";
 import type { PolicyCategory } from "@/lib/policy-categories";
 import { HISTORY_EVENT_LABELS, fmtReviewDate, reviewState } from "@/lib/sop-review";
+import { fmtDateTime } from "@/lib/format-date";
 import {
   deleteSop,
   publishSop,
@@ -73,10 +74,12 @@ export function SopEditor({
   sourceDoc,
   history,
   openActions,
+  timezone,
 }: {
   sop: Sop;
   categories: PolicyCategory[];
   canEdit: boolean;
+  timezone: string;
   services: { id: string; name: string }[];
   jobRoles: { id: string; name: string; is_placeholder: boolean }[];
   linkedRoleIds: string[];
@@ -139,7 +142,7 @@ export function SopEditor({
               {published
                 ? `Published v${sop.published_version}` +
                   (sop.published_at
-                    ? ` on ${new Date(sop.published_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}`
+                    ? ` on ${fmtDateTime(sop.published_at, timezone)}`
                     : "") +
                   (canEdit && dirty ? " · unpublished changes below" : "")
                 : "Not published — staff cannot see this yet"}
@@ -507,10 +510,7 @@ export function SopEditor({
                     {HISTORY_EVENT_LABELS[h.eventType] ?? h.eventType}
                   </span>
                   <span className="text-xs text-slate-400">
-                    {new Date(h.at).toLocaleString("en-AU", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}{" "}
+                    {fmtDateTime(h.at, timezone, { time: true })}{" "}
                     · {h.actor}
                   </span>
                 </div>
