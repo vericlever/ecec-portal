@@ -143,6 +143,17 @@ export async function submitReview(sopId: string, formData: FormData): Promise<R
     });
   }
 
+  // Any staff outcome flag on this procedure is exactly what this review was
+  // meant to consider - resolve it against the review that just took it into
+  // account, rather than leaving it open indefinitely (build addendum, "My
+  // Outcomes" feeds into the review cycle instead of standing as its own
+  // inbox).
+  await supabase
+    .from("sop_outcome_flags")
+    .update({ resolved_review_id: review.id, resolved_at: new Date().toISOString() })
+    .eq("sop_id", sopId)
+    .is("resolved_at", null);
+
   revalidatePath(`/admin/sops/${sopId}`);
   revalidatePath(`/admin/sops/${sopId}/review`);
   revalidatePath("/admin/sops");

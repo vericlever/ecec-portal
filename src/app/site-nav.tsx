@@ -96,6 +96,9 @@ export function SiteNav(props: SiteNavProps) {
     const items: Item[] = [];
     if (canEditContent) items.push({ href: "/admin/policies", label: "Policies" });
     items.push({ href: "/admin/sops", label: "Procedures" });
+    if (canCountersign) {
+      items.push({ href: "/admin/outcome-flags", label: "Staff outcome flags" });
+    }
     if (canEditContent) {
       items.push(
         { href: "/admin/agreements", label: "Agreements" },

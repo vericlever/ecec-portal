@@ -36,22 +36,41 @@ export default async function ReviewSopPage({
     );
   }
 
-  const [{ data: links }, tags, { data: staff }, { data: previousReviews }] = await Promise.all([
-    supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
-    documentTags(supabase, "sop", sop.id),
-    supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("organisation_id", me.organisation_id)
-      .eq("is_active", true)
-      .order("full_name"),
-    supabase
-      .from("sop_reviews")
-      .select("id, reviewed_at, practice_reflection, outcome_reflection, decision")
-      .eq("sop_id", sop.id)
-      .order("reviewed_at", { ascending: false })
-      .limit(1),
-  ]);
+  const [{ data: links }, tags, { data: staff }, { data: previousReviews }, { data: openFlags }] =
+    await Promise.all([
+      supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
+      documentTags(supabase, "sop", sop.id),
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("organisation_id", me.organisation_id)
+        .eq("is_active", true)
+        .order("full_name"),
+      supabase
+        .from("sop_reviews")
+        .select("id, reviewed_at, practice_reflection, outcome_reflection, decision")
+        .eq("sop_id", sop.id)
+        .order("reviewed_at", { ascending: false })
+        .limit(1),
+      supabase
+        .from("sop_outcome_flags")
+        .select("id, reflection, created_at, flagged_by")
+        .eq("sop_id", sop.id)
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const flaggerIds = [...new Set((openFlags ?? []).map((f) => f.flagged_by as string))];
+  const { data: flaggers } = flaggerIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", flaggerIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const flaggerName = new Map((flaggers ?? []).map((p) => [p.id as string, p.full_name as string]));
+  const outcomeFlags = (openFlags ?? []).map((f) => ({
+    id: f.id as string,
+    reflection: f.reflection as string,
+    at: f.created_at as string,
+    by: flaggerName.get(f.flagged_by as string) ?? "A staff member",
+  }));
 
   const policyIds = (links ?? []).map((l) => l.policy_id as string);
   const { data: policyRows } = policyIds.length
@@ -101,6 +120,29 @@ export default async function ReviewSopPage({
         ← {sop.name}
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Review: {sop.name}</h1>
+
+      {outcomeFlags.length > 0 && (
+        <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+            Staff outcome flags ({outcomeFlags.length})
+          </h2>
+          <p className="mt-1 text-xs text-amber-700">
+            Raised by staff on this procedure since the last review. Consider these
+            alongside your own reflections below - they resolve automatically once
+            you save this review.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {outcomeFlags.map((f) => (
+              <li key={f.id} className="border-t border-amber-200 pt-2 first:border-t-0 first:pt-0">
+                <p className="text-slate-800">{f.reflection}</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  {f.by} · {fmtReviewDate(f.at)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
         <p className="text-slate-700">

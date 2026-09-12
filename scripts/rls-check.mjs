@@ -88,6 +88,7 @@ const TABLES = {
   sop_history: "organisation_id",
   sop_reviews: "organisation_id",
   sop_review_actions: "organisation_id",
+  sop_outcome_flags: "organisation_id",
   staff_import_records: "organisation_id",
   comprehension_questions: "organisation_id",
   profile_job_roles: "organisation_id",
@@ -697,6 +698,95 @@ const APP_SCENARIOS = [
     as: STAFF,
     probe: (c) =>
       c.query(`update public.sop_review_actions set status='cancelled' where id=$1`, [c._actionId]),
+  },
+
+  // sop_outcome_flags (migration 0055, "My Outcomes"): any org member raises
+  // a flag as themselves; only a manager/admin can read the org-wide list or
+  // resolve one (submitReview() does the resolving, not the person who
+  // raised it).
+  {
+    label: "staff flags a procedure with a reflection (own flag)",
+    expectOk: true,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_outcome_flags (organisation_id, sop_id, flagged_by, reflection) values ($1,$2,$3,'Kids seem unsettled after this routine.')`,
+        [RSG, RSG_SOP, STAFF],
+      ),
+  },
+  {
+    label: "staff spoofs flagged_by to someone else",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_outcome_flags (organisation_id, sop_id, flagged_by, reflection) values ($1,$2,$3,'x')`,
+        [RSG, RSG_SOP, MANAGER],
+      ),
+  },
+  {
+    label: "SK staff flags an RSG sop (cross-tenant, blocked)",
+    expectOk: false,
+    as: "f504ce94-e3c0-4584-8ac7-64cbe810a889",
+    probe: (c) =>
+      c.query(
+        `insert into public.sop_outcome_flags (organisation_id, sop_id, flagged_by, reflection) values ($1,$2,$3,'x')`,
+        [SK, RSG_SOP, "f504ce94-e3c0-4584-8ac7-64cbe810a889"],
+      ),
+  },
+  {
+    label: "manager reads open outcome flags org-wide",
+    expectOk: true,
+    setup: async (c) => {
+      const f = await c.query(
+        `insert into public.sop_outcome_flags (organisation_id, sop_id, flagged_by, reflection) values ($1,$2,$3,'x') returning id`,
+        [RSG, RSG_SOP, STAFF],
+      );
+      c._flagId = f.rows[0].id;
+    },
+    as: MANAGER,
+    probe: (c) => c.query(`select id from public.sop_outcome_flags where id=$1`, [c._flagId]),
+  },
+  {
+    label: "staff reads someone else's open outcome flag (blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      const f = await c.query(
+        `insert into public.sop_outcome_flags (organisation_id, sop_id, flagged_by, reflection) values ($1,$2,$3,'x') returning id`,
+        [RSG, RSG_SOP, MANAGER],
+      );
+      c._flagId = f.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select id from public.sop_outcome_flags where id=$1`, [c._flagId]),
+  },
+  {
+    label: "manager resolves an open flag",
+    expectOk: true,
+    setup: async (c) => {
+      const f = await c.query(
+        `insert into public.sop_outcome_flags (organisation_id, sop_id, flagged_by, reflection) values ($1,$2,$3,'x') returning id`,
+        [RSG, RSG_SOP, STAFF],
+      );
+      c._flagId = f.rows[0].id;
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(`update public.sop_outcome_flags set resolved_at=now() where id=$1`, [c._flagId]),
+  },
+  {
+    label: "staff resolves their own flag directly (blocked - only a review does this)",
+    expectOk: false,
+    setup: async (c) => {
+      const f = await c.query(
+        `insert into public.sop_outcome_flags (organisation_id, sop_id, flagged_by, reflection) values ($1,$2,$3,'x') returning id`,
+        [RSG, RSG_SOP, STAFF],
+      );
+      c._flagId = f.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) =>
+      c.query(`update public.sop_outcome_flags set resolved_at=now() where id=$1`, [c._flagId]),
   },
 ];
 

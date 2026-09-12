@@ -5,6 +5,7 @@ import { classifyPersonCredentials } from "@/lib/credentials";
 import { agreementsForProfile } from "@/lib/agreements";
 import { assignedJobRoles } from "@/lib/staff-job-roles";
 import { StageArc } from "@/components/bauhaus";
+import { OutcomeFlagForm } from "./outcome-flag-form";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,7 @@ export default async function StaffHomePage() {
   let sopTotal = 0;
   const suiteByRole = new Map<string, string[]>();
   const trainingByRole: { name: string; pct: number | null }[] = [];
+  const mySops: { id: string; name: string }[] = [];
   if (myRoleIds.length > 0) {
     const { data: roleSops } = await supabase
       .from("job_role_sops")
@@ -85,6 +87,7 @@ export default async function StaffHomePage() {
       );
       sopTotal = published.size;
       for (const s of published.values()) {
+        mySops.push({ id: s.id as string, name: s.name as string });
         const so = signOffFor.get(`${s.id}:${s.published_version}`);
         const item = { label: s.name as string, href: `/sops/${s.id}` };
         if (!so) {
@@ -113,6 +116,7 @@ export default async function StaffHomePage() {
       for (const role of myRoles) trainingByRole.push({ name: role.name, pct: null });
     }
   }
+  mySops.sort((a, b) => a.name.localeCompare(b.name));
 
   const credentialAlerts = classifyPersonCredentials({
     wwcc: (wwcc ?? []) as { expiry_date: string | null }[],
@@ -228,9 +232,7 @@ export default async function StaffHomePage() {
 
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <SectionHeading stage="outcomes" title="My Outcomes" />
-          <p className="mt-3 text-sm text-slate-500">
-            Flagging a procedure with a reflection for your manager is coming soon.
-          </p>
+          <OutcomeFlagForm sops={mySops} />
         </section>
       </div>
 

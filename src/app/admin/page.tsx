@@ -34,6 +34,7 @@ export default async function DashboardPage() {
     { data: sopLinks },
     { data: history },
     sopReviewStatus,
+    { count: openOutcomeFlags },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -82,6 +83,12 @@ export default async function DashboardPage() {
           }[],
         }),
     sopReviewStatusMap(supabase),
+    manager
+      ? supabase
+          .from("sop_outcome_flags")
+          .select("id", { count: "exact", head: true })
+          .is("resolved_at", null)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const { data: unsignedContracts } = await supabase
@@ -296,6 +303,17 @@ export default async function DashboardPage() {
       label: "Procedures waiting for your countersignature",
       count: cosignCount,
       detail: cosignCount === 0 ? "Nothing waiting" : "staff have signed",
+    },
+    {
+      show: manager,
+      href: "/admin/outcome-flags",
+      label: "Staff outcome flags awaiting review",
+      count: openOutcomeFlags ?? 0,
+      detail:
+        (openOutcomeFlags ?? 0) === 0
+          ? "Nothing outstanding"
+          : "resolves when that procedure is next reviewed",
+      alert: (openOutcomeFlags ?? 0) > 0,
     },
   ].filter((a) => a.show);
 
