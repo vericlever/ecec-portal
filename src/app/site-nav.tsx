@@ -44,12 +44,11 @@ export function SiteNav(props: SiteNavProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  // Plain staff (build addendum item 2): exactly Home, My details, Procedures.
-  // Policies is deliberately not a standalone tab here - reachable only via
-  // the Step 15 click-through from a procedure to its source policy, so the
-  // two-tier architecture (staff train on procedures, never touch policy
-  // directly) holds in the nav as well as the data model. Leaders keep the
-  // existing nav unchanged, Overview included.
+  // Plain staff (build addendum item 2, revised): Home, My details,
+  // Procedures, Policies. Policies was dropped as a standalone tab per the
+  // original spec (reachable only via the Step 15 click-through from a
+  // procedure to its source policy) but reinstated on request. Leaders keep
+  // the existing nav unchanged, Overview included.
   const primary: Item[] = isLeader
     ? [
         { href: "/admin", label: "Overview" },
@@ -67,6 +66,7 @@ export function SiteNav(props: SiteNavProps) {
         { href: "/home", label: "Home" },
         { href: "/onboarding", label: "My details" },
         { href: "/sops", label: "Procedures" },
+        { href: "/policies", label: "Policies" },
       ];
 
   const manageGroups: { label: string; items: Item[] }[] = [];
