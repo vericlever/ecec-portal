@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { requireContentEditor } from "@/lib/auth";
+import { requireManager, canEditContent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { reviewState } from "@/lib/sop-review";
 import { procedureCategories } from "@/lib/policy-categories";
 import { CategoryFilter } from "./category-filter";
+import { sopReviewStatusMap } from "@/lib/sop-review-status";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ type SopRow = {
   published_version: number | null;
   service_id: string | null;
   next_review_date: string | null;
-  needs_review: boolean | null;
+  latest_decision: "stands" | "needs_revision" | null;
 };
 
 function statusOf(s: SopRow): { label: string; tone: "grey" | "amber" | "green" | "blue" } {
@@ -43,20 +44,22 @@ export default async function AdminSopsPage({
 }: {
   searchParams: { category?: string };
 }) {
-  await requireContentEditor();
+  const me = await requireManager();
+  const canEdit = canEditContent(me.access_tier);
   const supabase = createClient();
 
-  const [{ data: sops }, { data: services }, { data: roleLinks }, categories] =
+  const [{ data: sops }, { data: services }, { data: roleLinks }, categories, reviewStatus] =
     await Promise.all([
       supabase
         .from("sops")
         .select(
-          "id, name, category_id, signoff_type, priority, body, published_body, published_version, service_id, next_review_date, needs_review",
+          "id, name, category_id, signoff_type, priority, body, published_body, published_version, service_id",
         )
         .order("name"),
       supabase.from("services").select("id, name"),
       supabase.from("job_role_sops").select("sop_id"),
       procedureCategories(supabase),
+      sopReviewStatusMap(supabase),
     ]);
 
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
@@ -65,7 +68,11 @@ export default async function AdminSopsPage({
   for (const l of roleLinks ?? [])
     roleCount.set(l.sop_id, (roleCount.get(l.sop_id) ?? 0) + 1);
 
-  const allRows = (sops ?? []) as SopRow[];
+  const allRows = (sops ?? []).map((s) => ({
+    ...s,
+    next_review_date: reviewStatus.get(s.id as string)?.nextReviewDate ?? null,
+    latest_decision: reviewStatus.get(s.id as string)?.latestDecision ?? null,
+  })) as SopRow[];
   const categoryFilter = searchParams.category ?? "";
   const rows = categoryFilter
     ? allRows.filter((s) => s.category_id === categoryFilter)
@@ -75,6 +82,7 @@ export default async function AdminSopsPage({
   const reviewOverdue = rows.filter(
     (s) => s.published_version && reviewState(s.next_review_date).status === "overdue",
   ).length;
+  const needsRevision = rows.filter((s) => s.latest_decision === "needs_revision").length;
 
   return (
     <div>
@@ -82,18 +90,22 @@ export default async function AdminSopsPage({
         <h1 className="text-xl font-semibold">Procedures</h1>
         <div className="flex gap-2">
           <CategoryFilter categories={categories} />
-          <Link
-            href="/admin/sops/bulk"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Bulk upload
-          </Link>
-          <Link
-            href="/admin/sops/new"
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
-          >
-            New Procedure
-          </Link>
+          {canEdit && (
+            <>
+              <Link
+                href="/admin/sops/bulk"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Bulk upload
+              </Link>
+              <Link
+                href="/admin/sops/new"
+                className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+              >
+                New Procedure
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
@@ -104,6 +116,12 @@ export default async function AdminSopsPage({
           <span className="text-red-700">
             {" "}
             · {reviewOverdue} overdue for review
+          </span>
+        )}
+        {needsRevision > 0 && (
+          <span className="text-red-700">
+            {" "}
+            · {needsRevision} needing revision
           </span>
         )}
       </p>
@@ -143,9 +161,9 @@ export default async function AdminSopsPage({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {s.needs_review && (
+                  {s.latest_decision === "needs_revision" && (
                     <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                      Needs review
+                      Needs revision
                     </span>
                   )}
                   {rev && (rev.status === "overdue" || rev.status === "soon") && (

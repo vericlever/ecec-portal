@@ -12,6 +12,7 @@ import { expiringCredentials } from "@/lib/credentials";
 import { contractAlerts } from "@/lib/contracts";
 import { unsignedAgreementsByProfile } from "@/lib/agreements";
 import { reviewState, HISTORY_EVENT_LABELS } from "@/lib/sop-review";
+import { sopReviewStatusMap } from "@/lib/sop-review-status";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
     { data: pubPolicies },
     { data: sopLinks },
     { data: history },
+    sopReviewStatus,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -56,7 +58,7 @@ export default async function DashboardPage() {
     supabase.from("services").select("id, name").order("name"),
     supabase
       .from("sops")
-      .select("id, name, next_review_date, needs_review")
+      .select("id, name")
       .not("published_version", "is", null),
     supabase
       .from("policies")
@@ -67,6 +69,7 @@ export default async function DashboardPage() {
       ? supabase
           .from("sop_history")
           .select("id, sop_id, event_type, note, created_at")
+          .neq("event_type", "period_change")
           .order("created_at", { ascending: false })
           .limit(20)
       : Promise.resolve({
@@ -78,6 +81,7 @@ export default async function DashboardPage() {
             created_at: string;
           }[],
         }),
+    sopReviewStatusMap(supabase),
   ]);
 
   const { data: unsignedContracts } = await supabase
@@ -153,11 +157,11 @@ export default async function DashboardPage() {
     (p) => (stats.get(p.id)?.outstanding ?? 0) > 0,
   ).length;
 
-  // --- review cycle (Steps 20 & 21) ------------------------------------
+  // --- review cycle (Review cycle v2) -----------------------------------
   type ReviewItem = { id: string; name: string; kind: "Procedure" | "Policy"; label: string; overdue: boolean };
   const reviewItems: ReviewItem[] = [];
   for (const s of pubSops ?? []) {
-    const r = reviewState(s.next_review_date as string | null);
+    const r = reviewState(sopReviewStatus.get(s.id as string)?.nextReviewDate ?? null);
     if (r.status === "overdue" || r.status === "soon")
       reviewItems.push({
         id: s.id as string,
@@ -182,7 +186,9 @@ export default async function DashboardPage() {
     (a, b) => Number(b.overdue) - Number(a.overdue) || a.name.localeCompare(b.name),
   );
   const reviewOverdue = reviewItems.filter((i) => i.overdue).length;
-  const flaggedSops = (pubSops ?? []).filter((s) => s.needs_review);
+  const needsRevision = (pubSops ?? []).filter(
+    (s) => sopReviewStatus.get(s.id as string)?.latestDecision === "needs_revision",
+  );
 
   // --- structural integrity (Step 6 linking) --------------------------
   const linkedSopIds = new Set((sopLinks ?? []).map((l) => l.sop_id as string));
@@ -235,15 +241,12 @@ export default async function DashboardPage() {
       alert: reviewOverdue > 0,
     },
     {
-      show: manager,
-      href: "/admin/observations",
-      label: "Procedures flagged by a procedure outcome record",
-      count: flaggedSops.length,
-      detail:
-        flaggedSops.length === 0
-          ? "None flagged"
-          : "waiting on a content editor",
-      alert: flaggedSops.length > 0,
+      show: editor,
+      href: "/admin/sops",
+      label: "Procedures a review decided need revision",
+      count: needsRevision.length,
+      detail: needsRevision.length === 0 ? "None" : "waiting on a content editor",
+      alert: needsRevision.length > 0,
     },
     {
       show: true,
@@ -366,19 +369,19 @@ export default async function DashboardPage() {
         ))}
       </ul>
 
-      {editor && (reviewItems.length > 0 || flaggedSops.length > 0) && (
+      {editor && (reviewItems.length > 0 || needsRevision.length > 0) && (
         <details className="mt-3 rounded-lg border border-slate-200 bg-white">
           <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-700">
             Review cycle detail
           </summary>
           <div className="border-t border-slate-100 px-4 py-3 text-sm">
-            {flaggedSops.length > 0 && (
+            {needsRevision.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                  Flagged from an observation
+                  A review decided these need revision
                 </p>
                 <ul className="mt-1 space-y-0.5">
-                  {flaggedSops.map((s) => (
+                  {needsRevision.map((s) => (
                     <li key={s.id as string}>
                       <Link
                         href={`/admin/sops/${s.id}`}

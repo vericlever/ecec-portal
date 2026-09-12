@@ -32,6 +32,19 @@ export function fmtReviewDate(isoDate: string): string {
   });
 }
 
+// Report rule 3 (Review cycle v2): day month year, no ordinal suffix, no
+// abbreviation - "10 March 2027", never "10 Sept 2026" or "2027-03-10". Used
+// only in generated report output, never in-app UI (fmtReviewDate covers
+// that, with its shorter month form).
+export function fmtReportDate(isoDate: string): string {
+  const d = new Date(isoDate.length === 10 ? isoDate + "T00:00:00" : isoDate);
+  return d.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function reviewState(nextReviewDate: string | null): ReviewState {
   if (!nextReviewDate) {
     return {
@@ -86,7 +99,9 @@ export function reviewDateFromNow(months: number): string {
 }
 
 export const HISTORY_EVENT_LABELS: Record<string, string> = {
-  edit: "Content edited",
+  edit: "Revised",
+  published: "Republished",
   period_change: "Review schedule changed",
   review: "Reviewed",
+  reviewed: "Reviewed",
 };

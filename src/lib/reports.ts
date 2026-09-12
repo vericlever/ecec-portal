@@ -13,7 +13,8 @@ import {
   CHILD_SAFE_STANDARDS,
   type TagOption,
 } from "@/lib/tags";
-import { reviewState } from "@/lib/sop-review";
+import { reviewState, fmtReportDate } from "@/lib/sop-review";
+import { sopReviewStatusMap } from "@/lib/sop-review-status";
 import { expiringCredentials, type CredentialAlert } from "@/lib/credentials";
 import { contractAlerts, renewalState, type ContractRow } from "@/lib/contracts";
 import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
@@ -236,52 +237,120 @@ export async function serviceOverviewData(
 }
 
 // ---------------------------------------------------------------------------
-// Steps 32 / 33: child safety standards report and quality area report. Same
-// shape - one section per tag, listing the SOPs (procedures) tagged to it,
-// their latest review, and what would show it is working.
+// Child safety standards report and its NQS equivalent (Review cycle v2).
+// One section per tag; each procedure under it appears as a full block, not
+// a table row - a reflection is a paragraph, and a table cell cannot hold
+// one. A procedure tagged to more than one standard appears in full under
+// each one it is tagged to; that duplication is intended, per the spec, since
+// each standard has to stand alone as evidence.
 // ---------------------------------------------------------------------------
+
+export type TagSectionAction = {
+  description: string;
+  ownerName: string;
+  dueDate: string;
+  status: "open" | "done" | "cancelled";
+};
 
 export type TagSectionSop = {
   id: string;
   name: string;
-  reviewLabel: string;
-  reviewOverdue: boolean;
-  lastReviewedNote: string | null;
-  suggestedEvidence: string | null;
+  policyNames: string[];
+  everReviewed: boolean;
+  lastReviewedDate: string | null;
+  nextReviewDueDate: string | null;
+  nextReviewOverdue: boolean;
+  decision: "stands" | "needs_revision" | null;
+  practiceReflection: string | null;
+  outcomeReflection: string | null;
+  evidenceFileName: string | null;
+  actions: TagSectionAction[];
 };
 
 export type TagSection = { option: TagOption; sops: TagSectionSop[] };
+
+// Storage paths are "<org>/<owner-type>/<owner-id>/<timestamp>-<name>" (see
+// storeDocument) - the report only ever needs the trailing name.
+function fileNameFromPath(path: string): string {
+  const last = path.split("/").pop() ?? path;
+  return last.replace(/^\d+-/, "");
+}
 
 async function tagSectionsReport(
   supabase: ServerClient,
   options: TagOption[],
   kind: "quality_area" | "child_safe_standard",
 ): Promise<TagSection[]> {
-  const [{ data: sops }, tagsBySop, { data: historyRows }] = await Promise.all([
-    supabase
-      .from("sops")
-      .select("id, name, next_review_date, suggested_evidence")
-      .not("published_version", "is", null),
-    documentTagsFor(supabase, "sop"),
-    supabase
-      .from("sop_history")
-      .select("sop_id, event_type, note, created_at")
-      .eq("event_type", "review")
-      .order("created_at", { ascending: false }),
-  ]);
-
-  const lastReview = new Map<string, string>();
-  for (const h of historyRows ?? []) {
-    const id = h.sop_id as string;
-    if (!lastReview.has(id)) {
-      lastReview.set(
-        id,
-        `${new Date(h.created_at as string).toLocaleDateString("en-AU", { dateStyle: "medium" })}${h.note ? ` - ${h.note}` : ""}`,
-      );
-    }
-  }
+  const [{ data: sops }, tagsBySop, { data: policyLinks }, { data: allPolicies }, reviewStatus] =
+    await Promise.all([
+      supabase.from("sops").select("id, name").not("published_version", "is", null),
+      documentTagsFor(supabase, "sop"),
+      supabase.from("policy_sop_links").select("sop_id, policy_id"),
+      supabase.from("policies").select("id, name"),
+      sopReviewStatusMap(supabase),
+    ]);
 
   const sopById = new Map((sops ?? []).map((s) => [s.id as string, s]));
+  const policyName = new Map((allPolicies ?? []).map((p) => [p.id as string, p.name as string]));
+  const policyNamesBySop = new Map<string, string[]>();
+  for (const l of policyLinks ?? []) {
+    const list = policyNamesBySop.get(l.sop_id as string) ?? [];
+    const name = policyName.get(l.policy_id as string);
+    if (name) list.push(name);
+    policyNamesBySop.set(l.sop_id as string, list);
+  }
+
+  type ReviewRow = {
+    id: string;
+    sop_id: string;
+    reviewed_at: string;
+    decision: "stands" | "needs_revision";
+    practice_reflection: string;
+    outcome_reflection: string;
+    evidence_path: string | null;
+  };
+
+  const sopIdsInvolved = [...sopById.keys()];
+  const { data: reviews } = sopIdsInvolved.length
+    ? await supabase
+        .from("sop_reviews")
+        .select("id, sop_id, reviewed_at, decision, practice_reflection, outcome_reflection, evidence_path")
+        .in("sop_id", sopIdsInvolved)
+        .order("reviewed_at", { ascending: false })
+    : { data: [] as ReviewRow[] };
+
+  // First row per sop_id, since reviews came back newest first.
+  const latestReviewBySop = new Map<string, ReviewRow>();
+  for (const r of (reviews ?? []) as ReviewRow[]) {
+    const id = r.sop_id;
+    if (!latestReviewBySop.has(id)) latestReviewBySop.set(id, r);
+  }
+
+  const latestReviewIds = [...latestReviewBySop.values()].map((r) => r.id);
+  const { data: actionRows } = latestReviewIds.length
+    ? await supabase
+        .from("sop_review_actions")
+        .select("review_id, description, owner_id, due_date, status")
+        .in("review_id", latestReviewIds)
+    : { data: [] as never[] };
+
+  const ownerIds = [...new Set((actionRows ?? []).map((a) => a.owner_id as string))];
+  const { data: owners } = ownerIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", ownerIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const ownerName = new Map((owners ?? []).map((o) => [o.id as string, o.full_name as string]));
+
+  const actionsByReview = new Map<string, TagSectionAction[]>();
+  for (const a of actionRows ?? []) {
+    const list = actionsByReview.get(a.review_id as string) ?? [];
+    list.push({
+      description: a.description as string,
+      ownerName: ownerName.get(a.owner_id as string) ?? "Someone",
+      dueDate: fmtReportDate(a.due_date as string),
+      status: a.status as "open" | "done" | "cancelled",
+    });
+    actionsByReview.set(a.review_id as string, list);
+  }
 
   return options.map((option) => {
     const sopIds = [...tagsBySop.entries()]
@@ -295,14 +364,23 @@ async function tagSectionsReport(
 
     const sopsOut: TagSectionSop[] = sopIds.map((id) => {
       const s = sopById.get(id)!;
-      const rs = reviewState(s.next_review_date as string | null);
+      const status = reviewStatus.get(id);
+      const review = latestReviewBySop.get(id);
       return {
         id,
         name: s.name as string,
-        reviewLabel: rs.label,
-        reviewOverdue: rs.status === "overdue",
-        lastReviewedNote: lastReview.get(id) ?? null,
-        suggestedEvidence: (s.suggested_evidence as string | null) ?? null,
+        policyNames: policyNamesBySop.get(id) ?? [],
+        everReviewed: Boolean(status?.lastReviewedAt),
+        lastReviewedDate: status?.lastReviewedAt ? fmtReportDate(status.lastReviewedAt) : null,
+        nextReviewDueDate: status?.nextReviewDate ? fmtReportDate(status.nextReviewDate) : null,
+        nextReviewOverdue: status?.nextReviewDate
+          ? reviewState(status.nextReviewDate).status === "overdue"
+          : false,
+        decision: review?.decision ?? null,
+        practiceReflection: review?.practice_reflection ?? null,
+        outcomeReflection: review?.outcome_reflection ?? null,
+        evidenceFileName: review?.evidence_path ? fileNameFromPath(review.evidence_path) : null,
+        actions: review ? (actionsByReview.get(review.id) ?? []) : [],
       };
     });
     sopsOut.sort((a, b) => a.name.localeCompare(b.name));
@@ -393,26 +471,28 @@ export async function reviewCalendarData(
   supabase: ServerClient,
   serviceId: string | null,
 ): Promise<ReviewCalendarItem[]> {
-  const [{ data: sops }, { data: policies }] = await Promise.all([
+  const [{ data: sops }, { data: policies }, reviewStatus] = await Promise.all([
     supabase
       .from("sops")
-      .select("id, name, next_review_date, service_id")
+      .select("id, name, service_id")
       .not("published_version", "is", null),
     supabase
       .from("policies")
       .select("id, name, next_review_date, service_id")
       .not("published_version", "is", null),
+    sopReviewStatusMap(supabase),
   ]);
 
   const items: ReviewCalendarItem[] = [];
   for (const s of sops ?? []) {
     if (serviceId && s.service_id && s.service_id !== serviceId) continue;
-    const rs = reviewState(s.next_review_date as string | null);
+    const nextReviewDate = reviewStatus.get(s.id as string)?.nextReviewDate ?? null;
+    const rs = reviewState(nextReviewDate);
     items.push({
       id: s.id as string,
       name: s.name as string,
       kind: "Procedure",
-      nextReviewDate: s.next_review_date as string | null,
+      nextReviewDate,
       label: rs.label,
       overdue: rs.status === "overdue",
     });
@@ -588,9 +668,13 @@ export async function versionChangeHistoryData(
   supabase: ServerClient,
 ): Promise<ChangeHistoryEntry[]> {
   const [{ data: history }, { data: policies }] = await Promise.all([
+    // period_change events stay in the audit log but are dropped from every
+    // report and history view - a cadence change is not part of the
+    // improvement story and dilutes the log a reviewer has to read.
     supabase
       .from("sop_history")
       .select("sop_id, event_type, note, actor_profile_id, created_at")
+      .neq("event_type", "period_change")
       .order("created_at", { ascending: false })
       .limit(200),
     // No per-version policy history log exists yet - the latest publish and

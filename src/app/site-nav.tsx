@@ -89,20 +89,15 @@ export function SiteNav(props: SiteNavProps) {
     }
     manageGroups.push({ label: "Staff", items });
   }
-  // Library: content editors get the full editing set; anyone who can
-  // countersign (every manager tier, not just content editors) keeps their
-  // existing access to Procedure Outcomes here too, per Step 21's spec that
-  // logging is open to every manager tier - moving it into this group must
-  // not narrow who can reach it.
+  // Library: content editors get the full editing set. Any manager keeps
+  // Procedures too - Review cycle v2 lets manager_staff complete a review
+  // even though only a content editor may revise and republish the text.
   if (canEditContent || canCountersign) {
     const items: Item[] = [];
-    if (canCountersign) {
-      items.push({ href: "/admin/observations", label: "Procedure Outcomes" });
-    }
+    if (canEditContent) items.push({ href: "/admin/policies", label: "Policies" });
+    items.push({ href: "/admin/sops", label: "Procedures" });
     if (canEditContent) {
       items.push(
-        { href: "/admin/policies", label: "Policies" },
-        { href: "/admin/sops", label: "Procedures" },
         { href: "/admin/agreements", label: "Agreements" },
         { href: "/admin/job-roles", label: "Job roles" },
       );
