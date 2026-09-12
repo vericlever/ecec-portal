@@ -21,7 +21,7 @@ export default async function JobRoleDetailPage({
     .maybeSingle();
   if (!role || role.organisation_id !== me.organisation_id) notFound();
 
-  const [{ data: allSops }, { data: links }, { data: everyone }] =
+  const [{ data: allSops }, { data: links }, { data: everyone }, { data: roleHolders }] =
     await Promise.all([
       supabase
         .from("sops")
@@ -30,14 +30,16 @@ export default async function JobRoleDetailPage({
       supabase.from("job_role_sops").select("sop_id").eq("job_role_id", params.id),
       supabase
         .from("profiles")
-        .select("id, full_name, is_active, job_role_id")
+        .select("id, full_name, is_active")
         .neq("access_tier", "admin")
         .order("full_name"),
+      supabase.from("profile_job_roles").select("profile_id").eq("job_role_id", params.id),
     ]);
 
+  const holderIds = new Set((roleHolders ?? []).map((r) => r.profile_id as string));
   const activePeople = (everyone ?? []).filter((p) => p.is_active);
-  const staff = activePeople.filter((p) => p.job_role_id === params.id);
-  const candidates = activePeople.filter((p) => p.job_role_id !== params.id);
+  const staff = activePeople.filter((p) => holderIds.has(p.id as string));
+  const candidates = activePeople.filter((p) => !holderIds.has(p.id as string));
 
   const linkedIds = new Set((links ?? []).map((l) => l.sop_id));
 

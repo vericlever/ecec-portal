@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireProfile, isWorker, TIER_LABELS } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { assignedJobRoles } from "@/lib/staff-job-roles";
 
 export const dynamic = "force-dynamic";
 
@@ -8,30 +9,23 @@ export default async function AccountPage() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const [{ data: org }, { data: service }, { data: jobRole }] =
-    await Promise.all([
-      profile.organisation_id
-        ? supabase
-            .from("organisations")
-            .select("name")
-            .eq("id", profile.organisation_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      profile.service_id
-        ? supabase
-            .from("services")
-            .select("name")
-            .eq("id", profile.service_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      profile.job_role_id
-        ? supabase
-            .from("job_roles")
-            .select("name")
-            .eq("id", profile.job_role_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [{ data: org }, { data: service }, jobRoles] = await Promise.all([
+    profile.organisation_id
+      ? supabase
+          .from("organisations")
+          .select("name")
+          .eq("id", profile.organisation_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    profile.service_id
+      ? supabase
+          .from("services")
+          .select("name")
+          .eq("id", profile.service_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    assignedJobRoles(supabase, profile.id),
+  ]);
 
   const worker = isWorker(profile);
 
@@ -60,7 +54,7 @@ export default async function AccountPage() {
 
         <dt className="text-slate-500">Job role</dt>
         <dd className="col-span-2 text-slate-800">
-          {jobRole?.name ?? "None"}
+          {jobRoles.length > 0 ? jobRoles.map((r) => r.name).join(", ") : "None"}
         </dd>
       </dl>
 

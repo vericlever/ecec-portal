@@ -75,10 +75,21 @@ export async function staffStatsByProfile(
   people: { id: string; job_role_id: string | null; service_id: string | null }[],
   currentProfileId: string,
 ): Promise<Map<string, StaffStat>> {
+  const peopleIds = people.map((p) => p.id);
+  const { data: roleLinks } = peopleIds.length
+    ? await supabase
+        .from("profile_job_roles")
+        .select("profile_id, job_role_id")
+        .in("profile_id", peopleIds)
+    : { data: [] as { profile_id: string; job_role_id: string }[] };
+  const rolesByProfile = new Map<string, string[]>();
+  for (const r of roleLinks ?? []) {
+    const list = rolesByProfile.get(r.profile_id as string) ?? [];
+    list.push(r.job_role_id as string);
+    rolesByProfile.set(r.profile_id as string, list);
+  }
   const jobRoleIds = Array.from(
-    new Set(
-      people.map((p) => p.job_role_id).filter((x): x is string => Boolean(x)),
-    ),
+    new Set((roleLinks ?? []).map((r) => r.job_role_id as string)),
   );
 
   const [
@@ -128,7 +139,10 @@ export async function staffStatsByProfile(
       .from("contracts")
       .select("profile_id, expiry_date, period_type, signed_at, is_deed")
       .is("superseded_at", null),
-    unsignedAgreementsByProfile(supabase, people),
+    unsignedAgreementsByProfile(
+      supabase,
+      people.map((p) => ({ id: p.id, jobRoleIds: rolesByProfile.get(p.id) ?? [] })),
+    ),
   ]);
 
   // Expired or soon-to-expire credentials per person: latest expiry of each
@@ -237,8 +251,10 @@ export async function staffStatsByProfile(
 
   const out = new Map<string, StaffStat>();
   for (const p of people) {
-    const suite = (p.job_role_id ? (suiteByRole.get(p.job_role_id) ?? []) : [])
-      .filter((sopId) => publishedSop.has(sopId));
+    const roleIds = rolesByProfile.get(p.id) ?? [];
+    const suite = Array.from(
+      new Set(roleIds.flatMap((rid) => suiteByRole.get(rid) ?? [])),
+    ).filter((sopId) => publishedSop.has(sopId));
     const sopTotal = suite.length;
     const signed = signedByUser.get(p.id) ?? new Map<string, boolean>();
     const sopSigned = suite.filter((sopId) => {
@@ -263,7 +279,7 @@ export async function staffStatsByProfile(
     // published policies not yet viewed. This is the number the staff record
     // page breaks down item by item.
     const onboardingOutstanding =
-      p.job_role_id && !onboarded.has(p.id) ? 1 : 0;
+      roleIds.length > 0 && !onboarded.has(p.id) ? 1 : 0;
     const outstanding =
       onboardingOutstanding +
       (pendingSightings.get(p.id) ?? 0) +

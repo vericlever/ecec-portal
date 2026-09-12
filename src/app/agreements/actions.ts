@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { assignedJobRoleIds } from "@/lib/staff-job-roles";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -28,14 +29,17 @@ export async function signAgreement(agreementId: string): Promise<Result> {
 
   // Confirm it applies to this person.
   let applies = agreement.all_staff;
-  if (!applies && me.job_role_id) {
-    const { data: link } = await supabase
-      .from("hr_agreement_job_roles")
-      .select("agreement_id")
-      .eq("agreement_id", agreementId)
-      .eq("job_role_id", me.job_role_id)
-      .maybeSingle();
-    applies = Boolean(link);
+  if (!applies) {
+    const roleIds = await assignedJobRoleIds(supabase, me.id);
+    if (roleIds.length > 0) {
+      const { data: links } = await supabase
+        .from("hr_agreement_job_roles")
+        .select("agreement_id")
+        .eq("agreement_id", agreementId)
+        .in("job_role_id", roleIds)
+        .limit(1);
+      applies = Boolean(links && links.length > 0);
+    }
   }
   if (!applies) {
     return { ok: false, error: "This agreement does not apply to you." };

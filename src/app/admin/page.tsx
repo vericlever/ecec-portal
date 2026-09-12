@@ -88,9 +88,24 @@ export default async function DashboardPage() {
     .eq("is_deed", false);
 
   const activeStaff = (staff ?? []).filter((p) => p.is_active);
+  const { data: roleLinks } = activeStaff.length
+    ? await supabase
+        .from("profile_job_roles")
+        .select("profile_id, job_role_id")
+        .in(
+          "profile_id",
+          activeStaff.map((p) => p.id),
+        )
+    : { data: [] as { profile_id: string; job_role_id: string }[] };
+  const rolesByProfile = new Map<string, string[]>();
+  for (const r of roleLinks ?? []) {
+    const list = rolesByProfile.get(r.profile_id as string) ?? [];
+    list.push(r.job_role_id as string);
+    rolesByProfile.set(r.profile_id as string, list);
+  }
   const unsignedAgreements = await unsignedAgreementsByProfile(
     supabase,
-    activeStaff,
+    activeStaff.map((p) => ({ id: p.id, jobRoleIds: rolesByProfile.get(p.id) ?? [] })),
   );
   const activeIds = new Set(activeStaff.map((p) => p.id));
   const signaturePeople = new Set<string>();

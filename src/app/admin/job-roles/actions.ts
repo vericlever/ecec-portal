@@ -150,6 +150,10 @@ async function canAssignRoles(personServiceId: string | null) {
   return ok ? me : null;
 }
 
+// Adds this one role to whatever roles the person already holds - a person
+// can hold more than one (an ed leader might need Educator and Room Leader
+// both). profiles.job_role_id is kept in sync as a "primary" role only when
+// the person had none before; adding a second role doesn't change it.
 export async function assignStaffToRole(
   roleId: string,
   profileId: string,
@@ -159,7 +163,7 @@ export async function assignStaffToRole(
     db.from("job_roles").select("id, organisation_id").eq("id", roleId).maybeSingle(),
     db
       .from("profiles")
-      .select("id, organisation_id, service_id")
+      .select("id, organisation_id, service_id, job_role_id")
       .eq("id", profileId)
       .maybeSingle(),
   ]);
@@ -172,14 +176,21 @@ export async function assignStaffToRole(
   }
 
   const { error } = await db
-    .from("profiles")
-    .update({ job_role_id: roleId })
-    .eq("id", profileId);
+    .from("profile_job_roles")
+    .upsert(
+      { profile_id: profileId, job_role_id: roleId, organisation_id: role.organisation_id },
+      { onConflict: "profile_id,job_role_id" },
+    );
   if (error) return { ok: false, error: error.message };
+
+  if (!person.job_role_id) {
+    await db.from("profiles").update({ job_role_id: roleId }).eq("id", profileId);
+  }
 
   revalidatePath(`/admin/job-roles/${roleId}`);
   revalidatePath("/admin/staff", "layout");
   revalidatePath("/sops");
+  revalidatePath("/home");
   return { ok: true };
 }
 
@@ -193,23 +204,40 @@ export async function removeStaffFromRole(
     .select("id, organisation_id, service_id, job_role_id")
     .eq("id", profileId)
     .maybeSingle();
-  if (!person || person.job_role_id !== roleId) {
-    return { ok: false, error: "That person is not in this role." };
-  }
+  if (!person) return { ok: false, error: "Staff member not found." };
   const me = await canAssignRoles(person.service_id as string | null);
   if (!me || me.organisation_id !== person.organisation_id) {
     return { ok: false, error: "You cannot change this person's role." };
   }
 
-  const { error } = await db
-    .from("profiles")
-    .update({ job_role_id: null })
-    .eq("id", profileId);
+  const { error, count } = await db
+    .from("profile_job_roles")
+    .delete({ count: "exact" })
+    .eq("profile_id", profileId)
+    .eq("job_role_id", roleId);
   if (error) return { ok: false, error: error.message };
+  if (!count) return { ok: false, error: "That person is not in this role." };
+
+  // If the role removed was the kept-in-sync "primary", replace it with
+  // whatever role (if any) is left, so profiles.job_role_id never points at
+  // a role the person no longer holds.
+  if (person.job_role_id === roleId) {
+    const { data: remaining } = await db
+      .from("profile_job_roles")
+      .select("job_role_id")
+      .eq("profile_id", profileId)
+      .limit(1)
+      .maybeSingle();
+    await db
+      .from("profiles")
+      .update({ job_role_id: (remaining?.job_role_id as string | undefined) ?? null })
+      .eq("id", profileId);
+  }
 
   revalidatePath(`/admin/job-roles/${roleId}`);
   revalidatePath("/admin/staff", "layout");
   revalidatePath("/sops");
+  revalidatePath("/home");
   return { ok: true };
 }
 

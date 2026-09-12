@@ -11,7 +11,7 @@ import {
   setHrManager,
   setProbation,
   setStaffAccessTier,
-  setStaffJobRole,
+  setStaffJobRoles,
 } from "./actions";
 import {
   permanentlyDeleteStaff,
@@ -289,39 +289,50 @@ export function JobRoleControl({
   jobRoles,
 }: {
   profileId: string;
-  value: string | null;
+  value: string[];
   jobRoles: { id: string; name: string }[];
 }) {
   const router = useRouter();
-  const [choice, setChoice] = useState(value ?? "");
+  const [choices, setChoices] = useState<string[]>(value);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const dirty = choice !== (value ?? "");
+  const sortedChoices = [...choices].sort();
+  const sortedValue = [...value].sort();
+  const dirty = sortedChoices.join(",") !== sortedValue.join(",");
+
+  function toggle(id: string) {
+    setChoices((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  }
 
   return (
     <div className="text-sm">
       <span className="font-medium text-slate-700">Job role</span>
       <p className="mt-0.5 text-xs text-slate-500">
-        Sets which procedure suite this person must complete. Changing it swaps the
-        suite straight away. Sign-offs on the old role stay in the record but
-        stop counting.
+        Sets which procedure suite(s) this person must complete. A person can hold
+        more than one role - an ed leader might need both Educator and Room
+        Leader. Removing a role drops its suite from their outstanding list;
+        sign-offs already recorded stay in the record but stop counting.
       </p>
+      <div className="mt-2 flex flex-col gap-1.5">
+        {jobRoles.map((r) => (
+          <label key={r.id} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={choices.includes(r.id)}
+              disabled={pending}
+              onChange={() => toggle(r.id)}
+              className="h-4 w-4"
+            />
+            {r.name}
+          </label>
+        ))}
+        {jobRoles.length === 0 && (
+          <span className="text-xs text-slate-400">No job roles set up yet.</span>
+        )}
+      </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select
-          value={choice}
-          onChange={(e) => setChoice(e.target.value)}
-          disabled={pending}
-          className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-        >
-          <option value="">No job role</option>
-          {jobRoles.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
         <button
           type="button"
           disabled={!dirty || pending}
@@ -329,7 +340,7 @@ export function JobRoleControl({
             start(async () => {
               setError(null);
               setMsg(null);
-              const r = await setStaffJobRole(profileId, choice || null);
+              const r = await setStaffJobRoles(profileId, choices);
               if (r.ok) {
                 setMsg("Saved");
                 router.refresh();

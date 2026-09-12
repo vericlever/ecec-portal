@@ -257,6 +257,14 @@ async function importOne(
     return { ok: false, error: profileErr.message };
   }
 
+  // Mirrors the primary role into profile_job_roles too - a second role can
+  // be added afterwards from the staff record's Job role control.
+  if (w.job_role_id) {
+    await supabase
+      .from("profile_job_roles")
+      .insert({ profile_id: userId, job_role_id: w.job_role_id, organisation_id: org });
+  }
+
   // Everything past this point is data on an account that now exists. A failure
   // here is captured as a problem note, not a rejection - the admin can fill the
   // gap from the staff record rather than re-create the account.

@@ -18,6 +18,7 @@ import { expiringCredentials, type CredentialAlert } from "@/lib/credentials";
 import { contractAlerts, renewalState, type ContractRow } from "@/lib/contracts";
 import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
 import { unsignedAgreementsByProfile } from "@/lib/agreements";
+import { assignedJobRoles, sopSuiteIdsForRoles } from "@/lib/staff-job-roles";
 
 type ServerClient = ReturnType<typeof createClient>;
 
@@ -466,17 +467,15 @@ export async function perStaffComplianceData(
     .maybeSingle();
   if (!profile) return null;
 
-  const [{ data: service }, { data: jobRole }, { data: roleSops }, { data: sops }, { data: signOffs }] =
+  const jobRoles = await assignedJobRoles(supabase, profileId);
+  const jobRoleIds = jobRoles.map((r) => r.id);
+
+  const [{ data: service }, suiteIdList, { data: sops }, { data: signOffs }] =
     await Promise.all([
       profile.service_id
         ? supabase.from("services").select("name").eq("id", profile.service_id).maybeSingle()
         : Promise.resolve({ data: null }),
-      profile.job_role_id
-        ? supabase.from("job_roles").select("name").eq("id", profile.job_role_id).maybeSingle()
-        : Promise.resolve({ data: null }),
-      profile.job_role_id
-        ? supabase.from("job_role_sops").select("sop_id").eq("job_role_id", profile.job_role_id)
-        : Promise.resolve({ data: [] as { sop_id: string }[] }),
+      sopSuiteIdsForRoles(supabase, jobRoleIds),
       supabase.from("sops").select("id, name, published_version, signoff_type").not("published_version", "is", null),
       supabase
         .from("sign_offs")
@@ -484,7 +483,7 @@ export async function perStaffComplianceData(
         .eq("user_id", profileId),
     ]);
 
-  const suiteIds = new Set((roleSops ?? []).map((r) => r.sop_id as string));
+  const suiteIds = new Set(suiteIdList);
   const sopById = new Map((sops ?? []).map((s) => [s.id as string, s]));
   const signedByKey = new Map(
     (signOffs ?? []).map((s) => [`${s.sop_id}:${s.sop_version}`, Boolean(s.verified_at)]),
@@ -536,9 +535,7 @@ export async function perStaffComplianceData(
       .eq("profile_id", profileId)
       .is("superseded_at", null)
       .maybeSingle(),
-    unsignedAgreementsByProfile(supabase, [
-      { id: profileId, job_role_id: profile.job_role_id as string | null },
-    ]),
+    unsignedAgreementsByProfile(supabase, [{ id: profileId, jobRoleIds }]),
   ]);
 
   const contract = (contractRows as ContractRow | null) ?? null;
@@ -546,7 +543,7 @@ export async function perStaffComplianceData(
   return {
     fullName: profile.full_name as string,
     serviceName: (service?.name as string | undefined) ?? "Unassigned",
-    jobRoleName: (jobRole?.name as string | undefined) ?? null,
+    jobRoleName: jobRoles.length > 0 ? jobRoles.map((r) => r.name).join(", ") : null,
     sopSigned,
     sopOutstanding,
     policiesViewed,

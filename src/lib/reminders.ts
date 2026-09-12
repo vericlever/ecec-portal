@@ -110,6 +110,7 @@ export async function runReminders(opts?: {
     { data: orgs },
     { data: profiles },
     { data: roleSops },
+    { data: profileRoles },
     { data: pubSops },
     { data: pubPolicies },
     { data: signOffs },
@@ -131,6 +132,7 @@ export async function runReminders(opts?: {
         "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, is_active",
       ),
     admin.from("job_role_sops").select("job_role_id, sop_id"),
+    admin.from("profile_job_roles").select("profile_id, job_role_id"),
     admin
       .from("sops")
       .select("id, name, organisation_id, published_version, signoff_type, next_review_date")
@@ -169,6 +171,16 @@ export async function runReminders(opts?: {
   const orgName = new Map((orgs ?? []).map((o) => [o.id as string, o.name as string]));
   const people = (profiles ?? []) as Person[];
   const peopleById = new Map(people.map((p) => [p.id, p]));
+
+  // A person can hold more than one job role (build addendum, "My Training").
+  // profile_job_roles is the source of truth for suite and agreement
+  // targeting; profiles.job_role_id is just the kept-in-sync primary.
+  const rolesByProfile = new Map<string, string[]>();
+  for (const r of profileRoles ?? []) {
+    const list = rolesByProfile.get(r.profile_id as string) ?? [];
+    list.push(r.job_role_id as string);
+    rolesByProfile.set(r.profile_id as string, list);
+  }
 
   // suite (published SOP ids) per job role
   const pubSopById = new Map(
@@ -264,13 +276,12 @@ export async function runReminders(opts?: {
     agreementSignedByUser.set(s.user_id as string, set);
   }
   function unsignedAgreements(p: Person): string[] {
+    const roleIds = rolesByProfile.get(p.id) ?? [];
     const out: string[] = [];
     for (const a of agreements ?? []) {
       if (a.organisation_id !== p.organisation_id) continue;
-      const applies =
-        a.all_staff ||
-        (p.job_role_id != null &&
-          agreementRoleSet.get(a.id as string)?.has(p.job_role_id));
+      const roles = agreementRoleSet.get(a.id as string);
+      const applies = a.all_staff || (roles != null && roleIds.some((id) => roles.has(id)));
       if (!applies) continue;
       const signed = agreementSignedByUser
         .get(p.id)
@@ -286,12 +297,13 @@ export async function runReminders(opts?: {
 
   for (const p of people) {
     if (!p.is_active || !p.organisation_id || !p.email) continue;
-    if (!p.job_role_id) continue; // no suite yet, nothing to chase
+    const roleIds = rolesByProfile.get(p.id) ?? [];
+    if (roleIds.length === 0) continue; // no suite yet, nothing to chase
 
     const sections: Section[] = [];
 
-    // unsigned SOPs
-    const suite = suiteByRole.get(p.job_role_id) ?? [];
+    // unsigned SOPs, unioned across every role this person holds
+    const suite = Array.from(new Set(roleIds.flatMap((rid) => suiteByRole.get(rid) ?? [])));
     const signed = signedByUser.get(p.id) ?? new Map<string, boolean>();
     const unsignedSops = suite
       .filter((sopId) => {

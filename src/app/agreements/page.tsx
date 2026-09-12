@@ -2,13 +2,15 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { agreementsForProfile } from "@/lib/agreements";
+import { assignedJobRoleIds } from "@/lib/staff-job-roles";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgreementsListPage() {
   const profile = await requireProfile();
   const supabase = createClient();
-  const items = await agreementsForProfile(supabase, profile);
+  const jobRoleIds = await assignedJobRoleIds(supabase, profile.id);
+  const items = await agreementsForProfile(supabase, { id: profile.id, jobRoleIds });
 
   const outstanding = items.filter((a) => !a.signed);
 

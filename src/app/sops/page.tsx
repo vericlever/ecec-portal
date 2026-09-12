@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
+import { assignedJobRoleIds, sopSuiteIdsForRoles } from "@/lib/staff-job-roles";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,8 @@ export default async function SopListPage() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  if (!profile.job_role_id) {
+  const roleIds = await assignedJobRoleIds(supabase, profile.id);
+  if (roleIds.length === 0) {
     return (
       <div>
         <h1 className="text-xl font-semibold">Standard operating procedures</h1>
@@ -28,11 +30,7 @@ export default async function SopListPage() {
     );
   }
 
-  const { data: suite } = await supabase
-    .from("job_role_sops")
-    .select("sop_id")
-    .eq("job_role_id", profile.job_role_id);
-  const sopIds = (suite ?? []).map((r) => r.sop_id as string);
+  const sopIds = await sopSuiteIdsForRoles(supabase, roleIds);
 
   const [{ data: sops }, { data: signOffs }] = await Promise.all([
     sopIds.length

@@ -3,6 +3,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { classifyPersonCredentials } from "@/lib/credentials";
 import { agreementsForProfile } from "@/lib/agreements";
+import { assignedJobRoles } from "@/lib/staff-job-roles";
 import { StageArc } from "@/components/bauhaus";
 
 export const dynamic = "force-dynamic";
@@ -41,18 +42,31 @@ export default async function StaffHomePage() {
         .not("expiry_date", "is", null),
     ]);
 
-  // Procedure sign-off state: the same suite-and-sign-off shapes as
-  // /sops/page.tsx, so "outstanding" here always matches what that page would
-  // show as not-yet-signed.
+  const myRoles = await assignedJobRoles(supabase, me.id);
+  const myRoleIds = myRoles.map((r) => r.id);
+
+  // Procedure sign-off state, unioned across every role this person holds -
+  // the same suite-and-sign-off shapes as /sops/page.tsx, so "outstanding"
+  // here always matches what that page would show as not-yet-signed. Also
+  // grouped per role (suiteByRole) for the My Training breakdown, since a
+  // person with two roles gets one % for each, not just the combined total.
   const unsignedSops: WorklistItem[] = [];
   const awaitingCosignSops: WorklistItem[] = [];
   let sopTotal = 0;
-  if (me.job_role_id) {
-    const { data: suite } = await supabase
+  const suiteByRole = new Map<string, string[]>();
+  const trainingByRole: { name: string; pct: number | null }[] = [];
+  if (myRoleIds.length > 0) {
+    const { data: roleSops } = await supabase
       .from("job_role_sops")
-      .select("sop_id")
-      .eq("job_role_id", me.job_role_id);
-    const sopIds = (suite ?? []).map((r) => r.sop_id as string);
+      .select("job_role_id, sop_id")
+      .in("job_role_id", myRoleIds);
+    for (const r of roleSops ?? []) {
+      const list = suiteByRole.get(r.job_role_id as string) ?? [];
+      list.push(r.sop_id as string);
+      suiteByRole.set(r.job_role_id as string, list);
+    }
+    const sopIds = Array.from(new Set((roleSops ?? []).map((r) => r.sop_id as string)));
+
     if (sopIds.length > 0) {
       const [{ data: sops }, { data: signOffs }] = await Promise.all([
         supabase
@@ -65,12 +79,12 @@ export default async function StaffHomePage() {
           .select("sop_id, sop_version, verified_at")
           .eq("user_id", me.id),
       ]);
+      const published = new Map((sops ?? []).map((s) => [s.id as string, s]));
       const signOffFor = new Map(
         (signOffs ?? []).map((s) => [`${s.sop_id}:${s.sop_version}`, s]),
       );
-      const published = sops ?? [];
-      sopTotal = published.length;
-      for (const s of published) {
+      sopTotal = published.size;
+      for (const s of published.values()) {
         const so = signOffFor.get(`${s.id}:${s.published_version}`);
         const item = { label: s.name as string, href: `/sops/${s.id}` };
         if (!so) {
@@ -79,6 +93,24 @@ export default async function StaffHomePage() {
           awaitingCosignSops.push(item);
         }
       }
+
+      const isSigned = (sopId: string) => {
+        const s = published.get(sopId);
+        if (!s) return false;
+        const so = signOffFor.get(`${s.id}:${s.published_version}`);
+        if (!so) return false;
+        return s.signoff_type === "self_and_manager" ? Boolean(so.verified_at) : true;
+      };
+      for (const role of myRoles) {
+        const suite = (suiteByRole.get(role.id) ?? []).filter((id) => published.has(id));
+        const signedCount = suite.filter(isSigned).length;
+        trainingByRole.push({
+          name: role.name,
+          pct: suite.length > 0 ? Math.round((signedCount / suite.length) * 100) : null,
+        });
+      }
+    } else {
+      for (const role of myRoles) trainingByRole.push({ name: role.name, pct: null });
     }
   }
 
@@ -104,28 +136,21 @@ export default async function StaffHomePage() {
 
   const agreements = await agreementsForProfile(supabase, {
     id: me.id,
-    job_role_id: me.job_role_id,
+    jobRoleIds: myRoleIds,
   });
   const unsignedAgreements: WorklistItem[] = agreements
     .filter((a) => !a.signed)
     .map((a) => ({ label: a.name, href: `/agreements/${a.id}` }));
 
-  const onboardingOutstanding = Boolean(me.job_role_id && !wd?.onboarding_completed_at);
+  const onboardingOutstanding = Boolean(myRoleIds.length > 0 && !wd?.onboarding_completed_at);
 
   // Policy viewed %, same shape as the admin staff-record page's "Policies
   // viewed" stat, just scoped to the signed-in user instead of someone else's
   // record.
-  const [{ data: targetPolicies }, { data: policyViewRows }, { data: jobRole }] =
-    await Promise.all([
-      supabase.rpc("visible_published_policies", { p_profile: me.id }),
-      supabase
-        .from("policy_views")
-        .select("policy_id, policy_version")
-        .eq("user_id", me.id),
-      me.job_role_id
-        ? supabase.from("job_roles").select("name").eq("id", me.job_role_id).maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [{ data: targetPolicies }, { data: policyViewRows }] = await Promise.all([
+    supabase.rpc("visible_published_policies", { p_profile: me.id }),
+    supabase.from("policy_views").select("policy_id, policy_version").eq("user_id", me.id),
+  ]);
   const policyRows = (targetPolicies ?? []) as {
     id: string;
     published_version: number;
@@ -141,13 +166,6 @@ export default async function StaffHomePage() {
 
   const sopSignedCount = sopTotal - unsignedSops.length - awaitingCosignSops.length;
   const sopPct = sopTotal > 0 ? Math.round((sopSignedCount / sopTotal) * 100) : null;
-
-  // Training, per assigned job role. A profile carries a single job_role_id
-  // today, so this is one line in practice - built so a future move to
-  // multiple roles per person only needs a data change here, not a UI one.
-  const trainingByRole = me.job_role_id
-    ? [{ name: jobRole?.name ?? "Your role", pct: sopPct }]
-    : [];
 
   // Procedures have their own card above (My Procedures) with a live %, so
   // this count is just the items actually listed in the section below it.
@@ -182,7 +200,7 @@ export default async function StaffHomePage() {
           detail={
             sopTotal > 0
               ? `${sopSignedCount} of ${sopTotal} signed`
-              : me.job_role_id
+              : myRoleIds.length > 0
                 ? "No published procedures for your role yet."
                 : "No job role assigned yet."
           }

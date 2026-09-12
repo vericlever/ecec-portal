@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
+import { assignedJobRoleIds } from "@/lib/staff-job-roles";
 import { SignForm } from "./sign-form";
 import { ReadAloud } from "./read-aloud";
 
@@ -37,6 +38,7 @@ export default async function SopDetailPage({
 
   if (!sop || sop.published_version == null) notFound();
 
+  const roleIds = await assignedJobRoleIds(supabase, profile.id);
   const [{ data: links }, { data: signOff }, { data: inSuite }] =
     await Promise.all([
       supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
@@ -47,14 +49,14 @@ export default async function SopDetailPage({
         .eq("sop_id", sop.id)
         .eq("sop_version", sop.published_version)
         .maybeSingle(),
-      profile.job_role_id
+      roleIds.length > 0
         ? supabase
             .from("job_role_sops")
             .select("sop_id")
-            .eq("job_role_id", profile.job_role_id)
+            .in("job_role_id", roleIds)
             .eq("sop_id", sop.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
+            .limit(1)
+        : Promise.resolve({ data: [] as { sop_id: string }[] }),
     ]);
 
   // Linked policies the staff member is allowed to open. RLS on `policies`
@@ -69,7 +71,7 @@ export default async function SopDetailPage({
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const isInSuite = Boolean(inSuite);
+  const isInSuite = Boolean(inSuite && inSuite.length > 0);
   const needsManager = sop.signoff_type === "self_and_manager";
 
   return (

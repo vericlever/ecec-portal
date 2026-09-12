@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { assignedJobRoleIds } from "@/lib/staff-job-roles";
 import { AgreementSignForm } from "./sign-form";
 
 export const dynamic = "force-dynamic";
@@ -33,14 +34,17 @@ export default async function AgreementDetailPage({
 
   // Does it apply to this person?
   let applies = agreement.all_staff;
-  if (!applies && profile.job_role_id) {
-    const { data: link } = await supabase
-      .from("hr_agreement_job_roles")
-      .select("agreement_id")
-      .eq("agreement_id", agreement.id)
-      .eq("job_role_id", profile.job_role_id)
-      .maybeSingle();
-    applies = Boolean(link);
+  if (!applies) {
+    const roleIds = await assignedJobRoleIds(supabase, profile.id);
+    if (roleIds.length > 0) {
+      const { data: links } = await supabase
+        .from("hr_agreement_job_roles")
+        .select("agreement_id")
+        .eq("agreement_id", agreement.id)
+        .in("job_role_id", roleIds)
+        .limit(1);
+      applies = Boolean(links && links.length > 0);
+    }
   }
 
   const [{ data: signoff }, { data: linkedPolicy }] = await Promise.all([

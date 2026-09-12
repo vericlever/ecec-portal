@@ -120,6 +120,16 @@ export async function createStaff(
     return { status: "error", error: profileErr.message };
   }
 
+  // Mirrors the primary role into profile_job_roles too - a second role can
+  // be added afterwards from the staff record's Job role control.
+  if (jobRoleId) {
+    await supabase.from("profile_job_roles").insert({
+      profile_id: created.user.id,
+      job_role_id: jobRoleId,
+      organisation_id: me.organisation_id,
+    });
+  }
+
   // Invite: a first-login link, emailed if email is set up, otherwise handed
   // back for the admin to pass on.
   let inviteLink: string | null = null;

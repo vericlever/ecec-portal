@@ -30,6 +30,7 @@ import {
   renewalState,
 } from "@/lib/contracts";
 import { agreementsForProfile } from "@/lib/agreements";
+import { assignedJobRoles, sopSuiteIdsForRoles } from "@/lib/staff-job-roles";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,9 @@ export default async function StaffRecordPage({
 
   if (!person) notFound();
 
+  const personRoles = await assignedJobRoles(supabase, person.id);
+  const personRoleIds = personRoles.map((r) => r.id);
+
   const [{ data: contractRows }, { data: identityRows }] = await Promise.all([
     supabase
       .from("contracts")
@@ -119,13 +123,12 @@ export default async function StaffRecordPage({
 
   const agreements = await agreementsForProfile(supabase, {
     id: person.id,
-    job_role_id: person.job_role_id,
+    jobRoleIds: personRoleIds,
   });
   const unsignedAgreements = agreements
     .filter((a) => !a.signed)
     .map((a) => a.name);
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
-  const jobRoleName = new Map((jobRoles ?? []).map((r) => [r.id, r.name]));
   const hrManager = isHrManager(me);
   // Contract upload: Admin anywhere, or an HR manager for staff at their service.
   const canManageContract =
@@ -174,12 +177,8 @@ export default async function StaffRecordPage({
   // into "not started" and "signed, waiting on a manager to countersign".
   const unsignedSops: string[] = [];
   const awaitingCosignSops: string[] = [];
-  if (person.job_role_id) {
-    const { data: suite } = await supabase
-      .from("job_role_sops")
-      .select("sop_id")
-      .eq("job_role_id", person.job_role_id);
-    const suiteIds = (suite ?? []).map((r) => r.sop_id as string);
+  if (personRoleIds.length > 0) {
+    const suiteIds = await sopSuiteIdsForRoles(supabase, personRoleIds);
     if (suiteIds.length > 0) {
       const [{ data: sopRows }, { data: signRows }] = await Promise.all([
         supabase
@@ -341,7 +340,7 @@ export default async function StaffRecordPage({
   // A worker (anyone with a job role) who has not finished the onboarding
   // questionnaire. This matches the count shown against them on the staff list.
   const onboardingOutstanding = Boolean(
-    person.job_role_id && !wd?.onboarding_completed_at,
+    personRoleIds.length > 0 && !wd?.onboarding_completed_at,
   );
 
   // Expired or soon-to-expire credentials (WWCC, teacher registration,
@@ -428,7 +427,9 @@ export default async function StaffRecordPage({
       <p className="mt-1 text-sm text-slate-500">
         {person.email} · {TIER_LABELS[person.access_tier as keyof typeof TIER_LABELS]}
         {" · "}
-        {person.job_role_id ? jobRoleName.get(person.job_role_id) : "no job role"}
+        {personRoles.length > 0
+          ? personRoles.map((r) => r.name).join(", ")
+          : "no job role"}
         {" · "}
         {person.service_id ? serviceName.get(person.service_id) : "all services"}
         {!person.is_active && " · inactive"}
@@ -504,7 +505,7 @@ export default async function StaffRecordPage({
           <EmailControl profileId={person.id} value={person.email} />
           <JobRoleControl
             profileId={person.id}
-            value={person.job_role_id}
+            value={personRoleIds}
             jobRoles={(jobRoles ?? []) as { id: string; name: string }[]}
           />
           {isAdmin(me.access_tier) && person.id !== me.id && (
@@ -549,7 +550,7 @@ export default async function StaffRecordPage({
             done={sopSigned}
             total={sopTotal}
             emptyNote={
-              person.job_role_id
+              personRoleIds.length > 0
                 ? "This job role has no procedures attached yet."
                 : "No job role set, so there are no procedures to sign."
             }

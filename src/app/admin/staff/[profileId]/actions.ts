@@ -548,12 +548,16 @@ export async function setHrManager(
   return { ok: true };
 }
 
-// Change a staff member's job role. Admin anywhere in the organisation, or an
-// HR manager for staff at their own service. Changing the role swaps the SOP
-// suite; existing sign_offs stay in the record but no longer count.
-export async function setStaffJobRole(
+// Change a staff member's job roles (a person can hold more than one, e.g.
+// an ed leader needs both Educator and Room Leader). Admin anywhere in the
+// organisation, or an HR manager for staff at their own service. Removing a
+// role drops its suite from what they must sign; existing sign_offs stay in
+// the record but no longer count. profiles.job_role_id is kept in sync as
+// the first assigned role (or null) so any reader still on the single-role
+// column gets a reasonable value rather than a stale one.
+export async function setStaffJobRoles(
   profileId: string,
-  jobRoleId: string | null,
+  jobRoleIds: string[],
 ): Promise<Result> {
   const me = await getProfile();
   if (!me) return { ok: false, error: "Sign in." };
@@ -574,26 +578,45 @@ export async function setStaffJobRole(
     return { ok: false, error: "You cannot change this person's job role." };
   }
 
-  if (jobRoleId) {
-    const { data: role } = await supabase
+  const uniqueIds = Array.from(new Set(jobRoleIds));
+  if (uniqueIds.length > 0) {
+    const { data: roles } = await supabase
       .from("job_roles")
       .select("id, organisation_id")
-      .eq("id", jobRoleId)
-      .maybeSingle();
-    if (!role || role.organisation_id !== me.organisation_id) {
-      return { ok: false, error: "That job role is not in your organisation." };
+      .in("id", uniqueIds);
+    const valid = (roles ?? []).filter((r) => r.organisation_id === me.organisation_id);
+    if (valid.length !== uniqueIds.length) {
+      return { ok: false, error: "One of those job roles is not in your organisation." };
     }
   }
 
-  const { error } = await supabase
+  const { error: deleteErr } = await supabase
+    .from("profile_job_roles")
+    .delete()
+    .eq("profile_id", profileId);
+  if (deleteErr) return { ok: false, error: deleteErr.message };
+
+  if (uniqueIds.length > 0) {
+    const { error: insertErr } = await supabase.from("profile_job_roles").insert(
+      uniqueIds.map((jobRoleId) => ({
+        profile_id: profileId,
+        job_role_id: jobRoleId,
+        organisation_id: me.organisation_id,
+      })),
+    );
+    if (insertErr) return { ok: false, error: insertErr.message };
+  }
+
+  const { error: primaryErr } = await supabase
     .from("profiles")
-    .update({ job_role_id: jobRoleId })
+    .update({ job_role_id: uniqueIds[0] ?? null })
     .eq("id", profileId);
-  if (error) return { ok: false, error: error.message };
+  if (primaryErr) return { ok: false, error: primaryErr.message };
 
   revalidatePath("/admin/staff", "layout");
   revalidatePath("/admin/job-roles", "layout");
   revalidatePath("/sops");
+  revalidatePath("/home");
   return { ok: true };
 }
 

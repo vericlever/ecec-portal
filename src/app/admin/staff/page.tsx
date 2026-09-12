@@ -48,6 +48,21 @@ export default async function StaffPage() {
   }
 
   const rows = (staff ?? []) as StaffRow[];
+  const { data: roleLinks } = rows.length
+    ? await supabase
+        .from("profile_job_roles")
+        .select("profile_id, job_role_id")
+        .in(
+          "profile_id",
+          rows.map((p) => p.id),
+        )
+    : { data: [] as { profile_id: string; job_role_id: string }[] };
+  const roleIdsByProfile = new Map<string, string[]>();
+  for (const r of roleLinks ?? []) {
+    const list = roleIdsByProfile.get(r.profile_id as string) ?? [];
+    list.push(r.job_role_id as string);
+    roleIdsByProfile.set(r.profile_id as string, list);
+  }
   const stats = await staffStatsByProfile(supabase, rows, me.id);
   // Mark inactive greys the record and moves it to its own section at the
   // bottom of the list (build addendum item 1), separate from sort order.
@@ -68,6 +83,11 @@ export default async function StaffPage() {
   const jobRoleName = new Map(
     (jobRoles ?? []).map((r) => [r.id as string, r.name as string]),
   );
+  const roleLabel = (profileId: string) => {
+    const ids = roleIdsByProfile.get(profileId) ?? [];
+    if (ids.length === 0) return "no job role";
+    return ids.map((id) => jobRoleName.get(id) ?? "—").join(", ");
+  };
 
   return (
     <div>
@@ -140,7 +160,7 @@ export default async function StaffPage() {
             person={p}
             stat={stats.get(p.id)}
             serviceName={serviceName}
-            jobRoleName={jobRoleName}
+            roleLabel={roleLabel(p.id)}
           />
         ))}
       </ul>
@@ -157,7 +177,7 @@ export default async function StaffPage() {
                 person={p}
                 stat={stats.get(p.id)}
                 serviceName={serviceName}
-                jobRoleName={jobRoleName}
+                roleLabel={roleLabel(p.id)}
                 inactive
               />
             ))}
@@ -172,13 +192,13 @@ function StaffRowItem({
   person: p,
   stat,
   serviceName,
-  jobRoleName,
+  roleLabel,
   inactive = false,
 }: {
   person: StaffRow;
   stat: StaffStat | undefined;
   serviceName: Map<string, string>;
-  jobRoleName: Map<string, string>;
+  roleLabel: string;
   inactive?: boolean;
 }) {
   return (
@@ -207,9 +227,7 @@ function StaffRowItem({
           <div className="text-xs text-slate-400">
             {TIER_LABELS[p.access_tier]}
             {" · "}
-            {p.job_role_id
-              ? (jobRoleName.get(p.job_role_id) ?? "—")
-              : "no job role"}
+            {roleLabel}
             {" · "}
             {p.service_id
               ? (serviceName.get(p.service_id) ?? "—")

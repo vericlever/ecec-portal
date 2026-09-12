@@ -49,6 +49,7 @@ const RSG_SOP = "46f2280d-7e73-4365-bd57-9b617c2c6702"; // any published RSG sop
 const RSG_POLICY = "c7be62dc-117a-413b-940b-3fb98241c8cd"; // any published RSG policy
 const SK_SOP = "1652ad78-50c1-487e-9e24-59b56bf7b291"; // any SK sop
 const RSG_WWCC = "b77efe6f-4a35-41d1-ad79-9f61825be818"; // Sam's WWCC row, already sighted
+const RSG_SECOND_ROLE = "cba06a07-d786-47f9-bbf5-d8de570e50f9"; // Educational Leader - a role Sam does NOT already hold
 
 // table -> the column that carries the tenant boundary (null = no org column)
 const TABLES = {
@@ -88,6 +89,7 @@ const TABLES = {
   sop_observations: "organisation_id",
   staff_import_records: "organisation_id",
   comprehension_questions: "organisation_id",
+  profile_job_roles: "organisation_id",
   credential_types: null,
   external_providers: null,
 };
@@ -503,6 +505,60 @@ const APP_SCENARIOS = [
     probe: (c) => {
       const SK_STAFF = "f504ce94-e3c0-4584-8ac7-64cbe810a889"; // SK staff (Educator)
       return c.query(`delete from public.profiles where id=$1`, [SK_STAFF]);
+    },
+  },
+
+  // Build addendum item 2 follow-up (multi-role assignment, migration 0054).
+  // profile_job_roles is written by two different app-level gates - the
+  // person-record page's setStaffJobRoles() (admin, or hr_manager at the
+  // person's service) and the job-roles-admin page's assignStaffToRole()/
+  // removeStaffFromRole() (those two, plus a content editor org-wide) - so
+  // both need their own probe, not just the narrower one.
+  {
+    label: "admin assigns a second role to a staff member (Sam)",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) =>
+      c.query(
+        `insert into public.profile_job_roles (profile_id, job_role_id, organisation_id) values ($1,$2,$3)`,
+        [STAFF, RSG_SECOND_ROLE, RSG],
+      ),
+  },
+  {
+    label: "manager (not hr_manager, not content editor) assigns a role",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.profile_job_roles (profile_id, job_role_id, organisation_id) values ($1,$2,$3)`,
+        [STAFF, RSG_SECOND_ROLE, RSG],
+      ),
+  },
+  {
+    label: "manager reads their own assigned roles",
+    expectOk: true,
+    as: MANAGER,
+    probe: (c) => c.query(`select job_role_id from public.profile_job_roles where profile_id=$1`, [MANAGER]),
+  },
+  {
+    label: "staff (Sam) reads a colleague's assigned roles (blocked)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) => c.query(`select job_role_id from public.profile_job_roles where profile_id=$1`, [MANAGER]),
+  },
+  {
+    label: "RSG admin assigns a role to an SK staff member (cross-tenant, blocked)",
+    expectOk: false,
+    as: ADMIN,
+    probe: (c) => {
+      // organisation_id on the insert is RSG (the actor's own org) - the
+      // with-check's profile-org-match clause should still reject this,
+      // since SK_STAFF's real organisation_id is Science Kinder's.
+      const SK_STAFF = "f504ce94-e3c0-4584-8ac7-64cbe810a889";
+      return c.query(
+        `insert into public.profile_job_roles (profile_id, job_role_id, organisation_id) values ($1,$2,$3)`,
+        [SK_STAFF, EDUCATOR_ROLE, RSG],
+      );
     },
   },
 ];

@@ -12,10 +12,10 @@ export type AgreementListItem = {
 
 // The published agreements a person is expected to sign, and whether they have
 // signed the current version. An agreement applies if all_staff is true, or if
-// the person's job role is one of the agreement's targeted roles.
+// any of the person's job roles is one of the agreement's targeted roles.
 export async function agreementsForProfile(
   supabase: ServerClient,
-  profile: { id: string; job_role_id: string | null },
+  profile: { id: string; jobRoleIds: string[] },
 ): Promise<AgreementListItem[]> {
   const [{ data: agreements }, { data: roleLinks }, { data: signoffs }] =
     await Promise.all([
@@ -46,10 +46,9 @@ export async function agreementsForProfile(
 
   const out: AgreementListItem[] = [];
   for (const a of agreements ?? []) {
+    const roles = rolesByAgreement.get(a.id as string);
     const applies =
-      a.all_staff ||
-      (profile.job_role_id != null &&
-        rolesByAgreement.get(a.id as string)?.has(profile.job_role_id));
+      a.all_staff || (roles != null && profile.jobRoleIds.some((id) => roles.has(id)));
     if (!applies) continue;
     out.push({
       id: a.id as string,
@@ -69,7 +68,7 @@ export async function agreementsForProfile(
 // caller's staff.
 export async function unsignedAgreementsByProfile(
   supabase: ServerClient,
-  people: { id: string; job_role_id: string | null }[],
+  people: { id: string; jobRoleIds: string[] }[],
 ): Promise<Map<string, number>> {
   const [{ data: agreements }, { data: roleLinks }, { data: signoffs }] =
     await Promise.all([
@@ -100,10 +99,9 @@ export async function unsignedAgreementsByProfile(
   for (const p of people) {
     let unsigned = 0;
     for (const a of agreements ?? []) {
+      const roles = rolesByAgreement.get(a.id as string);
       const applies =
-        a.all_staff ||
-        (p.job_role_id != null &&
-          rolesByAgreement.get(a.id as string)?.has(p.job_role_id));
+        a.all_staff || (roles != null && p.jobRoleIds.some((id) => roles.has(id)));
       if (!applies) continue;
       const signed = signedByUser
         .get(p.id)
