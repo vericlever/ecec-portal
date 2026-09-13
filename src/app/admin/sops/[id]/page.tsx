@@ -136,7 +136,7 @@ export default async function SopDetailPage({
           category_id: sop.category_id ?? "",
           signoff_type: sop.signoff_type,
           priority: sop.priority,
-          signoff_priority: sop.signoff_priority,
+          signing_window: sop.signing_window,
           notes: sop.notes ?? "",
           service_id: sop.service_id,
           body: sop.body ?? "",

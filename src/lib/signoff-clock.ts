@@ -1,11 +1,12 @@
-import { SOP_SIGNOFF_PRIORITY_DAYS, type SopSignoffPriority } from "@/lib/constants";
+import { SOP_SIGNING_WINDOW_DAYS, type SopSigningWindow } from "@/lib/constants";
 import { fmtDate } from "@/lib/format-date";
 
 const DAY_MS = 86_400_000;
 
-// Contracts have no per-item priority (Step 44 decision: keep it simple,
-// one fixed window for every contract), anchored to when the contract was
-// issued, not its business start_date, which can be backdated or future.
+// Contracts have no configurable signing window (Step 44 decision: keep it
+// simple, one fixed window for every contract), anchored to when the
+// contract was issued, not its business start_date, which can be backdated
+// or future.
 export const CONTRACT_SIGN_WINDOW_DAYS = 7;
 
 // The date a procedure becomes due for a given person: however many days
@@ -16,13 +17,13 @@ export const CONTRACT_SIGN_WINDOW_DAYS = 7;
 export function sopDueDate(
   roleStart: string | Date,
   publishedAt: string | Date | null,
-  priority: SopSignoffPriority,
+  signingWindow: SopSigningWindow,
 ): Date {
   const start = new Date(roleStart);
   const published = publishedAt ? new Date(publishedAt) : null;
   const effectiveStart =
     published && published.getTime() > start.getTime() ? published : start;
-  return new Date(effectiveStart.getTime() + SOP_SIGNOFF_PRIORITY_DAYS[priority] * DAY_MS);
+  return new Date(effectiveStart.getTime() + SOP_SIGNING_WINDOW_DAYS[signingWindow] * DAY_MS);
 }
 
 export function contractDueDate(createdAt: string | Date): Date {

@@ -8,7 +8,7 @@ import {
   dueSignoffPhrase,
   isOverdue,
 } from "@/lib/signoff-clock";
-import { cleanSignoffPriority } from "@/lib/constants";
+import { cleanSigningWindow } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ type SopRow = {
   name: string;
   signoff_type: string | null;
   priority: number | null;
-  signoff_priority: string | null;
+  signing_window: string | null;
   published_version: number;
   published_at: string | null;
 };
@@ -51,7 +51,7 @@ export default async function SopListPage() {
     sopIds.length
       ? supabase
           .from("sops")
-          .select("id, name, signoff_type, priority, signoff_priority, published_version, published_at")
+          .select("id, name, signoff_type, priority, signing_window, published_version, published_at")
           .in("id", sopIds)
           .not("published_version", "is", null)
       : Promise.resolve({ data: [] }),
@@ -84,7 +84,7 @@ export default async function SopListPage() {
   function due(s: SopRow): Date | null {
     const start = roleStartBySop.get(s.id);
     if (!start) return null;
-    return sopDueDate(start, s.published_at, cleanSignoffPriority(s.signoff_priority));
+    return sopDueDate(start, s.published_at, cleanSigningWindow(s.signing_window));
   }
 
   const signedCount = rows.filter((s) => state(s) === "signed").length;

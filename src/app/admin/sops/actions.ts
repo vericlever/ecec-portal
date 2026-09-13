@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { storeDocument, deleteDocument } from "@/lib/documents/store";
-import { cleanReviewPeriod, cleanSignoffPriority } from "@/lib/constants";
+import { cleanReviewPeriod, cleanSigningWindow } from "@/lib/constants";
 import { writeDocumentTag } from "@/lib/document-tags";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
@@ -117,7 +117,7 @@ export async function updateSopMeta(
     signoffType: string;
     categoryId: string;
     priority: string;
-    signoffPriority: string;
+    signingWindow: string;
     notes: string;
     serviceId: string | null;
     reviewPeriod: number;
@@ -148,7 +148,7 @@ export async function updateSopMeta(
         : "self",
       category_id: categoryId,
       priority,
-      signoff_priority: cleanSignoffPriority(input.signoffPriority),
+      signing_window: cleanSigningWindow(input.signingWindow),
       notes: input.notes.trim() || null,
       service_id: input.serviceId,
       review_period_months: cleanReviewPeriod(input.reviewPeriod),
@@ -580,7 +580,7 @@ export type SopBulkFinishItem = {
   sopId: string;
   jobRoleIds: string[];
   reviewPeriod: number;
-  signoffPriority: string;
+  signingWindow: string;
   linkedPolicyIds: string[];
   publish: boolean;
 };
@@ -642,7 +642,7 @@ export async function finishBulkSops(
 
     const update: Record<string, unknown> = {
       review_period_months: cleanReviewPeriod(item.reviewPeriod),
-      signoff_priority: cleanSignoffPriority(item.signoffPriority),
+      signing_window: cleanSigningWindow(item.signingWindow),
       updated_by: me.id,
     };
 

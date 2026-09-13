@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   REVIEW_PERIODS,
   REVIEW_PERIOD_LABELS,
-  SOP_SIGNOFF_PRIORITIES,
-  SOP_SIGNOFF_PRIORITY_LABELS,
-  cleanSignoffPriority,
-  type SopSignoffPriority,
+  SOP_SIGNING_WINDOWS,
+  SOP_SIGNING_WINDOW_LABELS,
+  cleanSigningWindow,
+  type SopSigningWindow,
 } from "@/lib/constants";
 import type { PolicyCategory } from "@/lib/policy-categories";
 import { HISTORY_EVENT_LABELS, fmtReviewDate, reviewState } from "@/lib/sop-review";
@@ -40,7 +40,7 @@ type Sop = {
   category_id: string;
   signoff_type: string;
   priority: number | null;
-  signoff_priority: string;
+  signing_window: string;
   notes: string;
   service_id: string | null;
   body: string;
@@ -112,8 +112,8 @@ export function SopEditor({
   const [signoffType, setSignoffType] = useState(sop.signoff_type);
   const [categoryId, setCategoryId] = useState(sop.category_id);
   const [priority, setPriority] = useState(sop.priority?.toString() ?? "");
-  const [signoffPriority, setSignoffPriority] = useState<SopSignoffPriority>(
-    cleanSignoffPriority(sop.signoff_priority),
+  const [signingWindow, setSigningWindow] = useState<SopSigningWindow>(
+    cleanSigningWindow(sop.signing_window),
   );
   const [notes, setNotes] = useState(sop.notes);
   const [serviceId, setServiceId] = useState(sop.service_id ?? "");
@@ -327,17 +327,17 @@ export function SopEditor({
                   </select>
                 </label>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">Priority to sign</span>
+                  <span className="font-medium text-slate-700">Signing window</span>
                   <select
-                    value={signoffPriority}
+                    value={signingWindow}
                     onChange={(e) =>
-                      setSignoffPriority(cleanSignoffPriority(e.target.value))
+                      setSigningWindow(cleanSigningWindow(e.target.value))
                     }
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   >
-                    {SOP_SIGNOFF_PRIORITIES.map((p) => (
+                    {SOP_SIGNING_WINDOWS.map((p) => (
                       <option key={p} value={p}>
-                        {SOP_SIGNOFF_PRIORITY_LABELS[p]}
+                        {SOP_SIGNING_WINDOW_LABELS[p]}
                       </option>
                     ))}
                   </select>
@@ -369,7 +369,7 @@ export function SopEditor({
                         signoffType,
                         categoryId,
                         priority,
-                        signoffPriority,
+                        signingWindow,
                         notes,
                         serviceId: serviceId || null,
                         reviewPeriod,

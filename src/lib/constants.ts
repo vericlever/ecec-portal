@@ -16,7 +16,7 @@ export function cleanReviewPeriod(v: unknown): number {
 // The signing clock (Step 44). How long staff have once a procedure becomes
 // due for them before it counts as overdue - set per procedure, same for
 // every role it applies to.
-export const SOP_SIGNOFF_PRIORITIES = [
+export const SOP_SIGNING_WINDOWS = [
   "immediate",
   "week",
   "three_months",
@@ -24,9 +24,9 @@ export const SOP_SIGNOFF_PRIORITIES = [
   "twelve_months",
 ] as const;
 
-export type SopSignoffPriority = (typeof SOP_SIGNOFF_PRIORITIES)[number];
+export type SopSigningWindow = (typeof SOP_SIGNING_WINDOWS)[number];
 
-export const SOP_SIGNOFF_PRIORITY_LABELS: Record<SopSignoffPriority, string> = {
+export const SOP_SIGNING_WINDOW_LABELS: Record<SopSigningWindow, string> = {
   immediate: "Immediate",
   week: "1 week",
   three_months: "3 months",
@@ -34,7 +34,7 @@ export const SOP_SIGNOFF_PRIORITY_LABELS: Record<SopSignoffPriority, string> = {
   twelve_months: "12 months",
 };
 
-export const SOP_SIGNOFF_PRIORITY_DAYS: Record<SopSignoffPriority, number> = {
+export const SOP_SIGNING_WINDOW_DAYS: Record<SopSigningWindow, number> = {
   immediate: 0,
   week: 7,
   three_months: 90,
@@ -42,8 +42,8 @@ export const SOP_SIGNOFF_PRIORITY_DAYS: Record<SopSignoffPriority, number> = {
   twelve_months: 365,
 };
 
-export function cleanSignoffPriority(v: unknown): SopSignoffPriority {
-  return (SOP_SIGNOFF_PRIORITIES as readonly string[]).includes(v as string)
-    ? (v as SopSignoffPriority)
+export function cleanSigningWindow(v: unknown): SopSigningWindow {
+  return (SOP_SIGNING_WINDOWS as readonly string[]).includes(v as string)
+    ? (v as SopSigningWindow)
     : "week";
 }

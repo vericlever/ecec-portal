@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   REVIEW_PERIODS,
   REVIEW_PERIOD_LABELS,
-  SOP_SIGNOFF_PRIORITIES,
-  SOP_SIGNOFF_PRIORITY_LABELS,
-  cleanSignoffPriority,
-  type SopSignoffPriority,
+  SOP_SIGNING_WINDOWS,
+  SOP_SIGNING_WINDOW_LABELS,
+  cleanSigningWindow,
+  type SopSigningWindow,
 } from "@/lib/constants";
 import { finishBulkSops } from "../../actions";
 
@@ -19,7 +19,7 @@ type Row = {
   hasText: boolean;
   alreadyPublished: boolean;
   reviewPeriod: number;
-  signoffPriority: string;
+  signingWindow: string;
   linkedPolicyIds: string[];
   jobRoleIds: string[];
 };
@@ -27,7 +27,7 @@ type Row = {
 type State = {
   jobRoleIds: string[];
   reviewPeriod: number;
-  signoffPriority: SopSignoffPriority;
+  signingWindow: SopSigningWindow;
   publish: boolean;
   linkedPolicyIds: string[];
 };
@@ -59,7 +59,7 @@ export function SopBulkReview({
           reviewPeriod: REVIEW_PERIODS.includes(r.reviewPeriod as 3 | 6 | 12)
             ? r.reviewPeriod
             : 6,
-          signoffPriority: cleanSignoffPriority(r.signoffPriority),
+          signingWindow: cleanSigningWindow(r.signingWindow),
           publish: r.hasText,
           linkedPolicyIds: r.linkedPolicyIds,
         },
@@ -89,7 +89,7 @@ export function SopBulkReview({
         sopId: r.id,
         jobRoleIds: state[r.id].jobRoleIds,
         reviewPeriod: state[r.id].reviewPeriod,
-        signoffPriority: state[r.id].signoffPriority,
+        signingWindow: state[r.id].signingWindow,
         linkedPolicyIds: state[r.id].linkedPolicyIds,
         publish: state[r.id].publish && r.hasText,
       }));
@@ -269,20 +269,20 @@ export function SopBulkReview({
               </label>
               <label className="block text-sm">
                 <span className="text-xs font-medium text-slate-500">
-                  Priority to sign
+                  Signing window
                 </span>
                 <select
-                  value={s.signoffPriority}
+                  value={s.signingWindow}
                   onChange={(e) =>
                     patch(r.id, {
-                      signoffPriority: cleanSignoffPriority(e.target.value),
+                      signingWindow: cleanSigningWindow(e.target.value),
                     })
                   }
                   className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                 >
-                  {SOP_SIGNOFF_PRIORITIES.map((p) => (
+                  {SOP_SIGNING_WINDOWS.map((p) => (
                     <option key={p} value={p}>
-                      {SOP_SIGNOFF_PRIORITY_LABELS[p]}
+                      {SOP_SIGNING_WINDOW_LABELS[p]}
                     </option>
                   ))}
                 </select>

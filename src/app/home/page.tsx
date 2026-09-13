@@ -12,7 +12,7 @@ import {
   sopDueDate,
   dueSignoffPhrase,
 } from "@/lib/signoff-clock";
-import { cleanSignoffPriority } from "@/lib/constants";
+import { cleanSigningWindow } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +81,7 @@ export default async function StaffHomePage() {
       const [{ data: sops }, { data: signOffs }] = await Promise.all([
         supabase
           .from("sops")
-          .select("id, name, signoff_type, signoff_priority, published_version, published_at")
+          .select("id, name, signoff_type, signing_window, published_version, published_at")
           .in("id", sopIds)
           .not("published_version", "is", null),
         supabase
@@ -103,7 +103,7 @@ export default async function StaffHomePage() {
               sopDueDate(
                 roleStart,
                 s.published_at as string | null,
-                cleanSignoffPriority(s.signoff_priority),
+                cleanSigningWindow(s.signing_window),
               ),
             )}`
           : (s.name as string);

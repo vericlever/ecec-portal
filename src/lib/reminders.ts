@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailEnabled, esc } from "@/lib/email";
 import { fmtDate } from "@/lib/format-date";
-import { cleanSignoffPriority } from "@/lib/constants";
+import { cleanSigningWindow } from "@/lib/constants";
 import {
   earliestRoleStartBySop,
   sopDueDate,
@@ -135,7 +135,7 @@ export async function runReminders(opts?: {
     admin.from("profile_job_roles").select("profile_id, job_role_id, assigned_at"),
     admin
       .from("sops")
-      .select("id, name, organisation_id, published_version, published_at, signoff_type, signoff_priority")
+      .select("id, name, organisation_id, published_version, published_at, signoff_type, signing_window")
       .not("published_version", "is", null),
     admin.from("sop_review_status").select("sop_id, next_review_date"),
     admin
@@ -200,7 +200,7 @@ export async function runReminders(opts?: {
         version: s.published_version as number,
         needsManager: s.signoff_type === "self_and_manager",
         publishedAt: s.published_at as string | null,
-        priority: cleanSignoffPriority(s.signoff_priority),
+        signingWindow: cleanSigningWindow(s.signing_window),
       },
     ]),
   );
@@ -304,10 +304,10 @@ export async function runReminders(opts?: {
   }
 
   // Unsigned procedures, unioned across every role a person holds, that have
-  // actually crossed their own signing-priority window (Step 44). Shared by
-  // the staff digest below and the manager "staff overdue" summary - a
-  // 6-month-priority procedure should not appear in anyone's inbox in week
-  // one just because it is technically unsigned.
+  // actually crossed their own signing window (Step 44). Shared by the staff
+  // digest below and the manager "staff overdue" summary - a procedure with a
+  // 6-month signing window should not appear in anyone's inbox in week one
+  // just because it is technically unsigned.
   function overdueUnsignedSopNames(profileId: string): string[] {
     const roleIds = rolesByProfile.get(profileId) ?? [];
     const suite = Array.from(new Set(roleIds.flatMap((rid) => suiteByRole.get(rid) ?? [])));
@@ -327,7 +327,7 @@ export async function runReminders(opts?: {
         if (!outstanding) return false;
         const roleStart = roleStartBySop.get(sopId);
         if (!roleStart) return false;
-        return isOverdue(sopDueDate(roleStart, s.publishedAt, s.priority));
+        return isOverdue(sopDueDate(roleStart, s.publishedAt, s.signingWindow));
       })
       .map((sopId) => pubSopById.get(sopId)!.name);
   }

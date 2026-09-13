@@ -12,7 +12,7 @@ import {
   dueSignoffPhrase,
   isOverdue,
 } from "@/lib/signoff-clock";
-import { cleanSignoffPriority } from "@/lib/constants";
+import { cleanSigningWindow } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export default async function SopDetailPage({
   const { data: sop } = await supabase
     .from("sops")
     .select(
-      "id, name, signoff_type, notes, published_body, published_version, published_at, signoff_priority",
+      "id, name, signoff_type, notes, published_body, published_version, published_at, signing_window",
     )
     .eq("id", params.sopId)
     .maybeSingle();
@@ -79,7 +79,7 @@ export default async function SopDetailPage({
   const roleStartBySop = earliestRoleStartBySop(inSuiteLinks ?? [], roleDates);
   const roleStart = roleStartBySop.get(sop.id);
   const dueDate = roleStart
-    ? sopDueDate(roleStart, sop.published_at, cleanSignoffPriority(sop.signoff_priority))
+    ? sopDueDate(roleStart, sop.published_at, cleanSigningWindow(sop.signing_window))
     : null;
   const overdue = dueDate ? isOverdue(dueDate) : false;
 
