@@ -3,7 +3,14 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { REVIEW_PERIODS, REVIEW_PERIOD_LABELS } from "@/lib/constants";
+import {
+  REVIEW_PERIODS,
+  REVIEW_PERIOD_LABELS,
+  SOP_SIGNOFF_PRIORITIES,
+  SOP_SIGNOFF_PRIORITY_LABELS,
+  cleanSignoffPriority,
+  type SopSignoffPriority,
+} from "@/lib/constants";
 import { finishBulkSops } from "../../actions";
 
 type Row = {
@@ -12,6 +19,7 @@ type Row = {
   hasText: boolean;
   alreadyPublished: boolean;
   reviewPeriod: number;
+  signoffPriority: string;
   linkedPolicyIds: string[];
   jobRoleIds: string[];
 };
@@ -19,6 +27,7 @@ type Row = {
 type State = {
   jobRoleIds: string[];
   reviewPeriod: number;
+  signoffPriority: SopSignoffPriority;
   publish: boolean;
   linkedPolicyIds: string[];
 };
@@ -50,6 +59,7 @@ export function SopBulkReview({
           reviewPeriod: REVIEW_PERIODS.includes(r.reviewPeriod as 3 | 6 | 12)
             ? r.reviewPeriod
             : 6,
+          signoffPriority: cleanSignoffPriority(r.signoffPriority),
           publish: r.hasText,
           linkedPolicyIds: r.linkedPolicyIds,
         },
@@ -79,6 +89,7 @@ export function SopBulkReview({
         sopId: r.id,
         jobRoleIds: state[r.id].jobRoleIds,
         reviewPeriod: state[r.id].reviewPeriod,
+        signoffPriority: state[r.id].signoffPriority,
         linkedPolicyIds: state[r.id].linkedPolicyIds,
         publish: state[r.id].publish && r.hasText,
       }));
@@ -237,7 +248,7 @@ export function SopBulkReview({
               </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <label className="block text-sm">
                 <span className="text-xs font-medium text-slate-500">
                   Review every
@@ -247,11 +258,31 @@ export function SopBulkReview({
                   onChange={(e) =>
                     patch(r.id, { reviewPeriod: Number(e.target.value) })
                   }
-                  className="mt-1 w-full max-w-[12rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                 >
                   {REVIEW_PERIODS.map((p) => (
                     <option key={p} value={p}>
                       {REVIEW_PERIOD_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="text-xs font-medium text-slate-500">
+                  Priority to sign
+                </span>
+                <select
+                  value={s.signoffPriority}
+                  onChange={(e) =>
+                    patch(r.id, {
+                      signoffPriority: cleanSignoffPriority(e.target.value),
+                    })
+                  }
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                >
+                  {SOP_SIGNOFF_PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {SOP_SIGNOFF_PRIORITY_LABELS[p]}
                     </option>
                   ))}
                 </select>

@@ -2,10 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { assignedJobRoleIds } from "@/lib/staff-job-roles";
+import { assignedJobRoleIds, assignedRoleDates } from "@/lib/staff-job-roles";
 import { SignForm } from "./sign-form";
 import { ReadAloud } from "./read-aloud";
 import { fmtDateTime } from "@/lib/format-date";
+import {
+  earliestRoleStartBySop,
+  sopDueDate,
+  dueSignoffPhrase,
+  isOverdue,
+} from "@/lib/signoff-clock";
+import { cleanSignoffPriority } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +32,7 @@ export default async function SopDetailPage({
   const { data: sop } = await supabase
     .from("sops")
     .select(
-      "id, name, signoff_type, notes, published_body, published_version, published_at",
+      "id, name, signoff_type, notes, published_body, published_version, published_at, signoff_priority",
     )
     .eq("id", params.sopId)
     .maybeSingle();
@@ -33,7 +40,7 @@ export default async function SopDetailPage({
   if (!sop || sop.published_version == null) notFound();
 
   const roleIds = await assignedJobRoleIds(supabase, profile.id);
-  const [{ data: links }, { data: signOff }, { data: inSuite }] =
+  const [{ data: links }, { data: signOff }, { data: inSuiteLinks }, roleDates] =
     await Promise.all([
       supabase.from("policy_sop_links").select("policy_id").eq("sop_id", sop.id),
       supabase
@@ -46,12 +53,13 @@ export default async function SopDetailPage({
       roleIds.length > 0
         ? supabase
             .from("job_role_sops")
-            .select("sop_id")
+            .select("job_role_id, sop_id")
             .in("job_role_id", roleIds)
             .eq("sop_id", sop.id)
-            .limit(1)
-        : Promise.resolve({ data: [] as { sop_id: string }[] }),
+        : Promise.resolve({ data: [] as { job_role_id: string; sop_id: string }[] }),
+      assignedRoleDates(supabase, profile.id),
     ]);
+  const inSuite = inSuiteLinks;
 
   // Linked policies the staff member is allowed to open. RLS on `policies`
   // already limits this to published policies that target them, matching their
@@ -67,6 +75,13 @@ export default async function SopDetailPage({
 
   const isInSuite = Boolean(inSuite && inSuite.length > 0);
   const needsManager = sop.signoff_type === "self_and_manager";
+
+  const roleStartBySop = earliestRoleStartBySop(inSuiteLinks ?? [], roleDates);
+  const roleStart = roleStartBySop.get(sop.id);
+  const dueDate = roleStart
+    ? sopDueDate(roleStart, sop.published_at, cleanSignoffPriority(sop.signoff_priority))
+    : null;
+  const overdue = dueDate ? isOverdue(dueDate) : false;
 
   return (
     <div>
@@ -134,7 +149,20 @@ export default async function SopDetailPage({
           </div>
         )
       ) : isInSuite ? (
-        <SignForm sopId={sop.id} needsManager={needsManager} />
+        <>
+          {dueDate && (
+            <p
+              className={
+                overdue
+                  ? "mt-4 text-sm font-medium text-red-700"
+                  : "mt-4 text-sm text-slate-500"
+              }
+            >
+              {dueSignoffPhrase(dueDate)}
+            </p>
+          )}
+          <SignForm sopId={sop.id} needsManager={needsManager} />
+        </>
       ) : (
         <p className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
           This procedure is not part of your assigned job role, so it is shown for

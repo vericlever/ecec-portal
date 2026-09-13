@@ -3,7 +3,14 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { REVIEW_PERIODS, REVIEW_PERIOD_LABELS } from "@/lib/constants";
+import {
+  REVIEW_PERIODS,
+  REVIEW_PERIOD_LABELS,
+  SOP_SIGNOFF_PRIORITIES,
+  SOP_SIGNOFF_PRIORITY_LABELS,
+  cleanSignoffPriority,
+  type SopSignoffPriority,
+} from "@/lib/constants";
 import type { PolicyCategory } from "@/lib/policy-categories";
 import { HISTORY_EVENT_LABELS, fmtReviewDate, reviewState } from "@/lib/sop-review";
 import { fmtDateTime } from "@/lib/format-date";
@@ -33,6 +40,7 @@ type Sop = {
   category_id: string;
   signoff_type: string;
   priority: number | null;
+  signoff_priority: string;
   notes: string;
   service_id: string | null;
   body: string;
@@ -104,6 +112,9 @@ export function SopEditor({
   const [signoffType, setSignoffType] = useState(sop.signoff_type);
   const [categoryId, setCategoryId] = useState(sop.category_id);
   const [priority, setPriority] = useState(sop.priority?.toString() ?? "");
+  const [signoffPriority, setSignoffPriority] = useState<SopSignoffPriority>(
+    cleanSignoffPriority(sop.signoff_priority),
+  );
   const [notes, setNotes] = useState(sop.notes);
   const [serviceId, setServiceId] = useState(sop.service_id ?? "");
   const [reviewPeriod, setReviewPeriod] = useState(sop.review_period_months);
@@ -300,20 +311,42 @@ export function SopEditor({
                   </select>
                 </label>
               </div>
-              <label className="block text-sm">
-                <span className="font-medium text-slate-700">Review every</span>
-                <select
-                  value={reviewPeriod}
-                  onChange={(e) => setReviewPeriod(Number(e.target.value))}
-                  className="mt-1 w-full max-w-[12rem] rounded-md border border-slate-300 px-3 py-2 text-sm"
-                >
-                  {REVIEW_PERIODS.map((p) => (
-                    <option key={p} value={p}>
-                      {REVIEW_PERIOD_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Review every</span>
+                  <select
+                    value={reviewPeriod}
+                    onChange={(e) => setReviewPeriod(Number(e.target.value))}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    {REVIEW_PERIODS.map((p) => (
+                      <option key={p} value={p}>
+                        {REVIEW_PERIOD_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Priority to sign</span>
+                  <select
+                    value={signoffPriority}
+                    onChange={(e) =>
+                      setSignoffPriority(cleanSignoffPriority(e.target.value))
+                    }
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    {SOP_SIGNOFF_PRIORITIES.map((p) => (
+                      <option key={p} value={p}>
+                        {SOP_SIGNOFF_PRIORITY_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="text-xs text-slate-400">
+                How long staff have to sign once this procedure becomes due for
+                their role, before it shows as overdue.
+              </p>
               <label className="block text-sm">
                 <span className="font-medium text-slate-700">
                   Internal notes <span className="font-normal text-slate-400">(not shown to staff)</span>
@@ -336,6 +369,7 @@ export function SopEditor({
                         signoffType,
                         categoryId,
                         priority,
+                        signoffPriority,
                         notes,
                         serviceId: serviceId || null,
                         reviewPeriod,

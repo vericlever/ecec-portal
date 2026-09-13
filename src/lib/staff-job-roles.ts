@@ -33,6 +33,19 @@ export async function assignedJobRoleIds(
   return (data ?? []).map((l) => l.job_role_id as string);
 }
 
+// job_role_id -> when this person was assigned that role. The signing clock
+// (Step 44) starts here for every procedure in that role's suite.
+export async function assignedRoleDates(
+  supabase: ServerClient,
+  profileId: string,
+): Promise<Map<string, string>> {
+  const { data } = await supabase
+    .from("profile_job_roles")
+    .select("job_role_id, assigned_at")
+    .eq("profile_id", profileId);
+  return new Map((data ?? []).map((l) => [l.job_role_id as string, l.assigned_at as string]));
+}
+
 // The published SOPs covered by any of the given roles, deduplicated - the
 // suite a person with these roles must sign, whether they hold one role or
 // several.

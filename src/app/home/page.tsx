@@ -3,10 +3,16 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { classifyPersonCredentials } from "@/lib/credentials";
 import { agreementsForProfile } from "@/lib/agreements";
-import { assignedJobRoles } from "@/lib/staff-job-roles";
+import { assignedJobRoles, assignedRoleDates } from "@/lib/staff-job-roles";
 import { StageArc } from "@/components/bauhaus";
 import { OutcomeFlagForm } from "./outcome-flag-form";
 import { fmtDate } from "@/lib/format-date";
+import {
+  earliestRoleStartBySop,
+  sopDueDate,
+  dueSignoffPhrase,
+} from "@/lib/signoff-clock";
+import { cleanSignoffPriority } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +60,7 @@ export default async function StaffHomePage() {
   const suiteByRole = new Map<string, string[]>();
   const trainingByRole: { name: string; pct: number | null }[] = [];
   const mySops: { id: string; name: string }[] = [];
+  const roleDates = await assignedRoleDates(supabase, me.id);
   if (myRoleIds.length > 0) {
     const { data: roleSops } = await supabase
       .from("job_role_sops")
@@ -65,12 +72,16 @@ export default async function StaffHomePage() {
       suiteByRole.set(r.job_role_id as string, list);
     }
     const sopIds = Array.from(new Set((roleSops ?? []).map((r) => r.sop_id as string)));
+    const roleStartBySop = earliestRoleStartBySop(
+      (roleSops ?? []) as { job_role_id: string; sop_id: string }[],
+      roleDates,
+    );
 
     if (sopIds.length > 0) {
       const [{ data: sops }, { data: signOffs }] = await Promise.all([
         supabase
           .from("sops")
-          .select("id, name, signoff_type, published_version")
+          .select("id, name, signoff_type, signoff_priority, published_version, published_at")
           .in("id", sopIds)
           .not("published_version", "is", null),
         supabase
@@ -86,7 +97,17 @@ export default async function StaffHomePage() {
       for (const s of published.values()) {
         mySops.push({ id: s.id as string, name: s.name as string });
         const so = signOffFor.get(`${s.id}:${s.published_version}`);
-        const item = { label: s.name as string, href: `/sops/${s.id}` };
+        const roleStart = roleStartBySop.get(s.id as string);
+        const label = roleStart
+          ? `${s.name} — ${dueSignoffPhrase(
+              sopDueDate(
+                roleStart,
+                s.published_at as string | null,
+                cleanSignoffPriority(s.signoff_priority),
+              ),
+            )}`
+          : (s.name as string);
+        const item = { label, href: `/sops/${s.id}` };
         if (!so) {
           unsignedSops.push(item);
         } else if (s.signoff_type === "self_and_manager" && !so.verified_at) {

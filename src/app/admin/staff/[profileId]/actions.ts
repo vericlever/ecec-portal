@@ -590,15 +590,32 @@ export async function setStaffJobRoles(
     }
   }
 
-  const { error: deleteErr } = await supabase
+  // Diff against what they already hold rather than delete-and-reinsert
+  // everything: a role they keep must keep its original assigned_at, since
+  // that is what the signing clock (Step 44) counts from. Only a genuinely
+  // new role should start a fresh clock.
+  const { data: current } = await supabase
     .from("profile_job_roles")
-    .delete()
+    .select("job_role_id")
     .eq("profile_id", profileId);
-  if (deleteErr) return { ok: false, error: deleteErr.message };
+  const currentIds = new Set((current ?? []).map((r) => r.job_role_id as string));
+  const wantIds = new Set(uniqueIds);
 
-  if (uniqueIds.length > 0) {
+  const toRemove = Array.from(currentIds).filter((id) => !wantIds.has(id));
+  const toAdd = uniqueIds.filter((id) => !currentIds.has(id));
+
+  if (toRemove.length > 0) {
+    const { error: deleteErr } = await supabase
+      .from("profile_job_roles")
+      .delete()
+      .eq("profile_id", profileId)
+      .in("job_role_id", toRemove);
+    if (deleteErr) return { ok: false, error: deleteErr.message };
+  }
+
+  if (toAdd.length > 0) {
     const { error: insertErr } = await supabase.from("profile_job_roles").insert(
-      uniqueIds.map((jobRoleId) => ({
+      toAdd.map((jobRoleId) => ({
         profile_id: profileId,
         job_role_id: jobRoleId,
         organisation_id: me.organisation_id,

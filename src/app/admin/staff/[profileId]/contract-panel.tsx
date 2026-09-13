@@ -12,6 +12,7 @@ import {
   countersignContract,
 } from "./actions";
 import { fmtDate as fmtDateOnly, fmtDateTime } from "@/lib/format-date";
+import { contractDueDate, dueSignoffPhrase, isOverdue } from "@/lib/signoff-clock";
 
 // start_date/expiry_date are plain calendar dates (Step 43), never
 // timezone-converted; this just adds the null-handling the shared helper
@@ -63,6 +64,10 @@ export function ContractPanel({
   const active = contracts.find((c) => !c.superseded_at) ?? null;
   const history = contracts.filter((c) => c.superseded_at);
   const execution = active ? executionState(active) : null;
+  const signOverdue =
+    active && !active.signed_at && !active.is_deed
+      ? isOverdue(contractDueDate(active.created_at))
+      : false;
 
   const onSubmit = (form: HTMLFormElement) => {
     start(async () => {
@@ -144,10 +149,10 @@ export function ContractPanel({
             {!active.is_deed && (
               <>
                 <dt className="text-slate-500">Signed by staff member</dt>
-                <dd className="text-slate-800">
+                <dd className={active.signed_at ? "text-slate-800" : signOverdue ? "font-medium text-red-700" : "text-slate-800"}>
                   {active.signed_at
                     ? `${active.signed_name ?? "Yes"} · ${fmtDateTime(active.signed_at, timezone)}`
-                    : "Not signed yet"}
+                    : `Not signed yet · ${dueSignoffPhrase(contractDueDate(active.created_at))}`}
                 </dd>
                 <dt className="text-slate-500">Countersigned</dt>
                 <dd className="text-slate-800">

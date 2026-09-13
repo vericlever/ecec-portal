@@ -30,8 +30,14 @@ import {
   renewalState,
 } from "@/lib/contracts";
 import { agreementsForProfile } from "@/lib/agreements";
-import { assignedJobRoles, sopSuiteIdsForRoles } from "@/lib/staff-job-roles";
+import { assignedJobRoles, assignedRoleDates } from "@/lib/staff-job-roles";
 import { fmtDate as fmtDateOnly, fmtDateTime } from "@/lib/format-date";
+import {
+  earliestRoleStartBySop,
+  sopDueDate,
+  dueSignoffPhrase,
+} from "@/lib/signoff-clock";
+import { cleanSignoffPriority } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -179,12 +185,21 @@ export default async function StaffRecordPage({
   const unsignedSops: string[] = [];
   const awaitingCosignSops: string[] = [];
   if (personRoleIds.length > 0) {
-    const suiteIds = await sopSuiteIdsForRoles(supabase, personRoleIds);
+    const [{ data: roleLinks }, personRoleDates] = await Promise.all([
+      supabase
+        .from("job_role_sops")
+        .select("job_role_id, sop_id")
+        .in("job_role_id", personRoleIds),
+      assignedRoleDates(supabase, person.id),
+    ]);
+    const links = (roleLinks ?? []) as { job_role_id: string; sop_id: string }[];
+    const suiteIds = Array.from(new Set(links.map((l) => l.sop_id)));
+    const roleStartBySop = earliestRoleStartBySop(links, personRoleDates);
     if (suiteIds.length > 0) {
       const [{ data: sopRows }, { data: signRows }] = await Promise.all([
         supabase
           .from("sops")
-          .select("id, name, published_version, signoff_type")
+          .select("id, name, published_version, published_at, signoff_type, signoff_priority")
           .in("id", suiteIds)
           .not("published_version", "is", null),
         supabase
@@ -203,8 +218,18 @@ export default async function StaffRecordPage({
       for (const s of published) {
         const verified = signOf.get(`${s.id}:${s.published_version}`);
         const needsManager = s.signoff_type === "self_and_manager";
+        const roleStart = roleStartBySop.get(s.id as string);
+        const label = roleStart
+          ? `${s.name} — ${dueSignoffPhrase(
+              sopDueDate(
+                roleStart,
+                s.published_at as string | null,
+                cleanSignoffPriority(s.signoff_priority),
+              ),
+            )}`
+          : (s.name as string);
         if (verified === undefined) {
-          unsignedSops.push(s.name as string);
+          unsignedSops.push(label);
         } else if (needsManager && !verified) {
           awaitingCosignSops.push(s.name as string);
         } else {

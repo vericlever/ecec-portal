@@ -43,7 +43,9 @@ export default async function SopBulkReviewPage({
   ] = await Promise.all([
     supabase
       .from("sops")
-      .select("id, name, organisation_id, body, review_period_months, published_version")
+      .select(
+        "id, name, organisation_id, body, review_period_months, signoff_priority, published_version",
+      )
       .in("id", ids),
     supabase
       .from("policies")
@@ -81,6 +83,7 @@ export default async function SopBulkReviewPage({
       hasText: !!(s.body && String(s.body).trim()),
       alreadyPublished: (s.published_version as number | null) != null,
       reviewPeriod: (s.review_period_months as number | null) ?? 6,
+      signoffPriority: (s.signoff_priority as string | null) ?? "week",
       linkedPolicyIds: linkedBySop.get(s.id as string) ?? [],
       jobRoleIds: rolesBySop.get(s.id as string) ?? [],
     }));

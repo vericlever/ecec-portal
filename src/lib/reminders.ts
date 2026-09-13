@@ -1,6 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailEnabled, esc } from "@/lib/email";
 import { fmtDate } from "@/lib/format-date";
+import { cleanSignoffPriority } from "@/lib/constants";
+import {
+  earliestRoleStartBySop,
+  sopDueDate,
+  contractDueDate,
+  isOverdue,
+} from "@/lib/signoff-clock";
 
 // Step 19 reminder engine. Run once a day by the Vercel cron at
 // /api/cron/reminders. Builds one digest per person (staff or manager) covering
@@ -125,10 +132,10 @@ export async function runReminders(opts?: {
         "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, is_active",
       ),
     admin.from("job_role_sops").select("job_role_id, sop_id"),
-    admin.from("profile_job_roles").select("profile_id, job_role_id"),
+    admin.from("profile_job_roles").select("profile_id, job_role_id, assigned_at"),
     admin
       .from("sops")
-      .select("id, name, organisation_id, published_version, signoff_type")
+      .select("id, name, organisation_id, published_version, published_at, signoff_type, signoff_priority")
       .not("published_version", "is", null),
     admin.from("sop_review_status").select("sop_id, next_review_date"),
     admin
@@ -151,7 +158,7 @@ export async function runReminders(opts?: {
       .not("expiry_date", "is", null),
     admin
       .from("contracts")
-      .select("profile_id, expiry_date, period_type, signed_at")
+      .select("profile_id, expiry_date, period_type, signed_at, created_at")
       .is("superseded_at", null),
     admin
       .from("hr_agreements")
@@ -170,10 +177,18 @@ export async function runReminders(opts?: {
   // profile_job_roles is the source of truth for suite and agreement
   // targeting; profiles.job_role_id is just the kept-in-sync primary.
   const rolesByProfile = new Map<string, string[]>();
+  // The signing clock (Step 44) starts at the role assignment date, keyed
+  // per person per role since two people in the same role can have started
+  // at different times.
+  const roleAssignedAtByProfile = new Map<string, Map<string, string>>();
   for (const r of profileRoles ?? []) {
-    const list = rolesByProfile.get(r.profile_id as string) ?? [];
+    const pid = r.profile_id as string;
+    const list = rolesByProfile.get(pid) ?? [];
     list.push(r.job_role_id as string);
-    rolesByProfile.set(r.profile_id as string, list);
+    rolesByProfile.set(pid, list);
+    const dates = roleAssignedAtByProfile.get(pid) ?? new Map<string, string>();
+    dates.set(r.job_role_id as string, r.assigned_at as string);
+    roleAssignedAtByProfile.set(pid, dates);
   }
 
   // suite (published SOP ids) per job role
@@ -184,6 +199,8 @@ export async function runReminders(opts?: {
         name: s.name as string,
         version: s.published_version as number,
         needsManager: s.signoff_type === "self_and_manager",
+        publishedAt: s.published_at as string | null,
+        priority: cleanSignoffPriority(s.signoff_priority),
       },
     ]),
   );
@@ -244,7 +261,7 @@ export async function runReminders(opts?: {
   // contracts per person
   const contractsByProfile = new Map<
     string,
-    { expiry: string | null; fixed: boolean; signed: boolean }[]
+    { expiry: string | null; fixed: boolean; signed: boolean; createdAt: string }[]
   >();
   for (const c of contracts ?? []) {
     const list = contractsByProfile.get(c.profile_id as string) ?? [];
@@ -252,6 +269,7 @@ export async function runReminders(opts?: {
       expiry: (c.expiry_date as string | null) ?? null,
       fixed: c.period_type === "fixed",
       signed: Boolean(c.signed_at),
+      createdAt: c.created_at as string,
     });
     contractsByProfile.set(c.profile_id as string, list);
   }
@@ -285,6 +303,35 @@ export async function runReminders(opts?: {
     return out;
   }
 
+  // Unsigned procedures, unioned across every role a person holds, that have
+  // actually crossed their own signing-priority window (Step 44). Shared by
+  // the staff digest below and the manager "staff overdue" summary - a
+  // 6-month-priority procedure should not appear in anyone's inbox in week
+  // one just because it is technically unsigned.
+  function overdueUnsignedSopNames(profileId: string): string[] {
+    const roleIds = rolesByProfile.get(profileId) ?? [];
+    const suite = Array.from(new Set(roleIds.flatMap((rid) => suiteByRole.get(rid) ?? [])));
+    const personRoleLinks = roleIds.flatMap((rid) =>
+      (suiteByRole.get(rid) ?? []).map((sopId) => ({ job_role_id: rid, sop_id: sopId })),
+    );
+    const roleStartBySop = earliestRoleStartBySop(
+      personRoleLinks,
+      roleAssignedAtByProfile.get(profileId) ?? new Map<string, string>(),
+    );
+    const signed = signedByUser.get(profileId) ?? new Map<string, boolean>();
+    return suite
+      .filter((sopId) => {
+        const s = pubSopById.get(sopId)!;
+        const v = signed.get(`${sopId}:${s.version}`);
+        const outstanding = v === undefined ? true : s.needsManager ? !v : false;
+        if (!outstanding) return false;
+        const roleStart = roleStartBySop.get(sopId);
+        if (!roleStart) return false;
+        return isOverdue(sopDueDate(roleStart, s.publishedAt, s.priority));
+      })
+      .map((sopId) => pubSopById.get(sopId)!.name);
+  }
+
   // --- staff digests ----------------------------------------------------
 
   const digests: Digest[] = [];
@@ -296,18 +343,7 @@ export async function runReminders(opts?: {
 
     const sections: Section[] = [];
 
-    // unsigned SOPs, unioned across every role this person holds
-    const suite = Array.from(new Set(roleIds.flatMap((rid) => suiteByRole.get(rid) ?? [])));
-    const signed = signedByUser.get(p.id) ?? new Map<string, boolean>();
-    const unsignedSops = suite
-      .filter((sopId) => {
-        const s = pubSopById.get(sopId)!;
-        const v = signed.get(`${sopId}:${s.version}`);
-        if (v === undefined) return true;
-        return s.needsManager ? !v : false;
-      })
-      .map((sopId) => pubSopById.get(sopId)!.name)
-      .sort();
+    const unsignedSops = overdueUnsignedSopNames(p.id).sort();
     if (unsignedSops.length) {
       sections.push({ heading: "Procedures to sign", items: unsignedSops });
     }
@@ -333,10 +369,14 @@ export async function runReminders(opts?: {
       sections.push({ heading: "Agreements to sign", items: ua });
     }
 
-    // contract
+    // contract - same fixed one-week grace as everywhere else, from when
+    // the contract was issued, not its (possibly future or backdated)
+    // business start_date
     const myContracts = contractsByProfile.get(p.id) ?? [];
-    const unsignedContract = myContracts.some((c) => !c.signed);
-    if (unsignedContract) {
+    const overdueContract = myContracts.some(
+      (c) => !c.signed && isOverdue(contractDueDate(c.createdAt)),
+    );
+    if (overdueContract) {
       sections.push({ heading: "Contract", items: ["Your contract is waiting for your signature"] });
     }
 
@@ -443,6 +483,23 @@ export async function runReminders(opts?: {
       });
     }
 
+    // staff overdue on procedure sign-off (Step 44 signing clock)
+    const overdueSopItems: string[] = [];
+    for (const s of scope) {
+      const names = overdueUnsignedSopNames(s.id);
+      if (names.length) {
+        overdueSopItems.push(
+          `${s.full_name}: ${names.length} procedure${names.length === 1 ? "" : "s"} overdue`,
+        );
+      }
+    }
+    if (overdueSopItems.length) {
+      sections.push({
+        heading: "Staff overdue on procedures",
+        items: overdueSopItems.sort(),
+      });
+    }
+
     // contract renewals (admin + hr_manager)
     if (m.access_tier === "admin" || m.hr_manager) {
       const items: string[] = [];
@@ -455,6 +512,21 @@ export async function runReminders(opts?: {
       }
       if (items.length) {
         sections.push({ heading: "Contracts to renew", items: items.sort() });
+      }
+    }
+
+    // contracts overdue for initial signature (admin + hr_manager)
+    if (m.access_tier === "admin" || m.hr_manager) {
+      const items: string[] = [];
+      for (const s of scope) {
+        for (const c of contractsByProfile.get(s.id) ?? []) {
+          if (!c.signed && isOverdue(contractDueDate(c.createdAt))) {
+            items.push(`${s.full_name}: contract not yet signed`);
+          }
+        }
+      }
+      if (items.length) {
+        sections.push({ heading: "Contracts overdue for signature", items: items.sort() });
       }
     }
 

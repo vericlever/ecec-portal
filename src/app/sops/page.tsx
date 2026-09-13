@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { assignedJobRoleIds, sopSuiteIdsForRoles } from "@/lib/staff-job-roles";
+import { assignedJobRoleIds, assignedRoleDates } from "@/lib/staff-job-roles";
+import {
+  earliestRoleStartBySop,
+  sopDueDate,
+  dueSignoffPhrase,
+  isOverdue,
+} from "@/lib/signoff-clock";
+import { cleanSignoffPriority } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +17,9 @@ type SopRow = {
   name: string;
   signoff_type: string | null;
   priority: number | null;
+  signoff_priority: string | null;
   published_version: number;
+  published_at: string | null;
 };
 
 export default async function SopListPage() {
@@ -30,13 +39,19 @@ export default async function SopListPage() {
     );
   }
 
-  const sopIds = await sopSuiteIdsForRoles(supabase, roleIds);
+  const [{ data: roleLinks }, roleDates] = await Promise.all([
+    supabase.from("job_role_sops").select("job_role_id, sop_id").in("job_role_id", roleIds),
+    assignedRoleDates(supabase, profile.id),
+  ]);
+  const links = (roleLinks ?? []) as { job_role_id: string; sop_id: string }[];
+  const sopIds = Array.from(new Set(links.map((l) => l.sop_id)));
+  const roleStartBySop = earliestRoleStartBySop(links, roleDates);
 
   const [{ data: sops }, { data: signOffs }] = await Promise.all([
     sopIds.length
       ? supabase
           .from("sops")
-          .select("id, name, signoff_type, priority, published_version")
+          .select("id, name, signoff_type, priority, signoff_priority, published_version, published_at")
           .in("id", sopIds)
           .not("published_version", "is", null)
       : Promise.resolve({ data: [] }),
@@ -66,6 +81,12 @@ export default async function SopListPage() {
     return "signed";
   }
 
+  function due(s: SopRow): Date | null {
+    const start = roleStartBySop.get(s.id);
+    if (!start) return null;
+    return sopDueDate(start, s.published_at, cleanSignoffPriority(s.signoff_priority));
+  }
+
   const signedCount = rows.filter((s) => state(s) === "signed").length;
 
   return (
@@ -83,6 +104,8 @@ export default async function SopListPage() {
           <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
             {rows.map((sop) => {
               const st = state(sop);
+              const dueDate = st === "not_signed" ? due(sop) : null;
+              const overdue = dueDate ? isOverdue(dueDate) : false;
               return (
                 <li key={sop.id}>
                   <Link
@@ -90,19 +113,38 @@ export default async function SopListPage() {
                     className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
                   >
                     <span className="text-sm">{sop.name}</span>
-                    {st === "signed" ? (
-                      <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                        Signed
-                      </span>
-                    ) : st === "awaiting_manager" ? (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                        Awaiting manager
-                      </span>
-                    ) : (
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                        Not signed
-                      </span>
-                    )}
+                    <span className="flex shrink-0 items-center gap-2">
+                      {dueDate && (
+                        <span
+                          className={
+                            overdue
+                              ? "text-xs font-medium text-red-700"
+                              : "text-xs text-slate-400"
+                          }
+                        >
+                          {dueSignoffPhrase(dueDate)}
+                        </span>
+                      )}
+                      {st === "signed" ? (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                          Signed
+                        </span>
+                      ) : st === "awaiting_manager" ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          Awaiting manager
+                        </span>
+                      ) : (
+                        <span
+                          className={
+                            overdue
+                              ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                              : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500"
+                          }
+                        >
+                          Not signed
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 </li>
               );
