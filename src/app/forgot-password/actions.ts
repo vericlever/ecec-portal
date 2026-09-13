@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generatePasswordResetLink } from "@/lib/invite";
 import { emailEnabled, sendPasswordReset } from "@/lib/email";
+import { isEmailSuppressed, logNotification } from "@/lib/notifications";
 
 export type ForgotState = { done: boolean; devLink?: string };
 
@@ -35,9 +36,13 @@ export async function requestPasswordReset(
   const link = await generatePasswordResetLink(profile.email as string);
   let emailSent = false;
   let devLink: string | undefined;
+  let providerMessageId: string | null = null;
+  let sendError: string | undefined;
+
+  const suppression = await isEmailSuppressed(profile.id as string);
 
   if (link.ok) {
-    if (emailEnabled()) {
+    if (emailEnabled() && !suppression.suppressed) {
       const sent = await sendPasswordReset({
         to: profile.email as string,
         fullName: (profile.full_name as string) ?? "",
@@ -45,6 +50,8 @@ export async function requestPasswordReset(
         triggeredByLeader: false,
       });
       emailSent = sent.ok;
+      if (sent.ok) providerMessageId = sent.id;
+      else sendError = sent.error;
     }
     // In development, surface the link on screen whenever it did not actually
     // get emailed (no provider, or a sandbox rejection), so the flow stays
@@ -62,6 +69,18 @@ export async function requestPasswordReset(
     source: "self",
     email_sent: emailSent,
   });
+  if (profile.organisation_id) {
+    await logNotification({
+      organisationId: profile.organisation_id as string,
+      recipientProfileId: profile.id as string,
+      recipientEmail: profile.email as string,
+      kind: "password_reset",
+      triggerReason: "Self-service password reset",
+      providerMessageId,
+      deliveryState: suppression.suppressed ? "suppressed" : emailSent ? "sent" : "failed",
+      failureReason: suppression.suppressed ? (suppression.reason ?? undefined) : sendError,
+    });
+  }
 
   return { done: true, devLink };
 }

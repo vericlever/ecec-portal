@@ -7,6 +7,7 @@ import {
   sopDueDate,
   contractDueDate,
   isOverdue,
+  signingState,
 } from "@/lib/signoff-clock";
 
 // Step 19 reminder engine. Run once a day by the Vercel cron at
@@ -82,6 +83,8 @@ type Person = {
   is_active: boolean;
   signing_paused_at: string | null;
   signing_paused_days_banked: number;
+  email_suppressed_at: string | null;
+  email_suppressed_reason: string | null;
 };
 
 function isManager(t: string) {
@@ -131,7 +134,7 @@ export async function runReminders(opts?: {
     admin
       .from("profiles")
       .select(
-        "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, is_active, signing_paused_at, signing_paused_days_banked",
+        "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, is_active, signing_paused_at, signing_paused_days_banked, email_suppressed_at, email_suppressed_reason",
       ),
     admin.from("job_role_sops").select("job_role_id, sop_id"),
     admin.from("profile_job_roles").select("profile_id, job_role_id, assigned_at"),
@@ -305,14 +308,17 @@ export async function runReminders(opts?: {
     return out;
   }
 
-  // Unsigned procedures, unioned across every role a person holds, that have
-  // actually crossed their own signing window (Step 44). Shared by the staff
-  // digest below and the manager "staff overdue" summary - a procedure with a
-  // 6-month signing window should not appear in anyone's inbox in week one
-  // just because it is technically unsigned.
-  function overdueUnsignedSopNames(profileId: string): string[] {
+  // Every unsigned procedure in a person's suite that has actually crossed
+  // into due_soon or overdue (Step 44's signing clock) - a procedure with a
+  // 6-month signing window should not appear in anyone's inbox in month one
+  // just because it is technically unsigned. Shared by the staff digest
+  // (which wants the early due_soon heads-up too) and the manager "staff
+  // overdue" summary (which only cares once it is actually overdue).
+  function chasableSopItems(
+    profileId: string,
+  ): { name: string; clock: "overdue" | "due_soon" }[] {
     const person = peopleById.get(profileId);
-    if (person?.signing_paused_at) return []; // paused: nothing chases, nothing shows as overdue
+    if (person?.signing_paused_at) return []; // paused: nothing chases, nothing counts
     const roleIds = rolesByProfile.get(profileId) ?? [];
     const suite = Array.from(new Set(roleIds.flatMap((rid) => suiteByRole.get(rid) ?? [])));
     const personRoleLinks = roleIds.flatMap((rid) =>
@@ -324,19 +330,19 @@ export async function runReminders(opts?: {
     );
     const signed = signedByUser.get(profileId) ?? new Map<string, boolean>();
     const pausedDaysBanked = person?.signing_paused_days_banked ?? 0;
-    return suite
-      .filter((sopId) => {
-        const s = pubSopById.get(sopId)!;
-        const v = signed.get(`${sopId}:${s.version}`);
-        const outstanding = v === undefined ? true : s.needsManager ? !v : false;
-        if (!outstanding) return false;
-        const roleStart = roleStartBySop.get(sopId);
-        if (!roleStart) return false;
-        return isOverdue(
-          sopDueDate(roleStart, s.publishedAt, s.signingWindow, pausedDaysBanked),
-        );
-      })
-      .map((sopId) => pubSopById.get(sopId)!.name);
+    const out: { name: string; clock: "overdue" | "due_soon" }[] = [];
+    for (const sopId of suite) {
+      const s = pubSopById.get(sopId)!;
+      const v = signed.get(`${sopId}:${s.version}`);
+      const outstanding = v === undefined ? true : s.needsManager ? !v : false;
+      if (!outstanding) continue;
+      const roleStart = roleStartBySop.get(sopId);
+      if (!roleStart) continue;
+      const due = sopDueDate(roleStart, s.publishedAt, s.signingWindow, pausedDaysBanked);
+      const clock = signingState(due, { paused: false });
+      if (clock === "overdue" || clock === "due_soon") out.push({ name: s.name, clock });
+    }
+    return out;
   }
 
   // --- staff digests ----------------------------------------------------
@@ -351,7 +357,9 @@ export async function runReminders(opts?: {
 
     const sections: Section[] = [];
 
-    const unsignedSops = overdueUnsignedSopNames(p.id).sort();
+    const unsignedSops = chasableSopItems(p.id)
+      .map((i) => `${i.name} — ${i.clock === "overdue" ? "overdue" : "due this week"}`)
+      .sort();
     if (unsignedSops.length) {
       sections.push({ heading: "Procedures to sign", items: unsignedSops });
     }
@@ -491,13 +499,14 @@ export async function runReminders(opts?: {
       });
     }
 
-    // staff overdue on procedure sign-off (Step 44 signing clock)
+    // staff overdue on procedure sign-off (Step 44 signing clock) - overdue
+    // only, not due_soon; a manager doesn't need every early heads-up flagged
     const overdueSopItems: string[] = [];
     for (const s of scope) {
-      const names = overdueUnsignedSopNames(s.id);
-      if (names.length) {
+      const count = chasableSopItems(s.id).filter((i) => i.clock === "overdue").length;
+      if (count) {
         overdueSopItems.push(
-          `${s.full_name}: ${names.length} procedure${names.length === 1 ? "" : "s"} overdue`,
+          `${s.full_name}: ${count} procedure${count === 1 ? "" : "s"} overdue`,
         );
       }
     }
@@ -619,6 +628,20 @@ export async function runReminders(opts?: {
           ]),
         });
       } else {
+        const recipient = peopleById.get(d.profileId);
+        if (recipient?.email_suppressed_at) {
+          await admin.from("notification_log").insert({
+            organisation_id: d.organisationId,
+            recipient_profile_id: d.profileId,
+            recipient_email: d.email,
+            kind: d.kind,
+            trigger_reason: subject,
+            delivery_state: "suppressed",
+            failure_reason: recipient.email_suppressed_reason,
+            detail: { sections: d.sections },
+          });
+          continue;
+        }
         const sent = await sendEmail({
           to: d.email,
           subject,
@@ -627,6 +650,16 @@ export async function runReminders(opts?: {
         });
         if (!sent.ok) {
           result.errors.push(`${d.email}: ${sent.error}`);
+          await admin.from("notification_log").insert({
+            organisation_id: d.organisationId,
+            recipient_profile_id: d.profileId,
+            recipient_email: d.email,
+            kind: d.kind,
+            trigger_reason: subject,
+            delivery_state: "failed",
+            failure_reason: sent.error,
+            detail: { sections: d.sections },
+          });
           continue;
         }
         await admin.from("notification_log").insert({
@@ -634,6 +667,9 @@ export async function runReminders(opts?: {
           recipient_profile_id: d.profileId,
           recipient_email: d.email,
           kind: d.kind,
+          trigger_reason: subject,
+          provider_message_id: sent.id,
+          delivery_state: "sent",
           detail: { sections: d.sections },
         });
       }

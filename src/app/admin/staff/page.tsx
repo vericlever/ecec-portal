@@ -8,6 +8,7 @@ import {
   type AccessTier,
 } from "@/lib/auth";
 import { staffStatsByProfile, summariseTeam, type StaffStat } from "@/lib/staff-stats";
+import { fmtDateTime } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,23 @@ export default async function StaffPage() {
   // bottom of the list (build addendum item 1), separate from sort order.
   const activeRows = rows.filter((p) => p.is_active);
   const inactiveRows = rows.filter((p) => !p.is_active);
+
+  // Step 45: last reminded date per person, for the "otherwise a Director
+  // forgets who has been chased" ask. Most recent row per profile only.
+  const { data: notificationRows } = rows.length
+    ? await supabase
+        .from("notification_log")
+        .select("recipient_profile_id, sent_at")
+        .in("recipient_profile_id", rows.map((p) => p.id))
+        .order("sent_at", { ascending: false })
+    : { data: [] as { recipient_profile_id: string | null; sent_at: string }[] };
+  const lastRemindedByProfile = new Map<string, string>();
+  for (const n of notificationRows ?? []) {
+    const pid = n.recipient_profile_id as string | null;
+    if (pid && !lastRemindedByProfile.has(pid)) {
+      lastRemindedByProfile.set(pid, n.sent_at as string);
+    }
+  }
 
   // Team-wide compliance roll-up for the people in view. Managers see their own
   // service, admins the whole organisation, so the summary always matches the
@@ -164,6 +182,8 @@ export default async function StaffPage() {
             stat={stats.get(p.id)}
             serviceName={serviceName}
             roleLabel={roleLabel(p.id)}
+            lastReminded={lastRemindedByProfile.get(p.id) ?? null}
+            timezone={me.organisation_timezone}
           />
         ))}
       </ul>
@@ -181,6 +201,8 @@ export default async function StaffPage() {
                 stat={stats.get(p.id)}
                 serviceName={serviceName}
                 roleLabel={roleLabel(p.id)}
+                lastReminded={lastRemindedByProfile.get(p.id) ?? null}
+            timezone={me.organisation_timezone}
                 inactive
               />
             ))}
@@ -196,12 +218,16 @@ function StaffRowItem({
   stat,
   serviceName,
   roleLabel,
+  lastReminded,
+  timezone,
   inactive = false,
 }: {
   person: StaffRow;
   stat: StaffStat | undefined;
   serviceName: Map<string, string>;
   roleLabel: string;
+  lastReminded: string | null;
+  timezone: string;
   inactive?: boolean;
 }) {
   return (
@@ -240,6 +266,10 @@ function StaffRowItem({
             {p.service_id
               ? (serviceName.get(p.service_id) ?? "—")
               : "all services"}
+            {" · "}
+            {lastReminded
+              ? `Last reminded ${fmtDateTime(lastReminded, timezone)}`
+              : "Never reminded"}
           </div>
         </div>
 

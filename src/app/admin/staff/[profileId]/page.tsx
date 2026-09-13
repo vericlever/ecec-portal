@@ -55,6 +55,33 @@ function fmtDate(v: string | null | undefined) {
   return fmtDateOnly(v);
 }
 
+const NOTIFICATION_KIND_LABELS: Record<string, string> = {
+  staff_digest: "Weekly digest",
+  manager_digest: "Manager digest",
+  account_created: "Account created",
+  password_reset: "Password reset",
+};
+
+function DeliveryBadge({ state, reason }: { state: string; reason: string | null }) {
+  const styles: Record<string, string> = {
+    sent: "bg-slate-100 text-slate-600",
+    delivered: "bg-green-100 text-green-700",
+    bounced: "bg-red-100 text-red-700",
+    complained: "bg-red-100 text-red-700",
+    failed: "bg-red-100 text-red-700",
+    suppressed: "bg-amber-100 text-amber-800",
+    queued: "bg-slate-100 text-slate-600",
+  };
+  return (
+    <span
+      title={reason ?? undefined}
+      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${styles[state] ?? "bg-slate-100 text-slate-600"}`}
+    >
+      {state}
+    </span>
+  );
+}
+
 function ynLabel(v: boolean | null | undefined) {
   return v === true ? "Yes" : v === false ? "No" : "—";
 }
@@ -171,6 +198,20 @@ export default async function StaffRecordPage({
             .order("slot"),
         ])
       : [{ data: null }, { data: null }, { data: null }];
+
+  // Step 45: what this person has actually been sent, and what happened to
+  // it - "reminded four times, last on 3 October, delivered" rather than
+  // just "reminders are on". notification_log's own RLS (is_manager) already
+  // matches this visibility, so no extra scoping is needed here.
+  const canSeeNotifications = isManager(me.access_tier);
+  const { data: notifications } = canSeeNotifications
+    ? await supabase
+        .from("notification_log")
+        .select("id, kind, trigger_reason, sent_at, delivery_state, delivered_at, failure_reason")
+        .or(`recipient_profile_id.eq.${params.profileId},related_profile_id.eq.${params.profileId}`)
+        .order("sent_at", { ascending: false })
+        .limit(20)
+    : { data: null };
 
   // Onboarding documents this person has entered that a leader has not sighted.
   const pendingSightings = [wwcc, teacher, quals, training, identityRows].reduce(
@@ -895,6 +936,34 @@ export default async function StaffRecordPage({
             )}
         </div>
       </section>
+
+      {canSeeNotifications && (
+        <details className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Notification history {notifications && notifications.length > 0 ? `(${notifications.length})` : ""}
+          </summary>
+          {!notifications || notifications.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">Nothing sent yet.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-slate-100 text-sm">
+              {notifications.map((n) => (
+                <li key={n.id as string} className="flex items-center justify-between gap-3 py-2">
+                  <div>
+                    <p className="text-slate-700">
+                      {NOTIFICATION_KIND_LABELS[n.kind as string] ?? n.kind}
+                      {n.trigger_reason ? ` — ${n.trigger_reason}` : ""}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {fmtDateTime(n.sent_at as string, me.organisation_timezone, { time: true })}
+                    </p>
+                  </div>
+                  <DeliveryBadge state={n.delivery_state as string} reason={n.failure_reason as string | null} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
+      )}
     </div>
   );
 }

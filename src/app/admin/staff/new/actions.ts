@@ -7,6 +7,7 @@ import { getProfile, isAdmin, isManager, type AccessTier } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateFirstLoginLink } from "@/lib/invite";
 import { emailEnabled, sendStaffInvite } from "@/lib/email";
+import { isEmailSuppressed, logNotification } from "@/lib/notifications";
 
 export type CreateStaffState =
   | { status: "idle" }
@@ -137,7 +138,8 @@ export async function createStaff(
   const link = await generateFirstLoginLink(email);
   if (link.ok) {
     inviteLink = link.link;
-    if (emailEnabled()) {
+    const suppression = await isEmailSuppressed(created.user.id);
+    if (emailEnabled() && !suppression.suppressed) {
       const { data: org } = await supabase
         .from("organisations")
         .select("name")
@@ -150,6 +152,26 @@ export async function createStaff(
         orgName: org?.name ?? "VeriClever",
       });
       emailed = sent.ok;
+      await logNotification({
+        organisationId: me.organisation_id,
+        recipientProfileId: created.user.id,
+        recipientEmail: email,
+        kind: "account_created",
+        triggerReason: "Staff account created",
+        providerMessageId: sent.ok ? sent.id : null,
+        deliveryState: sent.ok ? "sent" : "failed",
+        failureReason: sent.ok ? undefined : sent.error,
+      });
+    } else if (suppression.suppressed) {
+      await logNotification({
+        organisationId: me.organisation_id,
+        recipientProfileId: created.user.id,
+        recipientEmail: email,
+        kind: "account_created",
+        triggerReason: "Staff account created",
+        deliveryState: "suppressed",
+        failureReason: suppression.reason ?? undefined,
+      });
     }
   }
 

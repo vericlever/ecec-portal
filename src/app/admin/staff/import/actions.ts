@@ -14,6 +14,7 @@ import {
 } from "@/lib/nqaits-import";
 import { generateFirstLoginLink } from "@/lib/invite";
 import { emailEnabled, sendStaffInvite } from "@/lib/email";
+import { isEmailSuppressed, logNotification } from "@/lib/notifications";
 
 export type ImportFormat = "csv" | "json";
 
@@ -167,14 +168,37 @@ export async function runImport(
     if (result.ok) {
       const link = await generateFirstLoginLink(r.email);
       let emailed = false;
-      if (link.ok && canEmail) {
-        const sent = await sendStaffInvite({
-          to: r.email,
-          fullName: r.name,
-          link: link.link,
-          orgName,
-        });
-        emailed = sent.ok;
+      if (link.ok) {
+        const suppression = await isEmailSuppressed(result.userId);
+        if (canEmail && !suppression.suppressed) {
+          const sent = await sendStaffInvite({
+            to: r.email,
+            fullName: r.name,
+            link: link.link,
+            orgName,
+          });
+          emailed = sent.ok;
+          await logNotification({
+            organisationId: org,
+            recipientProfileId: result.userId,
+            recipientEmail: r.email,
+            kind: "account_created",
+            triggerReason: "Staff account created (bulk import)",
+            providerMessageId: sent.ok ? sent.id : null,
+            deliveryState: sent.ok ? "sent" : "failed",
+            failureReason: sent.ok ? undefined : sent.error,
+          });
+        } else if (suppression.suppressed) {
+          await logNotification({
+            organisationId: org,
+            recipientProfileId: result.userId,
+            recipientEmail: r.email,
+            kind: "account_created",
+            triggerReason: "Staff account created (bulk import)",
+            deliveryState: "suppressed",
+            failureReason: suppression.reason ?? undefined,
+          });
+        }
       }
       rows.push({
         line: r.line,

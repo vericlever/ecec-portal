@@ -9,6 +9,7 @@ import { storeDocument, deleteDocument, documentSha256 } from "@/lib/documents/s
 import { calcExpiry } from "@/lib/contracts";
 import { generatePasswordResetLink } from "@/lib/invite";
 import { emailEnabled, sendPasswordReset } from "@/lib/email";
+import { isEmailSuppressed, logNotification } from "@/lib/notifications";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -733,9 +734,11 @@ export async function sendPasswordResetForStaff(
   const link = await generatePasswordResetLink(person.email as string);
   if (!link.ok) return { ok: false, error: link.error };
 
+  const suppression = await isEmailSuppressed(profileId);
   let emailSent = false;
   let sendError: string | null = null;
-  if (emailEnabled()) {
+  let providerMessageId: string | null = null;
+  if (emailEnabled() && !suppression.suppressed) {
     const sent = await sendPasswordReset({
       to: person.email as string,
       fullName: (person.full_name as string) ?? "",
@@ -743,7 +746,8 @@ export async function sendPasswordResetForStaff(
       triggeredByLeader: true,
     });
     emailSent = sent.ok;
-    if (!sent.ok) sendError = sent.error;
+    if (sent.ok) providerMessageId = sent.id;
+    else sendError = sent.error;
   }
 
   // Record the attempt either way, so the audit trail shows it was triggered.
@@ -755,6 +759,18 @@ export async function sendPasswordResetForStaff(
     source: "admin",
     email_sent: emailSent,
   });
+  await logNotification({
+    organisationId: person.organisation_id,
+    recipientProfileId: profileId,
+    recipientEmail: person.email as string,
+    kind: "password_reset",
+    triggerReason: "Admin-triggered password reset",
+    providerMessageId,
+    deliveryState: suppression.suppressed ? "suppressed" : emailSent ? "sent" : "failed",
+    failureReason: suppression.suppressed
+      ? (suppression.reason ?? undefined)
+      : (sendError ?? undefined),
+  });
   revalidatePath(`/admin/staff/${profileId}`);
 
   if (!emailSent) {
@@ -762,9 +778,11 @@ export async function sendPasswordResetForStaff(
       ok: true,
       emailSent: false,
       link: link.link,
-      reason: emailEnabled()
-        ? `The email did not send: ${sendError ?? "unknown error"}`
-        : "Email is not configured on this deployment.",
+      reason: suppression.suppressed
+        ? `This address is suppressed after a hard bounce: ${suppression.reason ?? "unknown reason"}.`
+        : emailEnabled()
+          ? `The email did not send: ${sendError ?? "unknown error"}`
+          : "Email is not configured on this deployment.",
     };
   }
   return { ok: true, emailSent: true };
