@@ -690,6 +690,14 @@ export async function setStaffAccessTier(
   return { ok: true };
 }
 
+// A reset link was always minted successfully here, whether or not it could
+// be emailed - the caller needs the link itself when it could not, so an
+// admin can pass it on some other way rather than the attempt vanishing.
+export type PasswordResetResult =
+  | { ok: true; emailSent: true }
+  | { ok: true; emailSent: false; link: string; reason: string }
+  | { ok: false; error: string };
+
 // Trigger a password reset email for a staff member. Admin anywhere in the
 // organisation, or an HR manager for staff at their own service. The person who
 // triggers it never sees or sets the password - Supabase mints the token and
@@ -699,7 +707,7 @@ export async function setStaffAccessTier(
 // an operation against Supabase's own auth schema.
 export async function sendPasswordResetForStaff(
   profileId: string,
-): Promise<Result> {
+): Promise<PasswordResetResult> {
   const me = await getProfile();
   if (!me) return { ok: false, error: "Sign in." };
   const admin = createAdminClient();
@@ -749,11 +757,15 @@ export async function sendPasswordResetForStaff(
   });
   revalidatePath(`/admin/staff/${profileId}`);
 
-  if (emailEnabled() && !emailSent) {
+  if (!emailSent) {
     return {
-      ok: false,
-      error: `Recorded, but the email did not send: ${sendError ?? "unknown error"}`,
+      ok: true,
+      emailSent: false,
+      link: link.link,
+      reason: emailEnabled()
+        ? `The email did not send: ${sendError ?? "unknown error"}`
+        : "Email is not configured on this deployment.",
     };
   }
-  return { ok: true };
+  return { ok: true, emailSent: true };
 }

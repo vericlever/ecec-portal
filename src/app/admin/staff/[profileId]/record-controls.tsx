@@ -435,6 +435,7 @@ export function PasswordResetControl({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [manualLink, setManualLink] = useState<{ link: string; reason: string } | null>(null);
   const [pending, start] = useTransition();
 
   return (
@@ -452,13 +453,18 @@ export function PasswordResetControl({
             start(async () => {
               setError(null);
               setMsg(null);
+              setManualLink(null);
               const r = await sendPasswordResetForStaff(profileId);
-              if (r.ok) {
-                setMsg("Reset email sent.");
-                router.refresh();
-              } else {
+              if (!r.ok) {
                 setError(r.error);
+                return;
               }
+              if (r.emailSent) {
+                setMsg("Reset email sent.");
+              } else {
+                setManualLink({ link: r.link, reason: r.reason });
+              }
+              router.refresh();
             });
           }}
           className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 disabled:opacity-40"
@@ -468,6 +474,17 @@ export function PasswordResetControl({
         {msg && <span className="text-xs text-green-700">{msg}</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
+      {manualLink && (
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
+          <p>{manualLink.reason} A reset link was still created - copy it and send it to {email} yourself.</p>
+          <input
+            readOnly
+            value={manualLink.link}
+            onFocus={(e) => e.currentTarget.select()}
+            className="mt-1.5 w-full rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-slate-700"
+          />
+        </div>
+      )}
       {lastReset && (
         <p className="mt-1 text-xs text-slate-400">
           Last reset {fmtDateTime(lastReset.at, timezone)}{" "}

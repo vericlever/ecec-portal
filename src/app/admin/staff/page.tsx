@@ -71,9 +71,11 @@ export default async function StaffPage() {
 
   // Team-wide compliance roll-up for the people in view. Managers see their own
   // service, admins the whole organisation, so the summary always matches the
-  // list below it.
+  // list below it. Active staff only - an inactive account (still shown, and
+  // still given its own stats, in the Inactive section below) must not skew
+  // the header tiles, matching how /admin's overview already does this.
   const summary = summariseTeam(
-    rows.map((p) => p.id),
+    activeRows.map((p) => p.id),
     stats,
   );
 
@@ -125,7 +127,7 @@ export default async function StaffPage() {
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <SummaryBox
             label="Staff fully compliant"
-            value={`${summary.clear} of ${rows.length}`}
+            value={`${summary.clear} of ${summary.total}`}
           />
           <SummaryBox
             label="Procedures signed"
