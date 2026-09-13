@@ -769,3 +769,92 @@ export async function sendPasswordResetForStaff(
   }
   return { ok: true, emailSent: true };
 }
+
+// Step 44 pause/leave. Freezes the signing clock for every outstanding item
+// this person has - not one procedure at a time, since the real scenario
+// (someone on leave) means all of it should stop the same way. Manager
+// (staff) tier and above, scoped to their own service like every other
+// staff-record edit; admin reaches anyone in the organisation.
+async function canPauseFor(profileId: string) {
+  const me = await getProfile();
+  if (!me) return null;
+  const supabase = createClient();
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, organisation_id, service_id")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!target || target.organisation_id !== me.organisation_id) return null;
+  const allowed =
+    isAdmin(me.access_tier) ||
+    (isManager(me.access_tier) && target.service_id === me.service_id);
+  if (!allowed) return null;
+  return { me, supabase };
+}
+
+export async function pauseStaffSigning(
+  profileId: string,
+  reason: string,
+  until: string | null,
+): Promise<Result> {
+  const gate = await canPauseFor(profileId);
+  if (!gate) return { ok: false, error: "You cannot pause this person's signing clock." };
+  const trimmed = reason.trim();
+  if (!trimmed) return { ok: false, error: "A reason is required." };
+
+  const { data, error } = await gate.supabase
+    .from("profiles")
+    .update({
+      signing_paused_at: new Date().toISOString(),
+      signing_paused_reason: trimmed,
+      signing_paused_until: until || null,
+    })
+    .eq("id", profileId)
+    .is("signing_paused_at", null)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false, error: "Already paused." };
+  }
+
+  revalidatePath(`/admin/staff/${profileId}`);
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/home");
+  return { ok: true };
+}
+
+export async function resumeStaffSigning(profileId: string): Promise<Result> {
+  const gate = await canPauseFor(profileId);
+  if (!gate) return { ok: false, error: "You cannot resume this person's signing clock." };
+
+  const { data: person } = await gate.supabase
+    .from("profiles")
+    .select("signing_paused_at, signing_paused_days_banked")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!person?.signing_paused_at) return { ok: true };
+
+  const pausedDays = Math.max(
+    0,
+    Math.round(
+      (Date.now() - new Date(person.signing_paused_at as string).getTime()) / 86_400_000,
+    ),
+  );
+
+  const { error } = await gate.supabase
+    .from("profiles")
+    .update({
+      signing_paused_at: null,
+      signing_paused_reason: null,
+      signing_paused_until: null,
+      signing_paused_days_banked:
+        (person.signing_paused_days_banked as number) + pausedDays,
+    })
+    .eq("id", profileId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/staff/${profileId}`);
+  revalidatePath("/admin/staff", "layout");
+  revalidatePath("/home");
+  return { ok: true };
+}

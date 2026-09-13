@@ -42,6 +42,8 @@ export function ContractPanel({
   canManage,
   canSign = false,
   timezone,
+  paused = false,
+  pausedDaysBanked = 0,
 }: {
   profileId: string;
   contracts: ContractRow[];
@@ -49,6 +51,9 @@ export function ContractPanel({
   // The contract owner viewing their own record (the onboarding page) can sign.
   canSign?: boolean;
   timezone: string;
+  // Step 44 pause/leave - this person's own clock, frozen either way.
+  paused?: boolean;
+  pausedDaysBanked?: number;
 }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -64,9 +69,10 @@ export function ContractPanel({
   const active = contracts.find((c) => !c.superseded_at) ?? null;
   const history = contracts.filter((c) => c.superseded_at);
   const execution = active ? executionState(active) : null;
+  const contractDue = active ? contractDueDate(active.created_at, pausedDaysBanked) : null;
   const signOverdue =
-    active && !active.signed_at && !active.is_deed
-      ? isOverdue(contractDueDate(active.created_at))
+    active && !active.signed_at && !active.is_deed && !paused && contractDue
+      ? isOverdue(contractDue)
       : false;
 
   const onSubmit = (form: HTMLFormElement) => {
@@ -152,7 +158,9 @@ export function ContractPanel({
                 <dd className={active.signed_at ? "text-slate-800" : signOverdue ? "font-medium text-red-700" : "text-slate-800"}>
                   {active.signed_at
                     ? `${active.signed_name ?? "Yes"} · ${fmtDateTime(active.signed_at, timezone)}`
-                    : `Not signed yet · ${dueSignoffPhrase(contractDueDate(active.created_at))}`}
+                    : paused
+                      ? "Not signed yet · Paused"
+                      : `Not signed yet · ${dueSignoffPhrase(contractDue as Date)}`}
                 </dd>
                 <dt className="text-slate-500">Countersigned</dt>
                 <dd className="text-slate-800">

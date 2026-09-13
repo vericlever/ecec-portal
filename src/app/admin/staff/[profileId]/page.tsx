@@ -5,6 +5,7 @@ import {
   requireStaffAccess,
   isHrManager,
   isAdmin,
+  isManager,
   TIER_LABELS,
 } from "@/lib/auth";
 import { ASSIGNABLE_TIERS } from "@/lib/roles";
@@ -20,6 +21,7 @@ import {
   ProbationControl,
   RefereeCheckControl,
   SightingControl,
+  SigningPauseControl,
 } from "./record-controls";
 import { ContractPanel } from "./contract-panel";
 import { IdentityPanel, type IdentityDoc } from "./identity-panel";
@@ -84,7 +86,9 @@ export default async function StaffRecordPage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, email, access_tier, hr_manager, service_id, job_role_id, is_active")
+      .select(
+        "id, full_name, email, access_tier, hr_manager, service_id, job_role_id, is_active, signing_paused_at, signing_paused_reason, signing_paused_until, signing_paused_days_banked",
+      )
       .eq("id", params.profileId)
       .maybeSingle(),
     supabase.from("worker_details").select("*").eq("profile_id", params.profileId).maybeSingle(),
@@ -219,15 +223,18 @@ export default async function StaffRecordPage({
         const verified = signOf.get(`${s.id}:${s.published_version}`);
         const needsManager = s.signoff_type === "self_and_manager";
         const roleStart = roleStartBySop.get(s.id as string);
-        const label = roleStart
-          ? `${s.name} — ${dueSignoffPhrase(
-              sopDueDate(
-                roleStart,
-                s.published_at as string | null,
-                cleanSigningWindow(s.signing_window),
-              ),
-            )}`
-          : (s.name as string);
+        const label = person.signing_paused_at
+          ? `${s.name} — Paused`
+          : roleStart
+            ? `${s.name} — ${dueSignoffPhrase(
+                sopDueDate(
+                  roleStart,
+                  s.published_at as string | null,
+                  cleanSigningWindow(s.signing_window),
+                  person.signing_paused_days_banked as number,
+                ),
+              )}`
+            : (s.name as string);
         if (verified === undefined) {
           unsignedSops.push(label);
         } else if (needsManager && !verified) {
@@ -556,6 +563,20 @@ export default async function StaffRecordPage({
         </section>
       )}
 
+      {person.id !== me.id &&
+        (isAdmin(me.access_tier) ||
+          (isManager(me.access_tier) && me.service_id === person.service_id)) && (
+          <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+            <SigningPauseControl
+              profileId={person.id}
+              pausedAt={person.signing_paused_at as string | null}
+              pausedReason={person.signing_paused_reason as string | null}
+              pausedUntil={person.signing_paused_until as string | null}
+              timezone={me.organisation_timezone}
+            />
+          </section>
+        )}
+
       {isAdmin(me.access_tier) && person.id !== me.id && (
         <section className="mt-6">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -698,6 +719,8 @@ export default async function StaffRecordPage({
           contracts={contracts}
           canManage={canManageContract}
           timezone={me.organisation_timezone}
+          paused={Boolean(person.signing_paused_at)}
+          pausedDaysBanked={person.signing_paused_days_banked as number}
         />
       </section>
 

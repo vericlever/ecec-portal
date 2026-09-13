@@ -11,6 +11,7 @@ import {
   earliestRoleStartBySop,
   sopDueDate,
   dueSignoffPhrase,
+  signingState,
 } from "@/lib/signoff-clock";
 import { cleanSigningWindow } from "@/lib/constants";
 
@@ -57,6 +58,8 @@ export default async function StaffHomePage() {
   const unsignedSops: WorklistItem[] = [];
   const awaitingCosignSops: WorklistItem[] = [];
   let sopTotal = 0;
+  let overdueCount = 0;
+  let dueSoonCount = 0;
   const suiteByRole = new Map<string, string[]>();
   const trainingByRole: { name: string; pct: number | null }[] = [];
   const mySops: { id: string; name: string }[] = [];
@@ -98,18 +101,25 @@ export default async function StaffHomePage() {
         mySops.push({ id: s.id as string, name: s.name as string });
         const so = signOffFor.get(`${s.id}:${s.published_version}`);
         const roleStart = roleStartBySop.get(s.id as string);
-        const label = roleStart
-          ? `${s.name} — ${dueSignoffPhrase(
-              sopDueDate(
-                roleStart,
-                s.published_at as string | null,
-                cleanSigningWindow(s.signing_window),
-              ),
-            )}`
+        const dueDate = roleStart
+          ? sopDueDate(
+              roleStart,
+              s.published_at as string | null,
+              cleanSigningWindow(s.signing_window),
+              me.signing_paused_days_banked,
+            )
+          : null;
+        const clock = dueDate
+          ? signingState(dueDate, { paused: Boolean(me.signing_paused_at) })
+          : null;
+        const label = clock
+          ? `${s.name} — ${clock === "paused" ? "Paused" : dueSignoffPhrase(dueDate as Date)}`
           : (s.name as string);
         const item = { label, href: `/sops/${s.id}` };
         if (!so) {
           unsignedSops.push(item);
+          if (clock === "overdue") overdueCount += 1;
+          else if (clock === "due_soon") dueSoonCount += 1;
         } else if (s.signoff_type === "self_and_manager" && !so.verified_at) {
           awaitingCosignSops.push(item);
         }
@@ -201,6 +211,24 @@ export default async function StaffHomePage() {
         Where your sign-off fits into the wider chain, and what&apos;s outstanding on
         your record.
       </p>
+
+      {me.signing_paused_at ? (
+        <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2.5 text-sm text-slate-600">
+          Your signing clock is paused
+          {me.signing_paused_reason ? ` — ${me.signing_paused_reason}` : ""}. Nothing
+          below counts as overdue while it is.
+        </p>
+      ) : (
+        (overdueCount > 0 || dueSoonCount > 0) && (
+          <p className="mt-3 text-sm font-medium">
+            {overdueCount > 0 && <span className="text-red-700">{overdueCount} overdue</span>}
+            {overdueCount > 0 && dueSoonCount > 0 && <span className="text-slate-400">, </span>}
+            {dueSoonCount > 0 && (
+              <span className="text-amber-700">{dueSoonCount} due this week</span>
+            )}
+          </p>
+        )
+      )}
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <StageSection

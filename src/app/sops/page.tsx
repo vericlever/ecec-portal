@@ -6,7 +6,7 @@ import {
   earliestRoleStartBySop,
   sopDueDate,
   dueSignoffPhrase,
-  isOverdue,
+  signingState,
 } from "@/lib/signoff-clock";
 import { cleanSigningWindow } from "@/lib/constants";
 
@@ -84,7 +84,18 @@ export default async function SopListPage() {
   function due(s: SopRow): Date | null {
     const start = roleStartBySop.get(s.id);
     if (!start) return null;
-    return sopDueDate(start, s.published_at, cleanSigningWindow(s.signing_window));
+    return sopDueDate(
+      start,
+      s.published_at,
+      cleanSigningWindow(s.signing_window),
+      profile.signing_paused_days_banked,
+    );
+  }
+
+  function clockOf(s: SopRow): "paused" | "overdue" | "due_soon" | "not_due" | null {
+    const dueDate = due(s);
+    if (!dueDate) return null;
+    return signingState(dueDate, { paused: Boolean(profile.signing_paused_at) });
   }
 
   const signedCount = rows.filter((s) => state(s) === "signed").length;
@@ -102,53 +113,68 @@ export default async function SopListPage() {
             {signedCount} of {rows.length} signed
           </p>
           <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-            {rows.map((sop) => {
-              const st = state(sop);
-              const dueDate = st === "not_signed" ? due(sop) : null;
-              const overdue = dueDate ? isOverdue(dueDate) : false;
-              return (
-                <li key={sop.id}>
-                  <Link
-                    href={`/sops/${sop.id}`}
-                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
-                  >
-                    <span className="text-sm">{sop.name}</span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      {dueDate && (
-                        <span
-                          className={
-                            overdue
-                              ? "text-xs font-medium text-red-700"
-                              : "text-xs text-slate-400"
-                          }
-                        >
-                          {dueSignoffPhrase(dueDate)}
-                        </span>
-                      )}
-                      {st === "signed" ? (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                          Signed
-                        </span>
-                      ) : st === "awaiting_manager" ? (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                          Awaiting manager
-                        </span>
-                      ) : (
-                        <span
-                          className={
-                            overdue
-                              ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
-                              : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500"
-                          }
-                        >
-                          Not signed
-                        </span>
-                      )}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
+            {rows
+              .slice()
+              .sort((a, b) => {
+                const rank = (s: SopRow) =>
+                  state(s) !== "not_signed" ? 2 : clockOf(s) === "overdue" ? 0 : 1;
+                return rank(a) - rank(b);
+              })
+              .map((sop) => {
+                const st = state(sop);
+                const dueDate = st === "not_signed" ? due(sop) : null;
+                const clock = st === "not_signed" ? clockOf(sop) : null;
+                return (
+                  <li key={sop.id}>
+                    <Link
+                      href={`/sops/${sop.id}`}
+                      className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
+                    >
+                      <span className="text-sm">{sop.name}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        {clock === "paused" ? (
+                          <span className="text-xs text-slate-400">Paused</span>
+                        ) : (
+                          dueDate && (
+                            <span
+                              className={
+                                clock === "overdue"
+                                  ? "text-xs font-medium text-red-700"
+                                  : clock === "due_soon"
+                                    ? "text-xs font-medium text-amber-700"
+                                    : "text-xs text-slate-400"
+                              }
+                            >
+                              {dueSignoffPhrase(dueDate)}
+                            </span>
+                          )
+                        )}
+                        {st === "signed" ? (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Signed
+                          </span>
+                        ) : st === "awaiting_manager" ? (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            Awaiting manager
+                          </span>
+                        ) : (
+                          <span
+                            className={
+                              clock === "overdue"
+                                ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                                : clock === "due_soon"
+                                  ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                                  : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500"
+                            }
+                          >
+                            Not signed
+                          </span>
+                        )}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
           </ul>
         </>
       )}

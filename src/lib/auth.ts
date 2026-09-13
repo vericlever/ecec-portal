@@ -26,6 +26,12 @@ export type Profile = {
   // the same default the column itself defaults to, for the org-less case
   // (there shouldn't be one, but Profile.organisation_id is nullable).
   organisation_timezone: string;
+  // Step 44 pause/leave. Non-null signing_paused_at freezes this person's own
+  // signing clock everywhere it is computed and suppresses their reminders.
+  signing_paused_at: string | null;
+  signing_paused_reason: string | null;
+  signing_paused_until: string | null;
+  signing_paused_days_banked: number;
 };
 
 export async function getProfile(): Promise<Profile | null> {
@@ -38,7 +44,7 @@ export async function getProfile(): Promise<Profile | null> {
   const { data } = await supabase
     .from("profiles")
     .select(
-      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, organisations(timezone)",
+      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, signing_paused_at, signing_paused_reason, signing_paused_until, signing_paused_days_banked, organisations(timezone)",
     )
     .eq("id", user.id)
     .maybeSingle();

@@ -80,6 +80,8 @@ type Person = {
   access_tier: string;
   hr_manager: boolean;
   is_active: boolean;
+  signing_paused_at: string | null;
+  signing_paused_days_banked: number;
 };
 
 function isManager(t: string) {
@@ -129,7 +131,7 @@ export async function runReminders(opts?: {
     admin
       .from("profiles")
       .select(
-        "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, is_active",
+        "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, is_active, signing_paused_at, signing_paused_days_banked",
       ),
     admin.from("job_role_sops").select("job_role_id, sop_id"),
     admin.from("profile_job_roles").select("profile_id, job_role_id, assigned_at"),
@@ -309,6 +311,8 @@ export async function runReminders(opts?: {
   // 6-month signing window should not appear in anyone's inbox in week one
   // just because it is technically unsigned.
   function overdueUnsignedSopNames(profileId: string): string[] {
+    const person = peopleById.get(profileId);
+    if (person?.signing_paused_at) return []; // paused: nothing chases, nothing shows as overdue
     const roleIds = rolesByProfile.get(profileId) ?? [];
     const suite = Array.from(new Set(roleIds.flatMap((rid) => suiteByRole.get(rid) ?? [])));
     const personRoleLinks = roleIds.flatMap((rid) =>
@@ -319,6 +323,7 @@ export async function runReminders(opts?: {
       roleAssignedAtByProfile.get(profileId) ?? new Map<string, string>(),
     );
     const signed = signedByUser.get(profileId) ?? new Map<string, boolean>();
+    const pausedDaysBanked = person?.signing_paused_days_banked ?? 0;
     return suite
       .filter((sopId) => {
         const s = pubSopById.get(sopId)!;
@@ -327,7 +332,9 @@ export async function runReminders(opts?: {
         if (!outstanding) return false;
         const roleStart = roleStartBySop.get(sopId);
         if (!roleStart) return false;
-        return isOverdue(sopDueDate(roleStart, s.publishedAt, s.signingWindow));
+        return isOverdue(
+          sopDueDate(roleStart, s.publishedAt, s.signingWindow, pausedDaysBanked),
+        );
       })
       .map((sopId) => pubSopById.get(sopId)!.name);
   }
@@ -338,6 +345,7 @@ export async function runReminders(opts?: {
 
   for (const p of people) {
     if (!p.is_active || !p.organisation_id || !p.email) continue;
+    if (p.signing_paused_at) continue; // Step 44: paused means no reminders at all, not just procedures
     const roleIds = rolesByProfile.get(p.id) ?? [];
     if (roleIds.length === 0) continue; // no suite yet, nothing to chase
 
@@ -519,8 +527,12 @@ export async function runReminders(opts?: {
     if (m.access_tier === "admin" || m.hr_manager) {
       const items: string[] = [];
       for (const s of scope) {
+        if (s.signing_paused_at) continue;
         for (const c of contractsByProfile.get(s.id) ?? []) {
-          if (!c.signed && isOverdue(contractDueDate(c.createdAt))) {
+          if (
+            !c.signed &&
+            isOverdue(contractDueDate(c.createdAt, s.signing_paused_days_banked))
+          ) {
             items.push(`${s.full_name}: contract not yet signed`);
           }
         }

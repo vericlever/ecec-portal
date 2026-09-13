@@ -46,6 +46,34 @@ export async function assignedRoleDates(
   return new Map((data ?? []).map((l) => [l.job_role_id as string, l.assigned_at as string]));
 }
 
+export type SigningPause = {
+  paused: boolean;
+  pausedAt: string | null;
+  reason: string | null;
+  until: string | null;
+  daysBanked: number;
+};
+
+// Step 44 pause/leave. Fetches the raw state; src/lib/signoff-clock.ts turns
+// it into due-date math (daysBanked) and display state (paused).
+export async function signingPauseFor(
+  supabase: ServerClient,
+  profileId: string,
+): Promise<SigningPause> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("signing_paused_at, signing_paused_reason, signing_paused_until, signing_paused_days_banked")
+    .eq("id", profileId)
+    .maybeSingle();
+  return {
+    paused: Boolean(data?.signing_paused_at),
+    pausedAt: (data?.signing_paused_at as string | null) ?? null,
+    reason: (data?.signing_paused_reason as string | null) ?? null,
+    until: (data?.signing_paused_until as string | null) ?? null,
+    daysBanked: (data?.signing_paused_days_banked as number | null) ?? 0,
+  };
+}
+
 // The published SOPs covered by any of the given roles, deduplicated - the
 // suite a person with these roles must sign, whether they hold one role or
 // several.

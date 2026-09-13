@@ -243,6 +243,8 @@ export default async function OnboardingPage() {
             canManage={false}
             canSign
             timezone={profile.organisation_timezone}
+            paused={Boolean(profile.signing_paused_at)}
+            pausedDaysBanked={profile.signing_paused_days_banked}
           />
         </section>
       )}

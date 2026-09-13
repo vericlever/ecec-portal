@@ -7,6 +7,8 @@ import {
   clearSighting,
   recordSighting,
   recordRefereeCheck,
+  pauseStaffSigning,
+  resumeStaffSigning,
   sendPasswordResetForStaff,
   setHrManager,
   setProbation,
@@ -653,6 +655,107 @@ export function ActiveControl({
         </button>
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
+    </div>
+  );
+}
+
+export function SigningPauseControl({
+  profileId,
+  pausedAt,
+  pausedReason,
+  pausedUntil,
+  timezone,
+}: {
+  profileId: string;
+  pausedAt: string | null;
+  pausedReason: string | null;
+  pausedUntil: string | null;
+  timezone: string;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const [reason, setReason] = useState("");
+  const [until, setUntil] = useState("");
+  const paused = Boolean(pausedAt);
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Signing clock</span>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Pausing freezes every outstanding procedure and contract due date for
+        this person and stops reminders going out - for leave, not for
+        anything else. Unpausing restores whatever time was left; it does not
+        reset the clock.
+      </p>
+      {paused ? (
+        <>
+          <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
+            Paused {fmtDateTime(pausedAt as string, timezone)}
+            {pausedReason ? ` — ${pausedReason}` : ""}
+            {pausedUntil ? ` (expected back ${fmtDate(pausedUntil)})` : ""}
+          </p>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                setError(null);
+                const r = await resumeStaffSigning(profileId);
+                if (r.ok) router.refresh();
+                else setError(r.error);
+              })
+            }
+            className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+          >
+            {pending ? "Saving…" : "Resume"}
+          </button>
+        </>
+      ) : (
+        <form
+          className="mt-2 space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            start(async () => {
+              setError(null);
+              const r = await pauseStaffSigning(profileId, reason, until || null);
+              if (r.ok) {
+                setReason("");
+                setUntil("");
+                router.refresh();
+              } else {
+                setError(r.error);
+              }
+            });
+          }}
+        >
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason (e.g. annual leave)"
+            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              Expected back
+              <input
+                type="date"
+                value={until}
+                onChange={(e) => setUntil(e.target.value)}
+                className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={pending || !reason.trim()}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+            >
+              {pending ? "Saving…" : "Pause"}
+            </button>
+          </div>
+        </form>
+      )}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }

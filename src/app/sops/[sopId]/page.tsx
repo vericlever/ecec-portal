@@ -10,7 +10,7 @@ import {
   earliestRoleStartBySop,
   sopDueDate,
   dueSignoffPhrase,
-  isOverdue,
+  signingState,
 } from "@/lib/signoff-clock";
 import { cleanSigningWindow } from "@/lib/constants";
 
@@ -79,9 +79,16 @@ export default async function SopDetailPage({
   const roleStartBySop = earliestRoleStartBySop(inSuiteLinks ?? [], roleDates);
   const roleStart = roleStartBySop.get(sop.id);
   const dueDate = roleStart
-    ? sopDueDate(roleStart, sop.published_at, cleanSigningWindow(sop.signing_window))
+    ? sopDueDate(
+        roleStart,
+        sop.published_at,
+        cleanSigningWindow(sop.signing_window),
+        profile.signing_paused_days_banked,
+      )
     : null;
-  const overdue = dueDate ? isOverdue(dueDate) : false;
+  const clock = dueDate
+    ? signingState(dueDate, { paused: Boolean(profile.signing_paused_at) })
+    : null;
 
   return (
     <div>
@@ -150,16 +157,24 @@ export default async function SopDetailPage({
         )
       ) : isInSuite ? (
         <>
-          {dueDate && (
-            <p
-              className={
-                overdue
-                  ? "mt-4 text-sm font-medium text-red-700"
-                  : "mt-4 text-sm text-slate-500"
-              }
-            >
-              {dueSignoffPhrase(dueDate)}
+          {clock === "paused" ? (
+            <p className="mt-4 text-sm text-slate-500">
+              Your signing clock is paused, so this is not counted as overdue.
             </p>
+          ) : (
+            dueDate && (
+              <p
+                className={
+                  clock === "overdue"
+                    ? "mt-4 text-sm font-medium text-red-700"
+                    : clock === "due_soon"
+                      ? "mt-4 text-sm font-medium text-amber-700"
+                      : "mt-4 text-sm text-slate-500"
+                }
+              >
+                {dueSignoffPhrase(dueDate)}
+              </p>
+            )
           )}
           <SignForm sopId={sop.id} needsManager={needsManager} />
         </>
