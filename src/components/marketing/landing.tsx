@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChainRing, StageArc, Wordmark, LogoMark } from "@/components/bauhaus";
 
-const CONTACT = "mailto:hello@vericlever.com.au";
+const CONTACT = "mailto:info@vericlever.com.au";
 
 export function Landing() {
   return (
