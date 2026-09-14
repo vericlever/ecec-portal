@@ -116,8 +116,10 @@ export function StageArc({
   );
 }
 
-// The wordmark's mark: three quarter-arcs anchored at the bottom-left corner
-// plus a dot at the origin, green only.
+// The wordmark's mark: the closed ring from the chain motif (StageArc's
+// "outcomes" state - the evidence, the ring fully closed), same three
+// concentric circles and centre dot, green only. Replaces the old signal/
+// wifi-style glyph everywhere the wordmark appears.
 export function LogoMark({ size = 30 }: { size?: number }) {
   return (
     <svg
@@ -127,12 +129,12 @@ export function LogoMark({ size = 30 }: { size?: number }) {
       className="block flex-none"
       aria-hidden="true"
     >
-      <g fill="none" stroke="#1B7A3E" strokeWidth={3.4}>
-        <path d="M 14 36 A 10 10 0 0 0 4 26" />
-        <path d="M 22 36 A 18 18 0 0 0 4 18" />
-        <path d="M 30 36 A 26 26 0 0 0 4 10" />
+      <g fill="none" stroke="#1B7A3E" strokeWidth={3}>
+        <circle cx="20" cy="20" r="17" />
+        <circle cx="20" cy="20" r="12" />
+        <circle cx="20" cy="20" r="7" />
       </g>
-      <circle cx="4" cy="36" r="2.8" fill="#1B7A3E" />
+      <circle cx="20" cy="20" r="2.8" fill="#1B7A3E" />
     </svg>
   );
 }
