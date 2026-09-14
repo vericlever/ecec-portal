@@ -14,8 +14,9 @@ export async function POST(request: Request) {
   }
 
   let sopId: string | undefined;
+  let attemptId: string | undefined;
   try {
-    ({ sopId } = await request.json());
+    ({ sopId, attemptId } = await request.json());
   } catch {
     return NextResponse.json({ ok: false, error: "Bad request." }, { status: 400 });
   }
@@ -35,13 +36,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Procedure not found." }, { status: 404 });
   }
 
+  // Step 46: signing is the last act. If this procedure has any
+  // comprehension questions, a passing attempt (this user, this procedure)
+  // is required before the sign-off is recorded - "read, passed, signed",
+  // not just a checkbox.
+  const { count: questionCount } = await supabase
+    .from("comprehension_questions")
+    .select("id", { count: "exact", head: true })
+    .eq("sop_id", sopId);
+  let comprehensionCheckPassed: boolean | null = null;
+  if ((questionCount ?? 0) > 0) {
+    if (!attemptId) {
+      return NextResponse.json(
+        { ok: false, error: "Pass the comprehension check before signing." },
+        { status: 400 },
+      );
+    }
+    const { data: attempt } = await supabase
+      .from("comprehension_attempts")
+      .select("id, passed, profile_id, sop_id")
+      .eq("id", attemptId)
+      .maybeSingle();
+    if (
+      !attempt ||
+      attempt.profile_id !== profile.id ||
+      attempt.sop_id !== sopId ||
+      !attempt.passed
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "That attempt is not a valid pass for this procedure." },
+        { status: 400 },
+      );
+    }
+    comprehensionCheckPassed = true;
+  }
+
   const { error } = await supabase.from("sign_offs").insert({
     organisation_id: sop.organisation_id,
     service_id: profile.service_id,
     user_id: profile.id,
     sop_id: sop.id,
     sop_version: sop.published_version,
-    comprehension_check_passed: null,
+    comprehension_check_passed: comprehensionCheckPassed,
+    comprehension_attempt_id: (questionCount ?? 0) > 0 ? attemptId : null,
   });
 
   // 23505 = already signed this version. Treat as success.

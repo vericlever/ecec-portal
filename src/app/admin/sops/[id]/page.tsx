@@ -123,6 +123,20 @@ export default async function SopDetailPage({
   const categories = await procedureCategories(supabase);
   const reviewStatus = await sopReviewStatusFor(supabase, params.id);
 
+  // Content-editor view - correct_option is fine here, this is the admin
+  // side, never sent to the staff sign page (see src/app/sops/[sopId]/page.tsx).
+  const { data: questionRows } = await supabase
+    .from("comprehension_questions")
+    .select("id, prompt, options, correct_option")
+    .eq("sop_id", params.id)
+    .order("position");
+  const comprehensionQuestions = (questionRows ?? []).map((q) => ({
+    id: q.id as string,
+    prompt: q.prompt as string,
+    options: q.options as string[],
+    correctOption: q.correct_option as number,
+  }));
+
   return (
     <div className="max-w-2xl">
       <Link href="/admin/sops" className="text-sm text-slate-500 hover:text-slate-900">
@@ -176,6 +190,7 @@ export default async function SopDetailPage({
               }
             : null
         }
+        comprehensionQuestions={comprehensionQuestions}
       />
     </div>
   );

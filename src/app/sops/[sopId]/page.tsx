@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { assignedJobRoleIds, assignedRoleDates } from "@/lib/staff-job-roles";
-import { SignForm } from "./sign-form";
+import { SignGate } from "./sign-gate";
 import { ReadAloud } from "./read-aloud";
 import { fmtDateTime } from "@/lib/format-date";
 import {
@@ -75,6 +75,22 @@ export default async function SopDetailPage({
 
   const isInSuite = Boolean(inSuite && inSuite.length > 0);
   const needsManager = sop.signoff_type === "self_and_manager";
+
+  // Never select correct_option here - this is the RLS-scoped client
+  // rendering straight into the page a staff member's browser receives, so
+  // anything selected is visible in the page source.
+  const { data: questionRows } = !signOff && isInSuite
+    ? await supabase
+        .from("comprehension_questions")
+        .select("id, prompt, options")
+        .eq("sop_id", sop.id)
+        .order("position")
+    : { data: [] as { id: string; prompt: string; options: unknown }[] };
+  const questions = (questionRows ?? []).map((q) => ({
+    id: q.id as string,
+    prompt: q.prompt as string,
+    options: q.options as string[],
+  }));
 
   const roleStartBySop = earliestRoleStartBySop(inSuiteLinks ?? [], roleDates);
   const roleStart = roleStartBySop.get(sop.id);
@@ -176,7 +192,7 @@ export default async function SopDetailPage({
               </p>
             )
           )}
-          <SignForm sopId={sop.id} needsManager={needsManager} />
+          <SignGate sopId={sop.id} needsManager={needsManager} questions={questions} />
         </>
       ) : (
         <p className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">

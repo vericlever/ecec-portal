@@ -7,9 +7,14 @@ type Status = "idle" | "signing" | "done";
 export function SignForm({
   sopId,
   needsManager = false,
+  attemptId,
 }: {
   sopId: string;
   needsManager?: boolean;
+  // Step 46: set only when this procedure has a comprehension check the
+  // caller already passed. /api/sign requires it whenever the procedure has
+  // any questions at all.
+  attemptId?: string;
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +39,7 @@ export function SignForm({
       const res = await fetch("/api/sign", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sopId }),
+        body: JSON.stringify({ sopId, attemptId }),
       });
       const data = await res.json();
       if (data.ok) {

@@ -27,6 +27,7 @@ import {
 } from "../actions";
 import { setActionStatus } from "./review/actions";
 import { TagPicker } from "@/app/admin/_tags/tag-picker";
+import { ComprehensionEditor, type ComprehensionQuestionRow } from "./comprehension-editor";
 import {
   CHILD_SAFE_STANDARDS,
   MAX_CHILD_SAFE_STANDARDS,
@@ -83,11 +84,13 @@ export function SopEditor({
   history,
   openActions,
   timezone,
+  comprehensionQuestions,
 }: {
   sop: Sop;
   categories: PolicyCategory[];
   canEdit: boolean;
   timezone: string;
+  comprehensionQuestions: ComprehensionQuestionRow[];
   services: { id: string; name: string }[];
   jobRoles: { id: string; name: string; is_placeholder: boolean }[];
   linkedRoleIds: string[];
@@ -456,6 +459,8 @@ export function SopEditor({
               Save text
             </button>
           </section>
+
+          <ComprehensionEditor sopId={sop.id} questions={comprehensionQuestions} />
         </>
       ) : (
         <section className="rounded-lg border border-slate-200 bg-white p-4">

@@ -556,3 +556,102 @@ export async function finishBulkSops(
   const summary = data as { created: number; replaced: number; skipped: number; flagged: number };
   return { ok: true, ...summary };
 }
+
+// Step 46. Editing sits in the procedure editor, below the text, above the
+// review cycle. The 3-question cap is enforced again here (a friendlier
+// message than the database trigger's) as well as by the trigger itself
+// (comprehension_questions_max_three, migration 0062) - refused at both
+// layers, per the locked spec.
+export async function addComprehensionQuestion(
+  sopId: string,
+  input: { prompt: string; options: string[]; correctIndex: number },
+): Promise<Result> {
+  const owned = await ownedSop(sopId);
+  if (!owned) return { ok: false, error: "Procedure not found." };
+
+  const prompt = input.prompt.trim();
+  if (!prompt) return { ok: false, error: "A question needs a prompt." };
+  const options = input.options.map((o) => o.trim()).filter(Boolean);
+  if (options.length < 1 || options.length > 4) {
+    return { ok: false, error: "A question needs between 1 and 4 answer options." };
+  }
+  if (input.correctIndex < 0 || input.correctIndex >= options.length) {
+    return { ok: false, error: "Choose which option is correct." };
+  }
+
+  const db = createClient();
+  const { count } = await db
+    .from("comprehension_questions")
+    .select("id", { count: "exact", head: true })
+    .eq("sop_id", sopId);
+  if ((count ?? 0) >= 3) {
+    return { ok: false, error: "A procedure may have at most 3 comprehension questions." };
+  }
+
+  const { error } = await db.from("comprehension_questions").insert({
+    organisation_id: owned.sop.organisation_id,
+    sop_id: sopId,
+    prompt,
+    options,
+    correct_option: input.correctIndex,
+    position: count ?? 0,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/sops/${sopId}`);
+  return { ok: true };
+}
+
+export async function updateComprehensionQuestion(
+  questionId: string,
+  input: { prompt: string; options: string[]; correctIndex: number },
+): Promise<Result> {
+  const me = await requireContentEditor();
+  const db = createClient();
+  const { data: existing } = await db
+    .from("comprehension_questions")
+    .select("id, sop_id, organisation_id")
+    .eq("id", questionId)
+    .maybeSingle();
+  if (!existing || existing.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Question not found." };
+  }
+
+  const prompt = input.prompt.trim();
+  if (!prompt) return { ok: false, error: "A question needs a prompt." };
+  const options = input.options.map((o) => o.trim()).filter(Boolean);
+  if (options.length < 1 || options.length > 4) {
+    return { ok: false, error: "A question needs between 1 and 4 answer options." };
+  }
+  if (input.correctIndex < 0 || input.correctIndex >= options.length) {
+    return { ok: false, error: "Choose which option is correct." };
+  }
+
+  const { error } = await db
+    .from("comprehension_questions")
+    .update({ prompt, options, correct_option: input.correctIndex })
+    .eq("id", questionId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/sops/${existing.sop_id}`);
+  return { ok: true };
+}
+
+export async function deleteComprehensionQuestion(questionId: string): Promise<Result> {
+  const me = await requireContentEditor();
+  const db = createClient();
+  const { data: existing } = await db
+    .from("comprehension_questions")
+    .select("id, sop_id, organisation_id")
+    .eq("id", questionId)
+    .maybeSingle();
+  if (!existing || existing.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Question not found." };
+  }
+
+  const { error } = await db.from("comprehension_questions").delete().eq("id", questionId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/sops/${existing.sop_id}`);
+  return { ok: true };
+}
