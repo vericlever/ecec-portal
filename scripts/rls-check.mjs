@@ -423,6 +423,37 @@ const APP_SCENARIOS = [
       ),
   },
 
+  // Migration 0063: contracts_write locks self-management to Admin only - an
+  // HR-manager-flagged manager must never be the one uploading their own
+  // contract, even at their own service, because there is no one else to
+  // check it. An Admin is the sole exception, since no higher tier exists to
+  // do it for them.
+  {
+    label: "HR-manager-flagged manager uploads a contract for themselves",
+    expectOk: false,
+    setup: async (c) => {
+      await c.query(`update public.profiles set hr_manager=true where id=$1`, [MANAGER]);
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.contracts (organisation_id, profile_id, start_date, period_type)
+         values ($1,$2, current_date, 'no_fixed_period')`,
+        [RSG, MANAGER],
+      ),
+  },
+  {
+    label: "admin uploads a contract for themselves",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) =>
+      c.query(
+        `insert into public.contracts (organisation_id, profile_id, start_date, period_type)
+         values ($1,$2, current_date, 'no_fixed_period')`,
+        [RSG, ADMIN],
+      ),
+  },
+
   // Private documents Storage bucket: a separate policy set from table RLS.
   // No storage.objects policies exist for it (confirmed directly against
   // storage.buckets / pg_policies), so an authenticated user gets nothing -

@@ -125,7 +125,10 @@ export async function setProbation(
 
 // May upload or replace a contract: Admin anywhere in the organisation, or an
 // HR manager for staff at their own service. Mirrors the contracts_write RLS
-// policy, but gives a clean error before any file is touched.
+// policy (migration 0063), but gives a clean error before any file is touched.
+// Self-management is locked out for everyone except an Admin - there is no
+// higher tier to upload a contract for an Admin, but an HR-manager-flagged
+// staff member or manager must never be the one managing their own.
 async function canManageContractFor(
   profileId: string,
 ): Promise<
@@ -135,6 +138,12 @@ async function canManageContractFor(
   const me = await getProfile();
   if (!me || !isHrManager(me)) {
     return { ok: false, error: "You are not allowed to manage contracts." };
+  }
+  if (profileId === me.id && !isAdmin(me.access_tier)) {
+    return {
+      ok: false,
+      error: "You cannot manage your own contract. An admin needs to do this for you.",
+    };
   }
   const supabase = createClient();
   const { data: target } = await supabase

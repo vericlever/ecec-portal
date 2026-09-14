@@ -168,10 +168,14 @@ export default async function StaffRecordPage({
     .map((a) => a.name);
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const hrManager = isHrManager(me);
-  // Contract upload: Admin anywhere, or an HR manager for staff at their service.
+  // Contract upload: Admin anywhere, or an HR manager for staff at their
+  // service - except on their own record, which only an Admin may manage
+  // (Zeke: no self-uploaded contracts for anyone else, HR-manager flag or
+  // not). Mirrors the contracts_write RLS policy, migration 0063.
+  const isOwnRecord = me.id === person.id;
   const canManageContract =
     hrManager &&
-    (isAdmin(me.access_tier) || me.service_id === person.service_id);
+    (isAdmin(me.access_tier) || (me.service_id === person.service_id && !isOwnRecord));
   // Payroll, screening and referees: Admin anywhere, or an HR manager at the
   // person's service. Not the manager tiers.
   const canSeeSensitive =
