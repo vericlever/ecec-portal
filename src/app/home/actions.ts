@@ -36,6 +36,7 @@ export async function flagSopOutcome(sopId: string, reflection: string): Promise
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/home");
+  revalidatePath("/sops");
   revalidatePath("/admin");
   return { ok: true };
 }

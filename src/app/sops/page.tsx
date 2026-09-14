@@ -9,6 +9,8 @@ import {
   signingState,
 } from "@/lib/signoff-clock";
 import { cleanSigningWindow } from "@/lib/constants";
+import { StageArc } from "@/components/bauhaus";
+import { OutcomeFlagForm } from "@/app/home/outcome-flag-form";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function SopListPage() {
           You have not been assigned a job role yet, so you have no procedures to sign.
           Ask an administrator to set your job role.
         </p>
+        <OutcomesSection sops={[]} />
       </div>
     );
   }
@@ -178,6 +181,23 @@ export default async function SopListPage() {
           </ul>
         </>
       )}
+      <OutcomesSection sops={rows.map((s) => ({ id: s.id, name: s.name }))} />
     </div>
+  );
+}
+
+// Step: a second entry point to the same "My Outcomes" reflection, identical
+// to the one on /home and feeding the same table (sop_outcome_flags) through
+// the same server action - another chance to capture the signal without
+// staff needing to go back to the dashboard for it.
+function OutcomesSection({ sops }: { sops: { id: string; name: string }[] }) {
+  return (
+    <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex items-center gap-2.5">
+        <StageArc stage="outcomes" size={28} />
+        <h2 className="text-sm font-semibold text-slate-800">My Outcomes</h2>
+      </div>
+      <OutcomeFlagForm sops={sops} />
+    </section>
   );
 }
