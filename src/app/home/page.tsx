@@ -5,6 +5,7 @@ import { classifyPersonCredentials } from "@/lib/credentials";
 import { agreementsForProfile } from "@/lib/agreements";
 import { assignedJobRoles, assignedRoleDates } from "@/lib/staff-job-roles";
 import { StageArc } from "@/components/bauhaus";
+import { ChainOverview } from "@/components/chain-overview";
 import { OutcomeFlagForm } from "./outcome-flag-form";
 import { fmtDate } from "@/lib/format-date";
 import {
@@ -206,6 +207,10 @@ export default async function StaffHomePage() {
 
   return (
     <div>
+      <ChainOverview
+        intro="Policy sets the obligation, procedure sets the practice, training closes the gap between them, and outcomes are the evidence it worked. You don't edit either the policy or the procedure directly - your part is training on the procedure and signing off."
+      />
+
       <h1 className="text-xl font-semibold">Welcome back, {me.full_name.split(" ")[0]}</h1>
       <p className="mt-1 text-sm text-slate-500">
         Where your sign-off fits into the wider chain, and what&apos;s outstanding on

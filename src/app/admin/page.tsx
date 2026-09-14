@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
+import { ChainOverview } from "@/components/chain-overview";
 import { pendingSightingsByProfile } from "@/lib/verification";
 import { expiringCredentials } from "@/lib/credentials";
 import { contractAlerts } from "@/lib/contracts";
@@ -321,6 +322,10 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      <ChainOverview
+        intro="Policy sets the obligation, procedure sets the practice, training closes the gap between them, and outcomes are the evidence it worked. Your part in the chain is setting the policy, writing the procedure, assigning it to a job role, and holding the evidence."
+      />
+
       <h1 className="text-xl font-semibold">Overview</h1>
       <p className="mt-1 text-sm text-slate-500">
         {isAdmin(me.access_tier)
