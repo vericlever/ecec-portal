@@ -39,8 +39,7 @@ export default async function AgreementDetailPage({
         .eq("agreement_id", params.id),
       supabase
         .from("profiles")
-        .select("id, full_name, job_role_id, is_active")
-        .neq("access_tier", "admin"),
+        .select("id, full_name, job_role_id, is_active"),
     ]);
 
   const linkedRoleIds = (roleLinks ?? []).map((l) => l.job_role_id as string);

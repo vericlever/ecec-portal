@@ -31,7 +31,6 @@ export default async function JobRoleDetailPage({
       supabase
         .from("profiles")
         .select("id, full_name, is_active")
-        .neq("access_tier", "admin")
         .order("full_name"),
       supabase.from("profile_job_roles").select("profile_id").eq("job_role_id", params.id),
     ]);

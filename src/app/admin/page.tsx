@@ -37,10 +37,11 @@ export default async function DashboardPage() {
     sopReviewStatus,
     { count: openOutcomeFlags },
   ] = await Promise.all([
+    // Everyone with compliance obligations, Admin included - an Admin is
+    // still a staff member underneath (WWCC, contract, onboarding).
     supabase
       .from("profiles")
-      .select("id, job_role_id, service_id, is_active")
-      .neq("access_tier", "admin"),
+      .select("id, job_role_id, service_id, is_active"),
     pendingSightingsByProfile(supabase, me.id),
     manager
       ? supabase

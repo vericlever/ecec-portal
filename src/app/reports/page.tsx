@@ -18,7 +18,6 @@ export default async function ReportsPage() {
       .from("profiles")
       .select("id, full_name, service_id")
       .eq("is_active", true)
-      .neq("access_tier", "admin")
       .order("full_name"),
     coverageReport(supabase),
   ]);

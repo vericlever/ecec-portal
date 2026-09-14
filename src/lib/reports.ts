@@ -209,8 +209,7 @@ export async function serviceOverviewData(
       .from("profiles")
       .select("id, job_role_id, service_id, is_active")
       .eq("service_id", serviceId)
-      .eq("is_active", true)
-      .neq("access_tier", "admin"),
+      .eq("is_active", true),
   ]);
   const people = (staff ?? []) as {
     id: string;
@@ -415,8 +414,7 @@ export async function hrExpiringItemsData(
       supabase
         .from("profiles")
         .select("id, full_name, service_id, is_active")
-        .eq("is_active", true)
-        .neq("access_tier", "admin"),
+        .eq("is_active", true),
       supabase.from("services").select("id, name"),
       expiringCredentials(supabase, { withinDays: 60 }),
       contractAlerts(supabase),
