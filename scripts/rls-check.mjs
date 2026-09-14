@@ -94,6 +94,8 @@ const TABLES = {
   profile_job_roles: "organisation_id",
   credential_types: null,
   external_providers: null,
+  platform_notices: null,
+  platform_notice_acceptances: "organisation_id",
 };
 
 const client = new pg.Client({
@@ -451,6 +453,40 @@ const APP_SCENARIOS = [
         `insert into public.contracts (organisation_id, profile_id, start_date, period_type)
          values ($1,$2, current_date, 'no_fixed_period')`,
         [RSG, ADMIN],
+      ),
+  },
+
+  // Step 51: platform_notices/platform_notice_acceptances. Not organisation-
+  // scoped content (the notice is the same for every tenant), so the select
+  // policy is simply "any authenticated user" rather than in_org() - anon
+  // still gets nothing. Acceptance is self-only, no org-boundary bypass
+  // needed since a user can only ever write their own profile_id anyway.
+  {
+    label: "anon reads the platform notice (blocked, no session)",
+    expectOk: false,
+    as: null,
+    probe: (c) => c.query(`select id from public.platform_notices limit 1`),
+  },
+  {
+    label: "staff accepts the platform notice for themselves",
+    expectOk: true,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.platform_notice_acceptances (profile_id, organisation_id, notice_version)
+         values ($1,$2,1)`,
+        [STAFF, RSG],
+      ),
+  },
+  {
+    label: "staff accepts the platform notice on someone else's behalf",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.platform_notice_acceptances (profile_id, organisation_id, notice_version)
+         values ($1,$2,1)`,
+        [MANAGER, RSG],
       ),
   },
 

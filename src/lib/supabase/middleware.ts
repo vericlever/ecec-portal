@@ -16,6 +16,16 @@ const PUBLIC_PATHS = new Set([
 // the session gate must not bounce them to /login.
 const PUBLIC_PREFIXES = ["/api/cron/"];
 
+// Step 51. Every authenticated user must accept the current Vericlever
+// Platform Terms of Use and Privacy Notice before reaching anywhere else -
+// "at first login before the onboarding wizard" means before literally
+// everything, since onboarding is the first thing a new account normally
+// does. Exempt the gate page itself, logout (so a stuck session can still
+// leave), and every /api/ route (nothing under the gate should ever need to
+// call one before accepting).
+const NOTICE_GATE_PATH = "/accept-terms";
+const NOTICE_GATE_EXEMPT = new Set([...PUBLIC_PATHS, NOTICE_GATE_PATH, "/logout"]);
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -71,6 +81,33 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = leader ? "/admin" : "/home";
     return NextResponse.redirect(url);
+  }
+
+  if (
+    user &&
+    !NOTICE_GATE_EXEMPT.has(path) &&
+    !path.startsWith("/api/")
+  ) {
+    const { data: latest } = await supabase
+      .from("platform_notices")
+      .select("version")
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latest) {
+      const { data: accepted } = await supabase
+        .from("platform_notice_acceptances")
+        .select("id")
+        .eq("profile_id", user.id)
+        .eq("notice_version", latest.version)
+        .maybeSingle();
+      if (!accepted) {
+        const url = request.nextUrl.clone();
+        url.pathname = NOTICE_GATE_PATH;
+        url.search = `?next=${encodeURIComponent(path)}`;
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   return response;
