@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { storeDocument, deleteDocument } from "@/lib/documents/store";
+import { randomUUID } from "node:crypto";
+import { storeDocument, deleteDocument, uploadAndExtract } from "@/lib/documents/store";
 import { cleanReviewPeriod } from "@/lib/constants";
 import { reviewDateFromNow } from "@/lib/sop-review";
 import { writeDocumentTag } from "@/lib/document-tags";
+import { bestDuplicateMatch, looksLikeFilename, isBlankContent } from "@/lib/bulk-import/dedup";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -441,245 +443,129 @@ export async function unlinkSop(policyId: string, sopId: string): Promise<Result
   return { ok: true };
 }
 
-export type BulkOutcome = {
-  fileName: string;
-  policyName: string;
-  policyId?: string;
-  hasText?: boolean;
-  outcome: "created" | "attached" | "error";
-  detail?: string;
-};
-
-// One draft policy per file. If a policy with the same name (filename minus
-// extension) already exists - which is the case for RSG's whole imported
-// inventory - the document is attached to it and its empty body filled in,
-// rather than creating a duplicate.
-export async function bulkImportPolicies(
+// Step 47. Same staging approach as stageBulkSops: parse, store and flag
+// every file now, but write nothing to `policies` until the batch commits.
+export async function stageBulkPolicies(
   formData: FormData,
-): Promise<
-  { ok: false; error: string } | { ok: true; outcomes: BulkOutcome[] }
-> {
+): Promise<{ ok: false; error: string } | { ok: true; batchId: string; failed: number }> {
   const me = await requireContentEditor();
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
   if (files.length === 0) return { ok: false, error: "No files." };
 
-  // Categories chosen for this batch, applied only to policies this upload
-  // creates, never to ones that matched an existing entry.
-  const categoryIds = formData
-    .getAll("categoryIds")
-    .map((v) => String(v))
-    .filter(Boolean);
-
   const db = createClient();
-  const outcomes: BulkOutcome[] = [];
+  const batchId = randomUUID();
 
+  const { data: existing } = await db
+    .from("policies")
+    .select("id, name")
+    .eq("organisation_id", me.organisation_id);
+  const candidates = (existing ?? []) as { id: string; name: string }[];
+
+  let failed = 0;
   for (const file of files) {
-    const policyName = file.name.replace(/\.[A-Za-z0-9]+$/, "").trim();
+    const title = file.name.replace(/\.[A-Za-z0-9]+$/, "").trim();
     try {
-      const { data: existing } = await db
-        .from("policies")
-        .select("id, body")
-        .eq("organisation_id", me.organisation_id)
-        .ilike("name", policyName)
-        .maybeSingle();
-
-      let policyId: string;
-      let attached = false;
-      if (existing) {
-        policyId = existing.id;
-        attached = true;
-      } else {
-        const { data: created, error } = await db
-          .from("policies")
-          .insert({
-            organisation_id: me.organisation_id,
-            name: policyName,
-            status: "in_library",
-            updated_by: me.id,
-          })
-          .select("id")
-          .single();
-        if (error || !created) {
-          outcomes.push({
-            fileName: file.name,
-            policyName,
-            outcome: "error",
-            detail: error?.message ?? "Could not create the policy.",
-          });
-          continue;
-        }
-        policyId = created.id;
-        await applyCategories(
-          db,
-          me.organisation_id,
-          policyId,
-          categoryIds,
-          { replace: false },
-        );
-      }
-
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const stored = await storeDocument({
+      const uploaded = await uploadAndExtract({
         organisationId: me.organisation_id,
-        ownerType: "policy",
-        ownerId: policyId,
+        pathPrefix: "bulk_staging",
+        ownerId: batchId,
         fileName: file.name,
         mimeType: file.type || null,
         bytes,
-        uploadedBy: me.id,
       });
-      if (!stored.ok) {
-        outcomes.push({
-          fileName: file.name,
-          policyName,
-          outcome: "error",
-          detail: stored.error,
-        });
+      if (!uploaded.ok) {
+        failed += 1;
         continue;
       }
-
-      const patch: Record<string, unknown> = {
-        source_document_id: stored.document.id,
-        updated_by: me.id,
-      };
-      const currentBody = existing?.body as string | null | undefined;
-      const hadBody = !!(currentBody && currentBody.trim());
-      const gotText = !!(
-        stored.document.extracted_text && stored.document.extracted_text.trim()
-      );
-      if (!hadBody && gotText) {
-        patch.body = stored.document.extracted_text;
-      }
-      await db.from("policies").update(patch).eq("id", policyId);
-
-      outcomes.push({
-        fileName: file.name,
-        policyName,
-        policyId,
-        hasText: hadBody || gotText,
-        outcome: attached ? "attached" : "created",
-        detail: stored.document.extraction_note ?? undefined,
+      const dup = bestDuplicateMatch(title, candidates);
+      const { error } = await db.from("bulk_upload_staging").insert({
+        organisation_id: me.organisation_id,
+        batch_id: batchId,
+        kind: "policy",
+        original_filename: file.name,
+        derived_title: title,
+        storage_path: uploaded.storagePath,
+        mime_type: file.type || null,
+        byte_size: bytes.byteLength,
+        extracted_text: uploaded.extractedText,
+        extraction_note: uploaded.extractionNote,
+        duplicate_of_id: dup?.match.id ?? null,
+        duplicate_of_name: dup?.match.name ?? null,
+        duplicate_score: dup?.score ?? null,
+        filename_flag: looksLikeFilename(title),
+        blank_flag: isBlankContent(uploaded.extractedText),
+        created_by: me.id,
       });
-    } catch (e) {
-      outcomes.push({
-        fileName: file.name,
-        policyName,
-        outcome: "error",
-        detail: e instanceof Error ? e.message : "Failed.",
-      });
+      if (error) failed += 1;
+    } catch {
+      failed += 1;
     }
   }
 
-  revalidatePath("/admin/policies");
-  return { ok: true, outcomes };
+  return { ok: true, batchId, failed };
 }
 
-// Page two of the bulk wizard. Sets categories, review period and SOP links for
-// every uploaded policy and publishes the ones marked to publish that have
-// text. A policy with no text stays an unpublished draft.
+export async function discardBulkPolicyBatch(batchId: string): Promise<Result> {
+  await requireContentEditor();
+  const db = createClient();
+  const { data: paths } = await db.rpc("discard_bulk_batch", { p_batch_id: batchId });
+  const admin = (await import("@/lib/supabase/admin")).createAdminClient();
+  if (paths && paths.length) {
+    await admin.storage.from("documents").remove(paths as string[]);
+  }
+  revalidatePath("/admin/policies/bulk");
+  return { ok: true };
+}
+
 export type PolicyBulkFinishItem = {
-  policyId: string;
+  stagingId: string;
+  action: "create" | "skip" | "replace";
+  title: string;
   categoryIds: string[];
+  serviceId: string | null;
   reviewPeriod: number;
   nextReviewDate: string;
   linkedSopIds: string[];
   publish: boolean;
+  replaceTargetId: string | null;
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// One commit_bulk_policies() call (migration 0060) - atomic across every row
+// in the batch, same as the SOP path.
 export async function finishBulkPolicies(
   items: PolicyBulkFinishItem[],
 ): Promise<
   | { ok: false; error: string }
-  | {
-      ok: true;
-      published: number;
-      drafted: number;
-      failed: { name: string; error: string }[];
-    }
+  | { ok: true; created: number; replaced: number; skipped: number; flagged: number }
 > {
   const me = await requireContentEditor();
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
-  if (items.length === 0) return { ok: false, error: "Nothing to publish." };
+  if (items.length === 0) return { ok: false, error: "Nothing to commit." };
 
   const db = createClient();
-  const ids = items.map((i) => i.policyId);
-  const { data: rows } = await db
-    .from("policies")
-    .select("id, name, organisation_id, body, published_version")
-    .in("id", ids);
-  const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
+  const payload = items.map((i) => ({
+    staging_id: i.stagingId,
+    action: i.action,
+    title: i.title,
+    category_ids: i.categoryIds,
+    service_id: i.serviceId,
+    review_period_months: cleanReviewPeriod(i.reviewPeriod),
+    next_review_date: ISO_DATE.test(i.nextReviewDate) ? i.nextReviewDate : null,
+    linked_sop_ids: i.linkedSopIds,
+    publish: i.publish,
+    replace_target_id: i.replaceTargetId,
+  }));
 
-  const { data: sops } = await db
-    .from("sops")
-    .select("id")
-    .eq("organisation_id", me.organisation_id);
-  const validSop = new Set((sops ?? []).map((s) => s.id as string));
-
-  let published = 0;
-  let drafted = 0;
-  const failed: { name: string; error: string }[] = [];
-
-  for (const item of items) {
-    const policy = byId.get(item.policyId);
-    if (!policy || policy.organisation_id !== me.organisation_id) continue;
-
-    await applyCategories(
-      db,
-      me.organisation_id,
-      item.policyId,
-      item.categoryIds,
-      { replace: true },
-    );
-
-    const update: Record<string, unknown> = {
-      review_period_months: cleanReviewPeriod(item.reviewPeriod),
-      next_review_date: ISO_DATE.test(item.nextReviewDate)
-        ? item.nextReviewDate
-        : null,
-      updated_by: me.id,
-    };
-
-    const hasBody = !!(policy.body && String(policy.body).trim());
-    const doPublish = item.publish && hasBody;
-    if (doPublish) {
-      const next = ((policy.published_version as number | null) ?? 0) + 1;
-      update.published_version = next;
-      update.published_body = policy.body;
-      update.published_at = new Date().toISOString();
-      update.published_by = me.id;
-      update.current_version = next;
-    }
-
-    const { error } = await db
-      .from("policies")
-      .update(update)
-      .eq("id", item.policyId);
-    if (error) {
-      failed.push({ name: policy.name as string, error: error.message });
-      continue;
-    }
-
-    for (const sid of item.linkedSopIds) {
-      if (!validSop.has(sid)) continue;
-      const { error: linkErr } = await db.from("policy_sop_links").insert({
-        organisation_id: me.organisation_id,
-        policy_id: item.policyId,
-        sop_id: sid,
-      });
-      if (linkErr && !linkErr.message.includes("duplicate")) {
-        failed.push({ name: policy.name as string, error: linkErr.message });
-      }
-    }
-
-    if (doPublish) published += 1;
-    else drafted += 1;
-  }
+  const { data, error } = await db.rpc("commit_bulk_policies", { p_items: payload });
+  if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/policies");
   revalidatePath("/admin/sops");
   revalidatePath("/policies");
-  return { ok: true, published, drafted, failed };
+  const summary = data as { created: number; replaced: number; skipped: number; flagged: number };
+  return { ok: true, ...summary };
 }

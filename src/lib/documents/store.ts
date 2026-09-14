@@ -20,6 +20,56 @@ function safeName(name: string): string {
   return base || "document";
 }
 
+// Upload bytes to the private bucket and extract text, without writing a
+// documents row - the half of storeDocument() that a bulk-upload staging
+// area needs (Step 47): the file has to actually be parsed and stored before
+// review, since duplicate/filename/blank-content detection all need the
+// result, but no permanent documents row should exist until the batch is
+// committed. storeDocument() below is this plus the row insert, for every
+// caller that already has a real owner to attach to.
+export async function uploadAndExtract(opts: {
+  organisationId: string;
+  pathPrefix: string; // e.g. "sop"/"policy" for real owners, "bulk_staging" for a pending batch
+  ownerId: string; // a real sop/policy id, or the staging row's own id
+  fileName: string;
+  mimeType: string | null;
+  bytes: Uint8Array;
+}): Promise<
+  | {
+      ok: true;
+      storagePath: string;
+      extractedText: string | null;
+      extractionNote: string | null;
+    }
+  | { ok: false; error: string }
+> {
+  const admin = createAdminClient();
+  const clean = safeName(opts.fileName);
+  const path = `${opts.organisationId}/${opts.pathPrefix}/${opts.ownerId}/${Date.now()}-${clean}`;
+
+  const up = await admin.storage
+    .from(BUCKET)
+    .upload(path, opts.bytes, {
+      contentType: opts.mimeType ?? "application/octet-stream",
+      upsert: false,
+    });
+  if (up.error) return { ok: false, error: up.error.message };
+
+  let extractedText: string | null = null;
+  let extractionNote: string | null = null;
+  try {
+    const extracted = await extractDocument(opts.fileName, opts.bytes);
+    extractedText = extracted.text || null;
+    extractionNote = extracted.note ?? null;
+  } catch (e) {
+    extractionNote =
+      "Could not read the document automatically: " +
+      (e instanceof Error ? e.message : "unknown error");
+  }
+
+  return { ok: true, storagePath: path, extractedText, extractionNote };
+}
+
 // Store an uploaded file: put the bytes in the private bucket, extract text,
 // and write one row in documents. The bucket itself has no per-object RLS
 // (Storage policies are a separate, wider piece of work), so file storage
@@ -44,29 +94,15 @@ export async function storeDocument(opts: {
 }): Promise<
   { ok: true; document: StoredDocument } | { ok: false; error: string }
 > {
-  const admin = createAdminClient();
-  const clean = safeName(opts.fileName);
-  const path = `${opts.organisationId}/${opts.ownerType}/${opts.ownerId}/${Date.now()}-${clean}`;
-
-  const up = await admin.storage
-    .from(BUCKET)
-    .upload(path, opts.bytes, {
-      contentType: opts.mimeType ?? "application/octet-stream",
-      upsert: false,
-    });
-  if (up.error) return { ok: false, error: up.error.message };
-
-  let extractedText: string | null = null;
-  let extractionNote: string | null = null;
-  try {
-    const extracted = await extractDocument(opts.fileName, opts.bytes);
-    extractedText = extracted.text || null;
-    extractionNote = extracted.note ?? null;
-  } catch (e) {
-    extractionNote =
-      "Could not read the document automatically: " +
-      (e instanceof Error ? e.message : "unknown error");
-  }
+  const uploaded = await uploadAndExtract({
+    organisationId: opts.organisationId,
+    pathPrefix: opts.ownerType,
+    ownerId: opts.ownerId,
+    fileName: opts.fileName,
+    mimeType: opts.mimeType,
+    bytes: opts.bytes,
+  });
+  if (!uploaded.ok) return uploaded;
 
   const supabase = createClient();
   const { data, error } = await supabase
@@ -78,16 +114,17 @@ export async function storeDocument(opts: {
       file_name: opts.fileName,
       mime_type: opts.mimeType,
       byte_size: opts.bytes.byteLength,
-      storage_path: path,
-      extracted_text: extractedText,
-      extraction_note: extractionNote,
+      storage_path: uploaded.storagePath,
+      extracted_text: uploaded.extractedText,
+      extraction_note: uploaded.extractionNote,
       uploaded_by: opts.uploadedBy,
     })
     .select("id, file_name, mime_type, byte_size, extracted_text, extraction_note, created_at")
     .single();
 
   if (error) {
-    await admin.storage.from(BUCKET).remove([path]);
+    const admin = createAdminClient();
+    await admin.storage.from(BUCKET).remove([uploaded.storagePath]);
     return { ok: false, error: error.message };
   }
   return { ok: true, document: data as StoredDocument };

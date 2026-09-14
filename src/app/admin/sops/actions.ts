@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { storeDocument, deleteDocument } from "@/lib/documents/store";
+import { randomUUID } from "node:crypto";
+import { storeDocument, deleteDocument, uploadAndExtract } from "@/lib/documents/store";
 import { cleanReviewPeriod, cleanSigningWindow } from "@/lib/constants";
 import { writeDocumentTag } from "@/lib/document-tags";
+import { bestDuplicateMatch, looksLikeFilename, isBlankContent } from "@/lib/bulk-import/dedup";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -417,311 +419,140 @@ export async function setSopChildSafeStandard(
   return { ok: true };
 }
 
-export type SopBulkOutcome = {
-  fileName: string;
-  sopName: string;
-  sopId?: string;
-  hasText?: boolean;
-  outcome: "created" | "attached" | "error";
-  detail?: string;
-};
-
-export async function bulkImportSops(
+// Step 47. Files are parsed and stored now (Storage + text extraction), and
+// flagged for duplicate/filename/blank-content review, but nothing is
+// written to `sops` until the batch is committed - unlike the old
+// bulkImportSops, which created a real row per file synchronously, before
+// anyone had reviewed anything.
+export async function stageBulkSops(
   formData: FormData,
-): Promise<
-  { ok: false; error: string } | { ok: true; outcomes: SopBulkOutcome[] }
-> {
+): Promise<{ ok: false; error: string } | { ok: true; batchId: string; failed: number }> {
   const me = await requireContentEditor();
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
   if (files.length === 0) return { ok: false, error: "No files." };
 
-  // Defaults applied only to SOPs newly created by this upload, never to ones
-  // that matched an existing entry.
-  const newRoleIds = formData
-    .getAll("newRoleIds")
-    .map((v) => String(v))
-    .filter(Boolean);
-  const newSignoff = SIGNOFF_TYPES.includes(String(formData.get("newSignoffType")))
-    ? String(formData.get("newSignoffType"))
-    : "self";
-
   const db = createClient();
+  const batchId = randomUUID();
 
-  // Validate the chosen roles belong to this org up front.
-  let validRoleIds: string[] = [];
-  if (newRoleIds.length) {
-    const { data: roles } = await db
-      .from("job_roles")
-      .select("id")
-      .eq("organisation_id", me.organisation_id)
-      .in("id", newRoleIds);
-    validRoleIds = (roles ?? []).map((r) => r.id as string);
-  }
+  const { data: existing } = await db
+    .from("sops")
+    .select("id, name")
+    .eq("organisation_id", me.organisation_id);
+  const candidates = (existing ?? []) as { id: string; name: string }[];
 
-  const outcomes: SopBulkOutcome[] = [];
-
+  let failed = 0;
   for (const file of files) {
-    const sopName = file.name.replace(/\.[A-Za-z0-9]+$/, "").trim();
+    const title = file.name.replace(/\.[A-Za-z0-9]+$/, "").trim();
     try {
-      const { data: existing } = await db
-        .from("sops")
-        .select("id, body")
-        .eq("organisation_id", me.organisation_id)
-        .ilike("name", sopName)
-        .maybeSingle();
-
-      let sopId: string;
-      let attached = false;
-      if (existing) {
-        sopId = existing.id;
-        attached = true;
-      } else {
-        const { data: created, error } = await db
-          .from("sops")
-          .insert({
-            organisation_id: me.organisation_id,
-            name: sopName,
-            status: null,
-            signoff_type: newSignoff,
-            target_tier: null,
-            updated_by: me.id,
-          })
-          .select("id")
-          .single();
-        if (error || !created) {
-          outcomes.push({
-            fileName: file.name,
-            sopName,
-            outcome: "error",
-            detail: error?.message ?? "Could not create the procedure.",
-          });
-          continue;
-        }
-        sopId = created.id;
-
-        // Attach the new SOP to the chosen job roles.
-        for (const roleId of validRoleIds) {
-          await db.from("job_role_sops").insert({
-            organisation_id: me.organisation_id,
-            job_role_id: roleId,
-            sop_id: sopId,
-          });
-        }
-      }
-
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const stored = await storeDocument({
+      const uploaded = await uploadAndExtract({
         organisationId: me.organisation_id,
-        ownerType: "sop",
-        ownerId: sopId,
+        pathPrefix: "bulk_staging",
+        ownerId: batchId,
         fileName: file.name,
         mimeType: file.type || null,
         bytes,
-        uploadedBy: me.id,
       });
-      if (!stored.ok) {
-        outcomes.push({ fileName: file.name, sopName, outcome: "error", detail: stored.error });
+      if (!uploaded.ok) {
+        failed += 1;
         continue;
       }
-
-      const patch: Record<string, unknown> = {
-        source_document_id: stored.document.id,
-        updated_by: me.id,
-      };
-      const currentBody = existing?.body as string | null | undefined;
-      const hadBody = !!(currentBody && currentBody.trim());
-      const gotText = !!(stored.document.extracted_text && stored.document.extracted_text.trim());
-      if (!hadBody && gotText) {
-        patch.body = stored.document.extracted_text;
-      }
-      await db.from("sops").update(patch).eq("id", sopId);
-
-      outcomes.push({
-        fileName: file.name,
-        sopName,
-        sopId,
-        hasText: hadBody || gotText,
-        outcome: attached ? "attached" : "created",
-        detail: stored.document.extraction_note ?? undefined,
+      const dup = bestDuplicateMatch(title, candidates);
+      const { error } = await db.from("bulk_upload_staging").insert({
+        organisation_id: me.organisation_id,
+        batch_id: batchId,
+        kind: "sop",
+        original_filename: file.name,
+        derived_title: title,
+        storage_path: uploaded.storagePath,
+        mime_type: file.type || null,
+        byte_size: bytes.byteLength,
+        extracted_text: uploaded.extractedText,
+        extraction_note: uploaded.extractionNote,
+        duplicate_of_id: dup?.match.id ?? null,
+        duplicate_of_name: dup?.match.name ?? null,
+        duplicate_score: dup?.score ?? null,
+        filename_flag: looksLikeFilename(title),
+        blank_flag: isBlankContent(uploaded.extractedText),
+        created_by: me.id,
       });
-    } catch (e) {
-      outcomes.push({
-        fileName: file.name,
-        sopName,
-        outcome: "error",
-        detail: e instanceof Error ? e.message : "Failed.",
-      });
+      if (error) failed += 1;
+    } catch {
+      failed += 1;
     }
   }
 
-  // A role that just gained SOPs is no longer a placeholder.
-  for (const roleId of validRoleIds) {
-    const { count } = await db
-      .from("job_role_sops")
-      .select("sop_id", { count: "exact", head: true })
-      .eq("job_role_id", roleId);
-    await db
-      .from("job_roles")
-      .update({ is_placeholder: (count ?? 0) === 0 })
-      .eq("id", roleId);
-  }
-
-  revalidatePath("/admin/sops");
-  revalidatePath("/admin/job-roles");
-  return { ok: true, outcomes };
+  return { ok: true, batchId, failed };
 }
 
-// Page two of the bulk wizard. One call sets the job roles (which decide staff
-// visibility), the review period and the policy links for every uploaded SOP,
-// then publishes the ones marked to publish that have text. A SOP with no
-// text stays an unpublished draft. Next review date is derived, not set here.
+// Cancel a batch before commit. Discards the staging rows and removes the
+// staged Storage objects - the library is left exactly as it was.
+export async function discardBulkSopBatch(batchId: string): Promise<Result> {
+  await requireContentEditor();
+  const db = createClient();
+  const { data: paths } = await db.rpc("discard_bulk_batch", { p_batch_id: batchId });
+  const admin = (await import("@/lib/supabase/admin")).createAdminClient();
+  if (paths && paths.length) {
+    await admin.storage.from("documents").remove(paths as string[]);
+  }
+  revalidatePath("/admin/sops/bulk");
+  return { ok: true };
+}
+
 export type SopBulkFinishItem = {
-  sopId: string;
+  stagingId: string;
+  action: "create" | "skip" | "replace";
+  title: string;
   jobRoleIds: string[];
+  serviceId: string | null;
+  categoryId: string | null;
+  signoffType: string;
   reviewPeriod: number;
   signingWindow: string;
   linkedPolicyIds: string[];
   publish: boolean;
+  replaceTargetId: string | null;
 };
 
+// The commit itself is one SECURITY DEFINER function call (migration 0060,
+// commit_bulk_sops) so every row in the batch lands atomically - a failure
+// on any one row rolls the whole commit back, per Step 47's requirement that
+// a mid-commit failure must leave the library untouched.
 export async function finishBulkSops(
   items: SopBulkFinishItem[],
 ): Promise<
   | { ok: false; error: string }
-  | {
-      ok: true;
-      published: number;
-      drafted: number;
-      failed: { name: string; error: string }[];
-    }
+  | { ok: true; created: number; replaced: number; skipped: number; flagged: number }
 > {
   const me = await requireContentEditor();
   if (!me.organisation_id) return { ok: false, error: "No organisation." };
-  if (items.length === 0) return { ok: false, error: "Nothing to publish." };
+  if (items.length === 0) return { ok: false, error: "Nothing to commit." };
 
   const db = createClient();
-  const ids = items.map((i) => i.sopId);
-  const { data: rows } = await db
-    .from("sops")
-    .select("id, name, organisation_id, body, published_version")
-    .in("id", ids);
-  const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
+  const payload = items.map((i) => ({
+    staging_id: i.stagingId,
+    action: i.action,
+    title: i.title,
+    job_role_ids: i.jobRoleIds,
+    service_id: i.serviceId,
+    category_id: i.categoryId,
+    signoff_type: SIGNOFF_TYPES.includes(i.signoffType) ? i.signoffType : "self",
+    review_period_months: cleanReviewPeriod(i.reviewPeriod),
+    signing_window: cleanSigningWindow(i.signingWindow),
+    linked_policy_ids: i.linkedPolicyIds,
+    publish: i.publish,
+    replace_target_id: i.replaceTargetId,
+  }));
 
-  const { data: policies } = await db
-    .from("policies")
-    .select("id")
-    .eq("organisation_id", me.organisation_id);
-  const validPolicy = new Set((policies ?? []).map((p) => p.id as string));
-
-  const { data: roles } = await db
-    .from("job_roles")
-    .select("id")
-    .eq("organisation_id", me.organisation_id);
-  const validRole = new Set((roles ?? []).map((r) => r.id as string));
-
-  const { data: currentLinks } = await db
-    .from("job_role_sops")
-    .select("sop_id, job_role_id")
-    .in("sop_id", ids);
-  const rolesBySop = new Map<string, Set<string>>();
-  for (const l of currentLinks ?? []) {
-    const set = rolesBySop.get(l.sop_id as string) ?? new Set<string>();
-    set.add(l.job_role_id as string);
-    rolesBySop.set(l.sop_id as string, set);
-  }
-
-  const touchedRoles = new Set<string>();
-  let published = 0;
-  let drafted = 0;
-  const failed: { name: string; error: string }[] = [];
-
-  for (const item of items) {
-    const sop = byId.get(item.sopId);
-    if (!sop || sop.organisation_id !== me.organisation_id) continue;
-
-    const update: Record<string, unknown> = {
-      review_period_months: cleanReviewPeriod(item.reviewPeriod),
-      signing_window: cleanSigningWindow(item.signingWindow),
-      updated_by: me.id,
-    };
-
-    const hasBody = !!(sop.body && String(sop.body).trim());
-    const doPublish = item.publish && hasBody;
-    if (doPublish) {
-      const next = ((sop.published_version as number | null) ?? 0) + 1;
-      update.published_version = next;
-      update.published_body = sop.body;
-      update.published_at = new Date().toISOString();
-      update.published_by = me.id;
-      update.current_version = next;
-    }
-
-    const { error } = await db
-      .from("sops")
-      .update(update)
-      .eq("id", item.sopId);
-    if (error) {
-      failed.push({ name: sop.name as string, error: error.message });
-      continue;
-    }
-
-    // Sync job role attachment to the choices on page two.
-    const want = new Set(item.jobRoleIds.filter((r) => validRole.has(r)));
-    const have = rolesBySop.get(item.sopId) ?? new Set<string>();
-    for (const roleId of want) {
-      if (!have.has(roleId)) {
-        await db.from("job_role_sops").insert({
-          organisation_id: me.organisation_id,
-          job_role_id: roleId,
-          sop_id: item.sopId,
-        });
-        touchedRoles.add(roleId);
-      }
-    }
-    for (const roleId of have) {
-      if (!want.has(roleId)) {
-        await db
-          .from("job_role_sops")
-          .delete()
-          .eq("sop_id", item.sopId)
-          .eq("job_role_id", roleId);
-        touchedRoles.add(roleId);
-      }
-    }
-
-    for (const pid of item.linkedPolicyIds) {
-      if (!validPolicy.has(pid)) continue;
-      const { error: linkErr } = await db.from("policy_sop_links").insert({
-        organisation_id: me.organisation_id,
-        policy_id: pid,
-        sop_id: item.sopId,
-      });
-      if (linkErr && !linkErr.message.includes("duplicate")) {
-        failed.push({ name: sop.name as string, error: linkErr.message });
-      }
-    }
-
-    if (doPublish) published += 1;
-    else drafted += 1;
-  }
-
-  // A role that gained or lost SOPs may no longer (or now) be a placeholder.
-  for (const roleId of touchedRoles) {
-    const { count } = await db
-      .from("job_role_sops")
-      .select("sop_id", { count: "exact", head: true })
-      .eq("job_role_id", roleId);
-    await db
-      .from("job_roles")
-      .update({ is_placeholder: (count ?? 0) === 0 })
-      .eq("id", roleId);
-  }
+  const { data, error } = await db.rpc("commit_bulk_sops", { p_items: payload });
+  if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/sops");
   revalidatePath("/admin/job-roles");
   revalidatePath("/admin/policies");
   revalidatePath("/sops");
   revalidatePath("/policies");
-  return { ok: true, published, drafted, failed };
+  const summary = data as { created: number; replaced: number; skipped: number; flagged: number };
+  return { ok: true, ...summary };
 }

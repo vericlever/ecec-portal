@@ -8,17 +8,14 @@ export const dynamic = "force-dynamic";
 export default async function SopBulkReviewPage({
   searchParams,
 }: {
-  searchParams: { ids?: string; failed?: string };
+  searchParams: { batch?: string; failed?: string };
 }) {
   const me = await requireContentEditor();
   const supabase = createClient();
 
-  const ids = (searchParams.ids ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const batchId = searchParams.batch ?? "";
 
-  if (ids.length === 0) {
+  if (!batchId) {
     return (
       <div className="max-w-2xl">
         <Link
@@ -35,57 +32,53 @@ export default async function SopBulkReviewPage({
   }
 
   const [
-    { data: sops },
+    { data: staged },
     { data: policies },
-    { data: links },
-    { data: roleLinks },
     { data: jobRoles },
+    { data: services },
+    { data: categories },
   ] = await Promise.all([
     supabase
-      .from("sops")
+      .from("bulk_upload_staging")
       .select(
-        "id, name, organisation_id, body, review_period_months, signing_window, published_version",
+        "id, organisation_id, kind, original_filename, derived_title, extracted_text, extraction_note, duplicate_of_id, duplicate_of_name, duplicate_score, filename_flag, blank_flag, status",
       )
-      .in("id", ids),
+      .eq("batch_id", batchId)
+      .eq("kind", "sop")
+      .eq("status", "pending")
+      .order("derived_title"),
     supabase
       .from("policies")
       .select("id, name")
       .eq("organisation_id", me.organisation_id)
       .order("name"),
-    supabase.from("policy_sop_links").select("sop_id, policy_id").in("sop_id", ids),
-    supabase.from("job_role_sops").select("sop_id, job_role_id").in("sop_id", ids),
     supabase
       .from("job_roles")
       .select("id, name")
       .eq("organisation_id", me.organisation_id)
       .order("name"),
+    supabase.from("services").select("id, name").eq("organisation_id", me.organisation_id),
+    supabase
+      .from("policy_categories")
+      .select("id, name")
+      .eq("organisation_id", me.organisation_id)
+      .eq("applies_to_procedures", true)
+      .order("name"),
   ]);
 
-  const linkedBySop = new Map<string, string[]>();
-  for (const l of links ?? []) {
-    const list = linkedBySop.get(l.sop_id as string) ?? [];
-    list.push(l.policy_id as string);
-    linkedBySop.set(l.sop_id as string, list);
-  }
-  const rolesBySop = new Map<string, string[]>();
-  for (const l of roleLinks ?? []) {
-    const list = rolesBySop.get(l.sop_id as string) ?? [];
-    list.push(l.job_role_id as string);
-    rolesBySop.set(l.sop_id as string, list);
-  }
-
-  const rows = (sops ?? [])
+  const rows = (staged ?? [])
     .filter((s) => s.organisation_id === me.organisation_id)
-    .sort((a, b) => (a.name as string).localeCompare(b.name as string))
     .map((s) => ({
-      id: s.id as string,
-      name: s.name as string,
-      hasText: !!(s.body && String(s.body).trim()),
-      alreadyPublished: (s.published_version as number | null) != null,
-      reviewPeriod: (s.review_period_months as number | null) ?? 6,
-      signingWindow: (s.signing_window as string | null) ?? "week",
-      linkedPolicyIds: linkedBySop.get(s.id as string) ?? [],
-      jobRoleIds: rolesBySop.get(s.id as string) ?? [],
+      stagingId: s.id as string,
+      fileName: s.original_filename as string,
+      title: s.derived_title as string,
+      hasText: !!(s.extracted_text && String(s.extracted_text).trim()),
+      extractionNote: s.extraction_note as string | null,
+      duplicateOfId: s.duplicate_of_id as string | null,
+      duplicateOfName: s.duplicate_of_name as string | null,
+      duplicateScore: s.duplicate_score as number | null,
+      filenameFlag: s.filename_flag as boolean,
+      blankFlag: s.blank_flag as boolean,
     }));
 
   const failed = Number(searchParams.failed ?? 0);
@@ -100,22 +93,30 @@ export default async function SopBulkReviewPage({
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Review and publish</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">
-        Step 2 of 2. Everything with readable text is set to publish. Check the
-        job roles, the review cadence and any policy links, then publish the
-        lot in one step. A procedure with no readable text stays a draft for you to
-        fix.
+        Step 2 of 2. Nothing is created until you commit below. Check the
+        title, job roles, category, site and any flags first - a likely
+        duplicate, a filename-style title, or no readable text are all
+        called out so you can decide before anything is written.
       </p>
       {failed > 0 && (
         <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          {failed} file{failed === 1 ? "" : "s"} could not be uploaded and{" "}
+          {failed} file{failed === 1 ? "" : "s"} could not be parsed and{" "}
           {failed === 1 ? "is" : "are"} not listed here.
+        </p>
+      )}
+      {rows.length === 0 && failed === 0 && (
+        <p className="mt-4 text-sm text-slate-600">
+          Nothing left to review in this batch - already committed or discarded.
         </p>
       )}
 
       <SopBulkReview
         rows={rows}
+        batchId={batchId}
         policies={(policies ?? []) as { id: string; name: string }[]}
         jobRoles={(jobRoles ?? []) as { id: string; name: string }[]}
+        services={(services ?? []) as { id: string; name: string }[]}
+        categories={(categories ?? []) as { id: string; name: string }[]}
       />
     </div>
   );

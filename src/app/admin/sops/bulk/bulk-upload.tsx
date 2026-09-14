@@ -2,17 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { bulkImportSops } from "../actions";
+import { stageBulkSops } from "../actions";
 
-export function SopBulkUpload({
-  jobRoles,
-}: {
-  jobRoles: { id: string; name: string }[];
-}) {
+export function SopBulkUpload() {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
-  const [roleIds, setRoleIds] = useState<string[]>([]);
-  const [signoffType, setSignoffType] = useState("self");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -21,29 +15,15 @@ export function SopBulkUpload({
     if (files.length === 0) return;
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
-    for (const r of roleIds) fd.append("newRoleIds", r);
-    fd.append("newSignoffType", signoffType);
     start(async () => {
       setError(null);
-      const r = await bulkImportSops(fd);
+      const r = await stageBulkSops(fd);
       if (!r.ok) {
         setError(r.error);
         return;
       }
-      const ids = r.outcomes
-        .filter((o) => o.outcome !== "error" && o.sopId)
-        .map((o) => o.sopId as string);
-      const errs = r.outcomes.filter((o) => o.outcome === "error");
-      if (ids.length === 0) {
-        setError(
-          errs.length
-            ? `No files could be uploaded. ${errs[0].detail ?? ""}`
-            : "No files were uploaded.",
-        );
-        return;
-      }
-      const q = new URLSearchParams({ ids: ids.join(",") });
-      if (errs.length) q.set("failed", String(errs.length));
+      const q = new URLSearchParams({ batch: r.batchId });
+      if (r.failed) q.set("failed", String(r.failed));
       router.push(`/admin/sops/bulk/review?${q.toString()}`);
     });
   }
@@ -52,7 +32,7 @@ export function SopBulkUpload({
     <div className="mt-6">
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <p className="mb-3 text-xs font-medium text-slate-500">
-          Step 1 of 2 &middot; Select files and set the defaults
+          Step 1 of 2 &middot; Select files
         </p>
         <input
           ref={inputRef}
@@ -67,52 +47,12 @@ export function SopBulkUpload({
             {files.length} file{files.length === 1 ? "" : "s"} selected
           </p>
         )}
-
-        <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
-          <div>
-            <span className="text-sm font-medium text-slate-700">
-              Job roles for the new procedures
-            </span>
-            <p className="text-xs text-slate-500">
-              This is what decides which staff see the procedure. You can change it per
-              procedure on the next page. A file that matches an existing procedure keeps
-              that procedure&apos;s current job roles.
-            </p>
-            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-              {jobRoles.map((r) => (
-                <label key={r.id} className="flex items-center gap-1.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={roleIds.includes(r.id)}
-                    onChange={(e) =>
-                      setRoleIds((cur) =>
-                        e.target.checked
-                          ? [...cur, r.id]
-                          : cur.filter((x) => x !== r.id),
-                      )
-                    }
-                  />
-                  {r.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">
-              Sign-off type for new procedures
-            </span>
-            <select
-              value={signoffType}
-              onChange={(e) => setSignoffType(e.target.value)}
-              className="mt-1 w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="self">Staff sign-off</option>
-              <option value="self_and_manager">
-                Staff and manager sign-off
-              </option>
-            </select>
-          </label>
-        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Nothing is created yet - the next page parses each file, flags likely
+          duplicates and anything that still looks like a filename, and lets you
+          set job roles, category, site and sign-off details before anything is
+          saved.
+        </p>
 
         <button
           type="button"
@@ -121,8 +61,8 @@ export function SopBulkUpload({
           className="mt-4 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
         >
           {pending
-            ? "Uploading…"
-            : `Upload ${files.length || ""} ${files.length === 1 ? "file" : "files"} and review`.trim()}
+            ? "Parsing…"
+            : `Parse ${files.length || ""} ${files.length === 1 ? "file" : "files"} and review`.trim()}
         </button>
       </div>
 
