@@ -103,6 +103,7 @@ export default async function RootLayout({
               // /account its "Your details" link) - a persistent nav item
               // would be clutter for a tier that isn't usually also a worker.
               isWorker={isWorker(profile) && !isAdmin(profile.access_tier)}
+              isAdmin={isAdmin(profile.access_tier)}
               canManageStaff={
                 isManager(profile.access_tier) || profile.hr_manager
               }

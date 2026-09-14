@@ -508,6 +508,36 @@ const APP_SCENARIOS = [
     probe: (c) => c.query(`select public.set_organisation_display_name($1)`, ["Not allowed"]),
   },
 
+  // Migration 0066: sops_delete/policies_delete split out admin-only from
+  // the shared manager_policy-or-admin write policy, specifically for the
+  // portal management page's bulk-delete-everything action. A manager
+  // (manager_staff here, already outside can_edit_content) must not be
+  // able to delete a procedure or policy at all, single or bulk.
+  {
+    label: "admin deletes an RSG procedure",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) => c.query(`delete from public.sops where id = $1`, [RSG_SOP]),
+  },
+  {
+    label: "manager (not admin) deletes an RSG procedure",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) => c.query(`delete from public.sops where id = $1`, [RSG_SOP]),
+  },
+  {
+    label: "admin deletes an RSG policy",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) => c.query(`delete from public.policies where id = $1`, [RSG_POLICY]),
+  },
+  {
+    label: "manager (not admin) deletes an RSG policy",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) => c.query(`delete from public.policies where id = $1`, [RSG_POLICY]),
+  },
+
   // Private documents Storage bucket: a separate policy set from table RLS.
   // No storage.objects policies exist for it (confirmed directly against
   // storage.buckets / pg_policies), so an authenticated user gets nothing -

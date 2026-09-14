@@ -13,6 +13,7 @@ export type SiteNavProps = {
   orgName: string | null;
   isLeader: boolean;
   isWorker: boolean;
+  isAdmin: boolean;
   canManageStaff: boolean;
   canCountersign: boolean;
   canEditContent: boolean;
@@ -25,6 +26,7 @@ export function SiteNav(props: SiteNavProps) {
     orgName,
     isLeader,
     isWorker,
+    isAdmin,
     canManageStaff,
     canCountersign,
     canEditContent,
@@ -126,6 +128,7 @@ export function SiteNav(props: SiteNavProps) {
       items.push({ href: "/admin/agreements", label: "Agreements" });
     }
     if (canViewReports) items.push({ href: "/reports", label: "Reports" });
+    if (isAdmin) items.push({ href: "/admin/organisation", label: "Organisation" });
     ourWorkflowGroups.push({ label: null, items });
   }
   const showOurWorkflow = ourWorkflowGroups.length > 0;
