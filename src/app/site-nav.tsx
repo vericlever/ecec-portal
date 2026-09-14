@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/bauhaus";
-import { ManageMenu } from "./manage-menu";
+import { NavDropdown, type NavGroup } from "./nav-dropdown";
 
 type Item = { href: string; label: string };
 
@@ -45,23 +45,16 @@ export function SiteNav(props: SiteNavProps) {
   }, []);
 
   // Plain staff (build addendum item 2, revised): Home, My details,
-  // Procedures, Policies. Policies was dropped as a standalone tab per the
-  // original spec (reachable only via the Step 15 click-through from a
-  // procedure to its source policy) but reinstated on request. Leaders keep
-  // the existing nav unchanged, Overview included.
+  // Procedures, Policies. No admin-facing duplicate of anything exists for
+  // this tier, so there is nothing to disambiguate - the flat nav stays.
+  // Leaders get a different structure below: the personal ("My Portal") and
+  // the administrative ("Our Staff" / "Our Workflow") views used to share
+  // identical labels ("Procedures", "Policies") in two different places -
+  // one flat in the primary nav, one inside a single catch-all "Manage"
+  // menu - with nothing to tell a manager which one they were about to
+  // open. Splitting them into three purpose-named groups fixes that.
   const primary: Item[] = isLeader
-    ? [
-        { href: "/admin", label: "Overview" },
-        { href: "/sops", label: "Procedures" },
-        { href: "/policies", label: "Policies" },
-        ...(canViewReports ? [{ href: "/reports", label: "Reports" }] : []),
-        ...(isWorker
-          ? [
-              { href: "/agreements", label: "Agreements" },
-              { href: "/onboarding", label: "My details" },
-            ]
-          : []),
-      ]
+    ? [{ href: "/admin", label: "Overview" }]
     : [
         { href: "/home", label: "Home" },
         { href: "/onboarding", label: "My details" },
@@ -69,13 +62,31 @@ export function SiteNav(props: SiteNavProps) {
         { href: "/policies", label: "Policies" },
       ];
 
-  const manageGroups: { label: string; items: Item[] }[] = [];
-  if (canManageStaff || canCountersign || canEditContent) {
-    manageGroups.push({
-      label: "",
-      items: [{ href: "/account", label: "My details" }],
-    });
-  }
+  // My Portal: this person's own procedures, policies, agreements and
+  // details - identical destinations to the plain-staff flat nav above,
+  // just grouped since a leader also has administrative destinations to
+  // keep separate from them.
+  const myPortalGroups: NavGroup[] = [
+    {
+      label: null,
+      items: [
+        { href: "/sops", label: "My Procedures" },
+        { href: "/policies", label: "My Policies" },
+        ...(isWorker
+          ? [
+              { href: "/agreements", label: "My Agreements" },
+              { href: "/onboarding", label: "My Details" },
+            ]
+          : []),
+      ],
+    },
+  ];
+
+  // Our Staff: everything about the people, not the content - the previous
+  // "Manage > Staff" group, plus job roles (who is assigned what) moved
+  // here from "Library" since it is a staff-structure question, not a
+  // content-authoring one.
+  const ourStaffGroups: NavGroup[] = [];
   if (canManageStaff || canCountersign) {
     const items: Item[] = [];
     if (canManageStaff) {
@@ -87,27 +98,36 @@ export function SiteNav(props: SiteNavProps) {
     if (canCountersign) {
       items.push({ href: "/admin/countersign", label: "Procedure countersigning" });
     }
-    manageGroups.push({ label: "Staff", items });
+    if (canEditContent) {
+      items.push({ href: "/admin/job-roles", label: "Job roles" });
+    }
+    ourStaffGroups.push({ label: null, items });
   }
-  // Library: content editors get the full editing set. Any manager keeps
-  // Procedures too - Review cycle v2 lets manager_staff complete a review
-  // even though only a content editor may revise and republish the text.
-  if (canEditContent || canCountersign) {
+  const showOurStaff = ourStaffGroups.length > 0;
+
+  // Our Workflow: the manager/content-editor view of policies and
+  // procedures (search, review, publish), staff outcome flags and reports -
+  // the previous "Manage > Library" group. Content editors get the full
+  // authoring set; any manager keeps Procedures too, since Review cycle v2
+  // lets manager_staff complete a review even though only a content editor
+  // may revise and republish the text.
+  const ourWorkflowGroups: NavGroup[] = [];
+  if (canEditContent || canCountersign || canViewReports) {
     const items: Item[] = [];
     if (canEditContent) items.push({ href: "/admin/policies", label: "Policies" });
-    items.push({ href: "/admin/sops", label: "Procedures" });
+    if (canEditContent || canCountersign) {
+      items.push({ href: "/admin/sops", label: "Procedures" });
+    }
     if (canCountersign) {
-      items.push({ href: "/admin/outcome-flags", label: "Staff outcome flags" });
+      items.push({ href: "/admin/outcome-flags", label: "Outcome flags" });
     }
     if (canEditContent) {
-      items.push(
-        { href: "/admin/agreements", label: "Agreements" },
-        { href: "/admin/job-roles", label: "Job roles" },
-      );
+      items.push({ href: "/admin/agreements", label: "Agreements" });
     }
-    manageGroups.push({ label: "Library", items });
+    if (canViewReports) items.push({ href: "/reports", label: "Reports" });
+    ourWorkflowGroups.push({ label: null, items });
   }
-  const showManage = canManageStaff || canCountersign || canEditContent;
+  const showOurWorkflow = ourWorkflowGroups.length > 0;
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
@@ -118,6 +138,16 @@ export function SiteNav(props: SiteNavProps) {
         ? "font-semibold text-ink border-b-[3px] border-procedure pb-[3px]"
         : "text-ink-muted"
     } hover:text-ink`;
+
+  // For the mobile sheet, which lists every destination flat with a
+  // section heading rather than as nested dropdowns.
+  const mobileSections: { label: string; groups: NavGroup[] }[] = isLeader
+    ? [
+        { label: "My Portal", groups: myPortalGroups },
+        ...(showOurStaff ? [{ label: "Our Staff", groups: ourStaffGroups }] : []),
+        ...(showOurWorkflow ? [{ label: "Our Workflow", groups: ourWorkflowGroups }] : []),
+      ]
+    : [];
 
   return (
     <nav
@@ -142,13 +172,9 @@ export function SiteNav(props: SiteNavProps) {
               {it.label}
             </Link>
           ))}
-          {showManage && (
-            <ManageMenu
-              canManageStaff={canManageStaff}
-              canCountersign={canCountersign}
-              canEditContent={canEditContent}
-            />
-          )}
+          {isLeader && <NavDropdown label="My Portal" groups={myPortalGroups} />}
+          {showOurStaff && <NavDropdown label="Our Staff" groups={ourStaffGroups} />}
+          {showOurWorkflow && <NavDropdown label="Our Workflow" groups={ourWorkflowGroups} />}
         </div>
       </div>
 
@@ -215,14 +241,12 @@ export function SiteNav(props: SiteNavProps) {
               </Link>
             ))}
 
-            {manageGroups.map((g) => (
-              <div key={g.label} className="mt-2 border-t border-ink/15 pt-2">
-                {g.label && (
-                  <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
-                    {g.label}
-                  </div>
-                )}
-                {g.items.map((it) => (
+            {mobileSections.map((section) => (
+              <div key={section.label} className="mt-2 border-t border-ink/15 pt-2">
+                <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                  {section.label}
+                </div>
+                {section.groups.flatMap((g) => g.items).map((it) => (
                   <Link
                     key={it.href}
                     href={it.href}

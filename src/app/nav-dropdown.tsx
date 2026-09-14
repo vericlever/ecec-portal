@@ -4,17 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Item = { href: string; label: string };
+export type NavItem = { href: string; label: string };
+export type NavGroup = { label: string | null; items: NavItem[] };
 
-export function ManageMenu({
-  canManageStaff,
-  canCountersign,
-  canEditContent,
-}: {
-  canManageStaff: boolean;
-  canCountersign: boolean;
-  canEditContent: boolean;
-}) {
+// Generic top-level nav dropdown - "My Portal", "Our Staff" and "Our
+// Workflow" are all this component with different groups, replacing the
+// single catch-all "Manage" menu that mixed staff administration and
+// content authoring under one label with no way to tell them apart.
+export function NavDropdown({ label, groups }: { label: string; groups: NavGroup[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -36,41 +33,9 @@ export function ManageMenu({
     };
   }, []);
 
-  const groups: { label: string | null; items: Item[] }[] = [];
-  groups.push({ label: null, items: [{ href: "/account", label: "My details" }] });
-  if (canManageStaff || canCountersign) {
-    const items: Item[] = [];
-    if (canManageStaff) {
-      items.push({ href: "/admin/staff", label: "Staff" });
-      items.push({ href: "/admin/credentials", label: "Expiring credentials" });
-      items.push({ href: "/admin/contracts", label: "Contracts" });
-      items.push({ href: "/admin/verification", label: "Document verification" });
-    }
-    if (canCountersign) {
-      items.push({ href: "/admin/countersign", label: "Procedure countersigning" });
-    }
-    groups.push({ label: "Staff", items });
-  }
-  // Library: content editors get the full editing set. Any manager keeps
-  // Procedures too - Review cycle v2 lets manager_staff complete a review
-  // even though only a content editor may revise and republish the text.
-  if (canEditContent || canCountersign) {
-    const items: Item[] = [];
-    if (canEditContent) items.push({ href: "/admin/policies", label: "Policies" });
-    items.push({ href: "/admin/sops", label: "Procedures" });
-    if (canCountersign) {
-      items.push({ href: "/admin/outcome-flags", label: "Staff outcome flags" });
-    }
-    if (canEditContent) {
-      items.push(
-        { href: "/admin/agreements", label: "Agreements" },
-        { href: "/admin/job-roles", label: "Job roles" },
-      );
-    }
-    groups.push({ label: "Library", items });
-  }
-
-  const active = pathname.startsWith("/admin");
+  const isActiveHref = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+  const active = groups.some((g) => g.items.some((it) => isActiveHref(it.href)));
 
   return (
     <div className="relative" ref={ref}>
@@ -83,7 +48,7 @@ export function ManageMenu({
             : "text-ink-muted"
         }`}
       >
-        Manage
+        {label}
         <svg
           viewBox="0 0 12 12"
           className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
@@ -114,9 +79,7 @@ export function ManageMenu({
                   key={it.href}
                   href={it.href}
                   className={`block px-3 py-1.5 text-sm hover:bg-ink/[0.04] ${
-                    pathname === it.href || pathname.startsWith(it.href + "/")
-                      ? "font-semibold text-ink"
-                      : "text-ink-muted"
+                    isActiveHref(it.href) ? "font-semibold text-ink" : "text-ink-muted"
                   }`}
                 >
                   {it.label}
