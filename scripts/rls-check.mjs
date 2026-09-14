@@ -490,6 +490,24 @@ const APP_SCENARIOS = [
       ),
   },
 
+  // set_organisation_display_name is a SECURITY DEFINER function precisely
+  // because a second permissive RLS policy can't be scoped to one column -
+  // it would let an Admin (or worse, whoever else it was opened up to)
+  // rewrite any column on organisations, not just display_name. The
+  // function re-checks is_admin() itself and raises otherwise.
+  {
+    label: "admin sets their own organisation's display name",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) => c.query(`select public.set_organisation_display_name($1)`, ["Ready Set Go"]),
+  },
+  {
+    label: "manager (not admin) sets the organisation's display name",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) => c.query(`select public.set_organisation_display_name($1)`, ["Not allowed"]),
+  },
+
   // Private documents Storage bucket: a separate policy set from table RLS.
   // No storage.objects policies exist for it (confirmed directly against
   // storage.buckets / pg_policies), so an authenticated user gets nothing -

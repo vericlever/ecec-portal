@@ -326,7 +326,17 @@ export default async function DashboardPage() {
         intro="Policy sets the obligation, procedure sets the practice, training closes the gap between them, and outcomes are the evidence it worked. Your part in the chain is setting the policy, writing the procedure, assigning it to a job role, and holding the evidence."
       />
 
-      <h1 className="text-xl font-semibold">Overview</h1>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h1 className="text-xl font-semibold">Overview</h1>
+        {isAdmin(me.access_tier) && (
+          <Link
+            href="/admin/organisation"
+            className="text-xs text-slate-500 underline hover:text-slate-800"
+          >
+            Organisation settings
+          </Link>
+        )}
+      </div>
       <p className="mt-1 text-sm text-slate-500">
         {isAdmin(me.access_tier)
           ? "Compliance across your organisation."

@@ -11,6 +11,7 @@ type Item = { href: string; label: string };
 export type SiteNavProps = {
   fullName: string;
   tierLabel: string;
+  orgName: string | null;
   isLeader: boolean;
   isWorker: boolean;
   canManageStaff: boolean;
@@ -23,6 +24,7 @@ export function SiteNav(props: SiteNavProps) {
   const {
     fullName,
     tierLabel,
+    orgName,
     isLeader,
     isWorker,
     canManageStaff,
@@ -181,6 +183,14 @@ export function SiteNav(props: SiteNavProps) {
 
       {/* Desktop account */}
       <div className="hidden items-center gap-3.5 sm:flex">
+        {orgName && (
+          <span
+            title={orgName}
+            className="max-w-[9rem] truncate border-r border-ink/15 pr-3.5 text-sm text-ink-faint"
+          >
+            {orgName}
+          </span>
+        )}
         <Link href="/account" className="group text-right leading-tight">
           <div className="text-sm font-medium text-ink group-hover:underline">
             {fullName}
@@ -265,6 +275,7 @@ export function SiteNav(props: SiteNavProps) {
 
             <div className="mt-2 flex items-center justify-between border-t border-ink/15 pt-3">
               <Link href="/account" className="text-sm">
+                {orgName && <div className="text-xs text-ink-faint">{orgName}</div>}
                 <div className="font-medium text-ink">{fullName}</div>
                 <div className="text-xs text-ink-faint">{tierLabel}</div>
               </Link>

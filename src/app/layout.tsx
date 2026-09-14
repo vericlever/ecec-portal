@@ -54,6 +54,19 @@ export default async function RootLayout({
     profile && (isManager(profile.access_tier) || profile.hr_manager),
   );
 
+  // Admin-editable label shown next to the staff member's own name in the
+  // nav - falls back to the account name (organisations.name, RLS-locked to
+  // a platform superuser) when no display_name has been set yet.
+  let orgName: string | null = null;
+  if (profile?.organisation_id) {
+    const { data: org } = await createClient()
+      .from("organisations")
+      .select("name, display_name")
+      .eq("id", profile.organisation_id)
+      .maybeSingle();
+    orgName = (org?.display_name as string | null) || (org?.name as string | null) || null;
+  }
+
   // Anyone with a job role is a worker who needs a Worker Register entry - and
   // so is an Admin, who has an underlying staff record too (Step 40).
   let showOnboardingPrompt = false;
@@ -84,6 +97,7 @@ export default async function RootLayout({
             <SiteNav
               fullName={profile.full_name}
               tierLabel={TIER_LABELS[profile.access_tier]}
+              orgName={orgName}
               isLeader={leader}
               // The top-nav "Agreements"/"My details" shortcuts are for staff
               // who live there day to day. An Admin reaches the same pages by
