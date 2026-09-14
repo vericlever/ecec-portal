@@ -760,7 +760,9 @@ export function SigningPauseControl({
   );
 }
 
-const DELETE_PHRASE = "permanently delete user";
+// Matches the button's own label, case-insensitively - a confirmation phrase
+// only works as a safeguard if it is trivial to copy correctly under stress.
+const DELETE_PHRASE = "delete permanently";
 
 export function DeleteAccountControl({ profileId }: { profileId: string }) {
   const router = useRouter();
@@ -786,7 +788,7 @@ export function DeleteAccountControl({ profileId }: { profileId: string }) {
         />
         <button
           type="button"
-          disabled={phrase.trim() !== DELETE_PHRASE || pending}
+          disabled={phrase.trim().toLowerCase() !== DELETE_PHRASE || pending}
           onClick={() => {
             if (!confirm("This cannot be undone. Delete this account permanently?")) return;
             start(async () => {

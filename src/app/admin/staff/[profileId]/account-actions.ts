@@ -200,7 +200,8 @@ export async function setStaffActive(
   return { ok: true };
 }
 
-const DELETE_PHRASE = "permanently delete user";
+// Matches the button's own label, case-insensitively (see record-controls.tsx).
+const DELETE_PHRASE = "delete permanently";
 
 // No other gate beyond the typed phrase, per spec - confirmed deletable even
 // with linked sign-off, credential and contract history attached. That
@@ -218,8 +219,8 @@ export async function permanentlyDeleteStaff(
   if (profileId === me.id) {
     return { ok: false, error: "You cannot delete your own account." };
   }
-  if (typedPhrase.trim() !== DELETE_PHRASE) {
-    return { ok: false, error: `Type "${DELETE_PHRASE}" exactly to confirm.` };
+  if (typedPhrase.trim().toLowerCase() !== DELETE_PHRASE) {
+    return { ok: false, error: `Type "${DELETE_PHRASE}" to confirm.` };
   }
 
   const supabase = createClient();
