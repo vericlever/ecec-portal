@@ -37,17 +37,15 @@ export function ChainOverview({ intro }: { intro: string }) {
           style={{ top: ICON_SIZE / 2, left: "12.5%", right: "12.5%" }}
         />
         {STAGES.map((s) => (
-          <div key={s.stage} className="relative flex flex-col items-center">
+          <div key={s.stage} className="flex flex-col items-center text-center">
             <div className="relative z-10 rounded-full bg-white">
               <StageArc stage={s.stage} size={ICON_SIZE} strokeWidth={7} />
             </div>
-            <div className="relative mt-3 h-0 w-full">
-              <div className="absolute left-1/2 w-max text-left leading-tight">
-                <div className={`text-xs font-semibold uppercase tracking-[0.14em] ${s.colorCls}`}>
-                  {s.label}
-                </div>
-                <div className="text-xs text-slate-500">{s.sub}</div>
+            <div className="mt-3 leading-tight">
+              <div className={`text-xs font-semibold uppercase tracking-[0.14em] ${s.colorCls}`}>
+                {s.label}
               </div>
+              <div className="text-xs text-slate-500">{s.sub}</div>
             </div>
           </div>
         ))}
