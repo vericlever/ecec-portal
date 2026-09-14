@@ -23,7 +23,6 @@ import {
   isAdmin,
   canEditContent,
   canViewReports,
-  TIER_LABELS,
 } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
@@ -96,7 +95,6 @@ export default async function RootLayout({
           <header className="relative z-40 border-b-[10px] border-ink bg-paper">
             <SiteNav
               fullName={profile.full_name}
-              tierLabel={TIER_LABELS[profile.access_tier]}
               orgName={orgName}
               isLeader={leader}
               // The top-nav "Agreements"/"My details" shortcuts are for staff

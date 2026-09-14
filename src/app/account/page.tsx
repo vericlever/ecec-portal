@@ -32,7 +32,12 @@ export default async function AccountPage() {
   return (
     <div className="max-w-xl">
       <h1 className="text-xl font-semibold">{profile.full_name}</h1>
-      <p className="mt-1 text-sm text-slate-500">Your profile</p>
+      <p className="mt-1 flex items-center gap-2 text-sm text-slate-500">
+        Your profile
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+          {TIER_LABELS[profile.access_tier]}
+        </span>
+      </p>
 
       <dl className="mt-6 grid grid-cols-3 gap-x-6 gap-y-2 rounded-lg border border-slate-200 bg-white p-4 text-sm">
         <dt className="text-slate-500">Email</dt>
