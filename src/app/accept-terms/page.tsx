@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireProfile, isManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { fmtDateTime } from "@/lib/format-date";
+import { fmtDate, fmtDateTime } from "@/lib/format-date";
 import { AcceptForm } from "./accept-form";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export default async function AcceptTermsPage({
       <h1 className="text-xl font-semibold text-slate-900">{notice.title}</h1>
       <p className="mt-1 text-xs text-slate-400">
         Version {notice.version}
-        {notice.effective_at && ` · effective ${notice.effective_at}`}
+        {notice.effective_at && ` · effective ${fmtDate(notice.effective_at)}`}
       </p>
 
       {acceptance ? (
