@@ -363,7 +363,7 @@ export default async function DashboardPage() {
       </h2>
       <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
         {actions.map((a) => (
-          <li key={a.href}>
+          <li key={a.label}>
             <Link
               href={a.href}
               className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
@@ -456,18 +456,20 @@ export default async function DashboardPage() {
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
             <IntegrityCard
               title="Published procedures with no policy link"
-              names={orphanSops.map((s) => s.name as string)}
-              hrefFor={(name) =>
-                `/admin/sops/${orphanSops.find((s) => s.name === name)?.id}`
-              }
+              items={orphanSops.map((s) => ({
+                id: s.id as string,
+                name: s.name as string,
+              }))}
+              hrefFor={(id) => `/admin/sops/${id}`}
               total={(pubSops ?? []).length}
             />
             <IntegrityCard
               title="Published policies with no procedure link"
-              names={orphanPolicies.map((p) => p.name as string)}
-              hrefFor={(name) =>
-                `/admin/policies/${orphanPolicies.find((p) => p.name === name)?.id}`
-              }
+              items={orphanPolicies.map((p) => ({
+                id: p.id as string,
+                name: p.name as string,
+              }))}
+              hrefFor={(id) => `/admin/policies/${id}`}
               total={(pubPolicies ?? []).length}
             />
           </div>
@@ -637,13 +639,13 @@ function HeatCell({ pct }: { pct: number | null }) {
 
 function IntegrityCard({
   title,
-  names,
+  items,
   hrefFor,
   total,
 }: {
   title: string;
-  names: string[];
-  hrefFor: (name: string) => string;
+  items: { id: string; name: string }[];
+  hrefFor: (id: string) => string;
   total: number;
 }) {
   return (
@@ -652,25 +654,25 @@ function IntegrityCard({
         <span className="text-sm font-medium text-slate-700">{title}</span>
         <span
           className={`text-sm font-semibold ${
-            names.length > 0 ? "text-amber-700" : "text-slate-400"
+            items.length > 0 ? "text-amber-700" : "text-slate-400"
           }`}
         >
-          {names.length}
+          {items.length}
         </span>
       </div>
       <p className="mt-0.5 text-xs text-slate-400">of {total} published</p>
-      {names.length > 0 && (
+      {items.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-sm">
-          {names.slice(0, 8).map((n) => (
-            <li key={n}>
-              <Link href={hrefFor(n)} className="text-slate-600 underline">
-                {n}
+          {items.slice(0, 8).map((item) => (
+            <li key={item.id}>
+              <Link href={hrefFor(item.id)} className="text-slate-600 underline">
+                {item.name}
               </Link>
             </li>
           ))}
-          {names.length > 8 && (
+          {items.length > 8 && (
             <li className="text-xs text-slate-400">
-              and {names.length - 8} more
+              and {items.length - 8} more
             </li>
           )}
         </ul>
