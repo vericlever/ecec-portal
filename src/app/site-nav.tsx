@@ -65,19 +65,19 @@ export function SiteNav(props: SiteNavProps) {
   // My Portal: this person's own procedures, policies, agreements and
   // details - identical destinations to the plain-staff flat nav above,
   // just grouped since a leader also has administrative destinations to
-  // keep separate from them.
+  // keep separate from them. My Details is every leader's own Worker
+  // Register record, admins included (an Admin normally has no job role but
+  // is still a staff member underneath, see isWorker() in lib/auth.ts) - it
+  // always appears, last, regardless of tier. My Agreements only applies to
+  // an actual employment record, so it stays behind isWorker.
   const myPortalGroups: NavGroup[] = [
     {
       label: null,
       items: [
         { href: "/sops", label: "My Procedures" },
         { href: "/policies", label: "My Policies" },
-        ...(isWorker
-          ? [
-              { href: "/agreements", label: "My Agreements" },
-              { href: "/onboarding", label: "My Details" },
-            ]
-          : []),
+        ...(isWorker ? [{ href: "/agreements", label: "My Agreements" }] : []),
+        { href: "/onboarding", label: "My Details" },
       ],
     },
   ];
