@@ -16,7 +16,7 @@ export async function generateFirstLoginLink(
     return { ok: false, error: error?.message ?? "Could not generate a login link." };
   }
 
-  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.vericlever.site").replace(
     /\/+$/,
     "",
   );
@@ -45,7 +45,7 @@ export async function generatePasswordResetLink(
     };
   }
 
-  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.vericlever.site").replace(
     /\/+$/,
     "",
   );

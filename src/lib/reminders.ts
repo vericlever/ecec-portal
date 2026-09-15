@@ -746,7 +746,7 @@ function renderText(d: Digest): string {
     for (const i of s.items) lines.push(`  - ${i}`);
     lines.push("");
   }
-  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://vericlever.site").replace(
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.vericlever.site").replace(
     /\/+$/,
     "",
   );
@@ -755,7 +755,7 @@ function renderText(d: Digest): string {
 }
 
 function renderHtml(d: Digest): string {
-  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://vericlever.site").replace(
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.vericlever.site").replace(
     /\/+$/,
     "",
   );
