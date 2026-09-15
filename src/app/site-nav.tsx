@@ -18,6 +18,7 @@ export type SiteNavProps = {
   canCountersign: boolean;
   canEditContent: boolean;
   canViewReports: boolean;
+  canViewParentPortal: boolean;
 };
 
 export function SiteNav(props: SiteNavProps) {
@@ -31,6 +32,7 @@ export function SiteNav(props: SiteNavProps) {
     canCountersign,
     canEditContent,
     canViewReports,
+    canViewParentPortal,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -115,9 +117,12 @@ export function SiteNav(props: SiteNavProps) {
   // lets manager_staff complete a review even though only a content editor
   // may revise and republish the text.
   const ourWorkflowGroups: NavGroup[] = [];
-  if (canEditContent || canCountersign || canViewReports) {
+  if (canEditContent || canCountersign || canViewReports || canViewParentPortal) {
     const items: Item[] = [];
     if (canEditContent) items.push({ href: "/admin/policies", label: "Policies" });
+    if (canViewParentPortal) {
+      items.push({ href: "/admin/parent-portal", label: "Parent portal access" });
+    }
     if (canEditContent || canCountersign) {
       items.push({ href: "/admin/sops", label: "Procedures" });
     }

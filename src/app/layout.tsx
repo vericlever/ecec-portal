@@ -50,13 +50,16 @@ export default async function RootLayout({
     profile && (isManager(profile.access_tier) || profile.hr_manager),
   );
 
-  // /faq is public and owns its own layout (marketing header/footer), same
-  // as the landing page - but unlike the landing page it doesn't redirect a
+  // /faq and /parent/[serviceId] are public and own their own layout, same as
+  // the landing page - but unlike the landing page neither redirects a
   // signed-in visitor away, so without this check a logged-in staff member
-  // opening it would get the portal's nav and backdrop wrapped around the
-  // marketing page as well, squeezed into the portal's narrower main column.
+  // opening one (or a parent whose browser happens to also hold a stray
+  // staff session cookie) would get the portal's nav and backdrop wrapped
+  // around the public page as well, squeezed into the portal's narrower
+  // main column.
   const pathname = (await headers()).get("x-pathname") ?? "";
-  const showPortalChrome = Boolean(profile) && pathname !== "/faq";
+  const showPortalChrome =
+    Boolean(profile) && pathname !== "/faq" && !pathname.startsWith("/parent/");
 
   // Admin-editable label shown next to the staff member's own name in the
   // nav - falls back to the account name (organisations.name, RLS-locked to
@@ -114,6 +117,7 @@ export default async function RootLayout({
               canCountersign={isManager(profile.access_tier)}
               canEditContent={canEditContent(profile.access_tier)}
               canViewReports={canViewReports(profile.access_tier)}
+              canViewParentPortal={isManager(profile.access_tier)}
             />
           </header>
         )}

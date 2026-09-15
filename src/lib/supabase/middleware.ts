@@ -19,9 +19,12 @@ const PUBLIC_PATHS = new Set([
   // ones with a current session.
   "/sw.js",
 ]);
-// Endpoints that authenticate themselves (the cron job checks CRON_SECRET), so
-// the session gate must not bounce them to /login.
-const PUBLIC_PREFIXES = ["/api/cron/"];
+// Endpoints/pages that authenticate themselves rather than via a Supabase
+// session - the cron job checks CRON_SECRET, and the parent portal checks its
+// own per-service access code (src/lib/parent-access.ts) - so the session
+// gate must not bounce them to /login, and a stray staff session cookie in
+// the same browser must not change what they show either.
+const PUBLIC_PREFIXES = ["/api/cron/", "/parent/", "/api/parent-documents/"];
 
 // Step 51. Every authenticated user must accept the current Vericlever
 // Platform Terms of Use and Privacy Notice before reaching anywhere else -
