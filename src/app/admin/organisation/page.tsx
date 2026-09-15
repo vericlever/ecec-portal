@@ -34,7 +34,7 @@ export default async function OrganisationSettingsPage() {
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Organisation settings</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Manage your organisation's account, subscription and content library.
+        Manage your organisation&apos;s account, subscription and content library.
       </p>
 
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">

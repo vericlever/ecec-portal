@@ -11,6 +11,12 @@ const PUBLIC_PATHS = new Set([
   "/login",
   "/forgot-password",
   "/auth/confirm",
+  // The service worker script must be fetchable with no session at all - a
+  // browser checks for updates to it in the background, logged in or not,
+  // and the self-destructing version (Step 12, PWA removed 15 September
+  // 2026) has to reach every browser that registered the old one, not just
+  // ones with a current session.
+  "/sw.js",
 ]);
 // Endpoints that authenticate themselves (the cron job checks CRON_SECRET), so
 // the session gate must not bounce them to /login.

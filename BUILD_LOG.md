@@ -84,7 +84,7 @@ steps:
 | 9 | Reg 172 parent notification trigger | Parked, blocked on the sending domain | (none yet) | (none) | No |
 | 10 | Credential tracking, director view, staff self-service | Done, on `main`. Email escalation deferred | 0017 | `9c2e4d6` | Yes |
 | 11 | Contract storage and renewal | Done, on `main`. Email and pop-up escalation deferred | 0026 | `90ddf8f` | Yes |
-| 12 | Mobile capture and installable app (PWA) | Done, on `main`. Wider mobile and tablet polish still worth doing | (none) | `8887337` | Partial |
+| 12 | Mobile capture and mobile nav | Done, on `main`. PWA half (manifest, service worker, install prompt) removed 15 September 2026 - deferred, not cut, see chronological log. Wider mobile and tablet polish still worth doing | (none) | `8887337` (original), `PENDING_HASH` (PWA removal) | Partial |
 | 13 | Compliance heatmap | Superseded by Step 27 | n/a | n/a | n/a |
 | Public site | Bauhaus landing page and restyled sign-in | Done, on `main` | (none) | `274487f`, `9795d59`, `d977222` | Landing and sign-in checked, wrong-password path checked |
 | 14 | Browser-native SOP read-aloud | Done, on `main` | (none) | `3d17773`, `2e86eaf` | Play, pause, resume, stop cycle checked |
@@ -204,6 +204,35 @@ built, with an Australian English voice preference. Step 15 SOP to source-policy
 click-through built. Public marketing site and restyled sign-in built. Portal-wide
 Bauhaus visual refresh, cosmetic only. Dropdown menu z-index fix. **Supabase dev review
 this date, revisions pending.**
+
+### 15 September 2026
+
+Step 12 reduced to mobile capture and mobile nav. The installable-app (PWA) half -
+manifest, service worker, install prompt - removed in commit `PENDING_HASH`. **Status is
+DEFERRED, not cut.** The decision was to remove the install prompt and offline caching
+for the trial, not to rule the capability out.
+
+Reasons: service worker caching would serve stale shells during frequent trial deploys,
+and an installed app on a personal device holds a session against a system containing
+TFN and bank details.
+
+A self-destructing service worker was shipped at the same path (`public/sw.js`) the old
+one used, so a browser that already registered it clears its caches and unregisters on
+its next update check rather than serving a cached shell indefinitely. That file stays in
+place going forward, kill-switch content, even though the PWA itself is only deferred.
+`/sw.js` was also added to the middleware's public-path allowlist - it was being caught
+by the session gate and redirected to `/login` before a browser could ever fetch it,
+which would have stopped the kill-switch reaching a logged-out browser.
+
+Default Next.js favicon (the Vercel triangle) replaced with the concentric-ring mark:
+`src/app/icon.png` (512x512) and `src/app/apple-icon.png` (180x180), Next's file-based
+icon convention, no manifest needed for it.
+
+Restore path: the original PWA work is in commit `8887337` and can be reverted.
+
+Revisit after the trial, specifically if connectivity at Timboon or Mortlake turns out to
+be a problem for staff reading procedures on the floor. If it is restored, the personal
+device question must be answered in the staff terms first, not after.
 
 ## Corrections against BUILD_PLAN.md
 

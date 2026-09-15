@@ -28,15 +28,11 @@ import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
 import { PortalBackdrop } from "@/components/bauhaus";
 import { SiteNav } from "./site-nav";
-import { RegisterServiceWorker } from "./register-sw";
 
 export const metadata: Metadata = {
   title: "VeriClever",
   description:
     "Staff compliance and training for early childhood education and care",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "VeriClever", statusBarStyle: "default" },
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export const viewport: Viewport = {
@@ -89,7 +85,6 @@ export default async function RootLayout({
   return (
     <html lang="en-AU" className={`${jost.variable} ${plexMono.variable}`}>
       <body className="font-jost min-h-screen bg-paper text-slate-900 antialiased">
-        <RegisterServiceWorker />
         {profile && <PortalBackdrop />}
         {profile && (
           <header className="relative z-40 border-b-[10px] border-ink bg-paper">

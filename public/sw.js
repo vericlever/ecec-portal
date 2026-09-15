@@ -1,70 +1,17 @@
-// VeriClever service worker. Deliberately small: it makes the app installable
-// and keeps it usable across a flaky connection, it does not try to be a full
-// offline app. A compliance tool with no network is of limited use anyway.
-
-const VERSION = "v1";
-const STATIC_CACHE = `vc-static-${VERSION}`;
-const PAGE_CACHE = `vc-pages-${VERSION}`;
-
-self.addEventListener("install", (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((c) => c.addAll(["/offline.html"])),
-  );
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((k) => k !== STATIC_CACHE && k !== PAGE_CACHE)
-            .map((k) => caches.delete(k)),
-        ),
-      )
-      .then(() => self.clients.claim()),
-  );
-});
-
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  if (request.method !== "GET") return;
-
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-
-  // Immutable build assets: cache first.
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then(async (cache) => {
-        const hit = await cache.match(request);
-        if (hit) return hit;
-        const res = await fetch(request);
-        if (res.ok) cache.put(request, res.clone());
-        return res;
-      }),
-    );
-    return;
-  }
-
-  // Page navigations: network first, fall back to the last good copy, then to
-  // a small offline page.
-  if (request.mode === "navigate") {
-    event.respondWith(
-      (async () => {
-        try {
-          const res = await fetch(request);
-          const cache = await caches.open(PAGE_CACHE);
-          cache.put(request, res.clone());
-          return res;
-        } catch (err) {
-          const cache = await caches.open(PAGE_CACHE);
-          const cached = await cache.match(request);
-          return cached || caches.match("/offline.html");
-        }
-      })(),
-    );
-  }
+// PWA removed 15 September 2026 (deferred, see BUILD_LOG.md - Step 12).
+// This file stays at the same path the old service worker used
+// deliberately: a browser that already registered it will fetch this on
+// its next update check, see it changed, and install this version - which
+// clears every cache it made and unregisters itself, then reloads any open
+// tab so the client stops being served a cached shell. Do not delete this
+// file; do not restore the old caching behaviour into it. If the PWA is
+// reinstated later, it gets a new file and a new registration call, not a
+// resurrection of this one.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", async () => {
+  const keys = await caches.keys();
+  await Promise.all(keys.map((k) => caches.delete(k)));
+  await self.registration.unregister();
+  const clients = await self.clients.matchAll({ type: "window" });
+  clients.forEach((c) => c.navigate(c.url));
 });
