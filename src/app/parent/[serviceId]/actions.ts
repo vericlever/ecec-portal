@@ -27,7 +27,15 @@ export async function verifyParentCode(serviceId: string, formData: FormData) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      path: `/parent/${serviceId}`,
+      // Site-wide, not scoped to /parent/[serviceId] - the download route
+      // lives at /api/parent-documents/[id], a different path, and a
+      // cookie's path scoping controls which requests the browser attaches
+      // it to at all. Scoping it to /parent/[serviceId] meant the list page
+      // could read it but the download route never received it, so every
+      // download silently 404'd. The cookie NAME (pp_<serviceId>) is still
+      // what scopes it to one service - "/" here only controls which
+      // requests carry it, not which service it grants access to.
+      path: "/",
       maxAge: 60 * 60 * 24 * 180, // 180 days - a parent shouldn't need to
       // re-enter this often, and resetting the code (Admin only) invalidates
       // every existing cookie immediately regardless of this expiry.
