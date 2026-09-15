@@ -313,9 +313,6 @@ export default async function StaffRecordPage({
   const policyViewed = targetPolicyRows.filter((p) =>
     viewedSet.has(`${p.id}:${p.published_version}`),
   ).length;
-  const unviewedPolicies = targetPolicyRows
-    .filter((p) => !viewedSet.has(`${p.id}:${p.published_version}`))
-    .map((p) => p.name);
 
   const documents: {
     label: string;
@@ -469,12 +466,14 @@ export default async function StaffRecordPage({
 
   // Every flag this person carries. The same primitives that staffStatsByProfile
   // counts for the staff-list "Outstanding" figure (same 60-day credential and
-  // 28-day contract windows), so this total matches that row.
+  // 28-day contract windows), so this total matches that row. Unread policies
+  // are deliberately excluded - policies are not a staff sign-off obligation,
+  // only procedures are (see CLAUDE.md's policy/SOP split). Policy view % is
+  // still shown in Training progress below, just not counted as outstanding.
   const outstandingCount =
     (onboardingOutstanding ? 1 : 0) +
     unsignedSops.length +
     awaitingCosignSops.length +
-    unviewedPolicies.length +
     unsightedDocs.length +
     credentialItems.length +
     contractItems.length +
@@ -534,10 +533,6 @@ export default async function StaffRecordPage({
               <OutstandingGroup
                 title="Procedures waiting on a manager countersignature"
                 items={awaitingCosignSops}
-              />
-              <OutstandingGroup
-                title="Policies not read"
-                items={unviewedPolicies}
               />
               <OutstandingGroup
                 title="Agreements not signed"

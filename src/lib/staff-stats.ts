@@ -49,9 +49,12 @@ export function summariseTeam(
     acc.policyViewed += s.policyViewed;
     acc.policyTotal += s.policyTotal;
     acc.outstanding += s.outstanding;
+    // Policy reading is not an obligation staff sign off on (only procedures
+    // are - see CLAUDE.md's policy/SOP split), so an unread policy neither
+    // counts toward "outstanding" nor blocks "fully compliant". Policy view %
+    // is still tracked and shown, just not gated on.
     const sopClear = s.sopPct === null || s.sopPct === 100;
-    const policyClear = s.policyPct === null || s.policyPct === 100;
-    if (s.outstanding === 0 && sopClear && policyClear) acc.clear += 1;
+    if (s.outstanding === 0 && sopClear) acc.clear += 1;
   }
   return {
     ...acc,
@@ -274,17 +277,20 @@ export async function staffStatsByProfile(
     ).length;
 
     // Everything still expected of this person: onboarding questionnaire,
-    // documents a leader has not sighted, SOPs not fully signed (a
-    // self_and_manager SOP counts until the manager countersigns), and
-    // published policies not yet viewed. This is the number the staff record
-    // page breaks down item by item.
+    // documents a leader has not sighted, and SOPs not fully signed (a
+    // self_and_manager SOP counts until the manager countersigns). This is
+    // the number the staff record page breaks down item by item.
+    //
+    // Deliberately excludes unread policies - policies are not a staff
+    // obligation to sign off on, only procedures are (see CLAUDE.md's
+    // policy/SOP split). Policy view % is tracked and shown separately, but
+    // does not count as outstanding.
     const onboardingOutstanding =
       roleIds.length > 0 && !onboarded.has(p.id) ? 1 : 0;
     const outstanding =
       onboardingOutstanding +
       (pendingSightings.get(p.id) ?? 0) +
       (sopTotal - sopSigned) +
-      (policyTotal - policyViewed) +
       (credAlertsByProfile.get(p.id) ?? 0) +
       (contractItemsByProfile.get(p.id) ?? 0) +
       (unsignedAgreements.get(p.id) ?? 0);

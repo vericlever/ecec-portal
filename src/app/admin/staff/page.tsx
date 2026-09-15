@@ -235,11 +235,11 @@ function StaffRowItem({
     <li>
       <Link
         href={`/admin/staff/${p.id}`}
-        className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 hover:bg-slate-100 ${
+        className={`flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-100 ${
           inactive ? "opacity-60" : ""
         }`}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="text-sm font-medium">
             {p.full_name}
             {inactive && (
