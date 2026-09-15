@@ -84,7 +84,7 @@ steps:
 | 9 | Reg 172 parent notification trigger | Parked, blocked on the sending domain | (none yet) | (none) | No |
 | 10 | Credential tracking, director view, staff self-service | Done, on `main`. Email escalation deferred | 0017 | `9c2e4d6` | Yes |
 | 11 | Contract storage and renewal | Done, on `main`. Email and pop-up escalation deferred | 0026 | `90ddf8f` | Yes |
-| 12 | Mobile capture and mobile nav | Done, on `main`. PWA half (manifest, service worker, install prompt) removed 15 September 2026 - deferred, not cut, see chronological log. Wider mobile and tablet polish still worth doing | (none) | `8887337` (original), `PENDING_HASH` (PWA removal) | Partial |
+| 12 | Mobile capture and mobile nav | Done, on `main`. PWA half (manifest, service worker, install prompt) removed 15 September 2026 - deferred, not cut, see chronological log. Wider mobile and tablet polish still worth doing | (none) | `8887337` (original), `3725832` (PWA removal) | Partial |
 | 13 | Compliance heatmap | Superseded by Step 27 | n/a | n/a | n/a |
 | Public site | Bauhaus landing page and restyled sign-in | Done, on `main` | (none) | `274487f`, `9795d59`, `d977222` | Landing and sign-in checked, wrong-password path checked |
 | 14 | Browser-native SOP read-aloud | Done, on `main` | (none) | `3d17773`, `2e86eaf` | Play, pause, resume, stop cycle checked |
@@ -208,7 +208,7 @@ this date, revisions pending.**
 ### 15 September 2026
 
 Step 12 reduced to mobile capture and mobile nav. The installable-app (PWA) half -
-manifest, service worker, install prompt - removed in commit `PENDING_HASH`. **Status is
+manifest, service worker, install prompt - removed in commit `3725832`. **Status is
 DEFERRED, not cut.** The decision was to remove the install prompt and offline caching
 for the trial, not to rule the capability out.
 
