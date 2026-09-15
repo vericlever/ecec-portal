@@ -52,7 +52,7 @@ export default async function ParentPortalPage() {
         no-login page that lists its parent-facing policies as downloads.
         The code is shared by every parent at that service, the same way a
         noticeboard door code would be - it is not a personal login. Choose
-        something easy to say and print, like "timboonkids".{" "}
+        something easy to say and print, like &ldquo;timboonkids&rdquo;.{" "}
         {isAdmin(me.access_tier)
           ? "Only an Admin can set or change a code."
           : "Ask an Admin if a code needs to be set or changed."}
