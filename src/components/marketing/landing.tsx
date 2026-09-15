@@ -1,43 +1,12 @@
-import Link from "next/link";
-import { ChainRing, StageArc, Wordmark, LogoMark } from "@/components/bauhaus";
+import { ChainRing, StageArc } from "@/components/bauhaus";
+import { SiteHeader, SiteFooter } from "@/components/marketing/site-chrome";
 
 const CONTACT = "mailto:info@vericlever.com.au";
 
 export function Landing() {
   return (
     <div className="font-jost overflow-x-hidden bg-paper text-ink">
-      {/* Header */}
-      <header className="sticky top-0 z-20 border-b-[10px] border-ink bg-paper">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-x-[clamp(16px,3vw,40px)] gap-y-[14px] px-5 sm:px-10 py-[18px]">
-          <Wordmark />
-          <nav className="flex flex-wrap items-center gap-x-[clamp(14px,2vw,30px)] gap-y-3 text-[15px] sm:justify-end">
-            <a href="#chain" className="text-ink hover:text-ink">
-              How it works
-            </a>
-            <a href="#tiers" className="text-ink hover:text-ink">
-              Policies &amp; procedures
-            </a>
-            <a href="#consultancy" className="text-ink hover:text-ink">
-              Consultancy
-            </a>
-            <a href="#contact" className="text-ink hover:text-ink">
-              Contact
-            </a>
-            <Link
-              href="/login"
-              className="border-l border-ink/20 pl-[30px] text-ink hover:text-ink"
-            >
-              Sign in
-            </Link>
-            <a
-              href={CONTACT}
-              className="bg-outcomes px-5 py-[11px] text-paper hover:bg-outcomes-hover hover:text-paper"
-            >
-              Book a walkthrough
-            </a>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero */}
       <section className="mx-auto grid max-w-[1240px] items-center gap-16 border-b-4 border-ink px-5 sm:px-10 pb-12 sm:pb-24 pt-12 sm:pt-[88px] [grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))]">
@@ -46,7 +15,7 @@ export function Landing() {
             For Australian ECEC providers
           </p>
           <h1 className="text-[clamp(38px,5.2vw,60px)] font-semibold leading-[1.03] tracking-[-0.025em] text-pretty">
-            Policy, procedure, training and evidence &mdash; one unbroken chain.
+            Policy, procedure, training and evidence in one cycle.
           </h1>
           <p className="max-w-[520px] text-[19px] leading-relaxed text-ink-muted">
             VeriClever takes your service from policy to outcomes, tracking the
@@ -86,9 +55,9 @@ export function Landing() {
             Four links. We hold them together for you.
           </h2>
           <p className="text-[17px] leading-[1.55] text-ink-muted">
-            Each stage is drawn as part of the same ring: a quarter for policy, a
-            half for procedure, three quarters for training, a closed ring when
-            the evidence is held.
+            Each stage is drawn as part of the same cycle: a quarter for
+            policy, a half for procedure, three quarters for training, and
+            complete once the evidence is held.
           </p>
         </div>
         <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))]">
@@ -102,13 +71,13 @@ export function Landing() {
             stage="procedure"
             index="02"
             title="The practice"
-            body="Short, room-level procedures written the way staff work. Each one linked to the policy it carries."
+            body="Clear, room-level procedures written the way staff work. Each one linked to the policy it carries."
           />
           <StageCard
             stage="training"
             index="03"
             title="The knowledge"
-            body="Not a tick box. Staff read, answer, and sign off — so you know the practice is understood, not just acknowledged."
+            body="Every staff member is assigned the procedures for their role. They read, answer and sign off, so understanding is on record, not just attendance."
           />
           <StageCard
             stage="outcomes"
@@ -135,8 +104,9 @@ export function Landing() {
             Most systems flatten the two into one document set, then ask
             educators to read twelve pages of regulatory language to find the
             three steps that apply to them. VeriClever keeps policy behind the
-            scenes where it belongs and puts a short procedure in front of staff
-            — with the link between them held by the system, not by memory.
+            scenes where it belongs and puts a clear procedure in front of
+            staff, with the link between them held by the system, not by
+            memory.
           </p>
           <ul className="flex flex-col gap-3">
             {[
@@ -145,9 +115,7 @@ export function Landing() {
               "Every sign-off traces back to a clause you can point at.",
             ].map((t) => (
               <li key={t} className="flex items-baseline gap-3 text-[16px]">
-                <span className="font-plex-mono text-[13px] text-outcomes">
-                  &mdash;
-                </span>
+                <span className="mt-[7px] h-[9px] w-[9px] flex-none bg-outcomes" />
                 {t}
               </li>
             ))}
@@ -198,8 +166,8 @@ export function Landing() {
           </h2>
           <p className="text-[17px] leading-[1.55] text-ink-muted">
             The same four marks run through the portal. A director can see which
-            chains are closed and which are missing a link, without opening a
-            single document.
+            cycles are complete and which are missing a link, without opening
+            a single document.
           </p>
         </div>
         <div className="overflow-x-auto border-2 border-ink px-4 py-6 sm:px-8 sm:py-[30px]">
@@ -228,143 +196,82 @@ export function Landing() {
         </div>
       </section>
 
-      {/* Consultancy */}
-      <section id="consultancy" className="bg-ink text-paper">
-        <div className="mx-auto grid max-w-[1240px] items-center gap-16 px-5 sm:px-10 pb-12 sm:pb-[90px] pt-12 sm:pt-[84px] [grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))]">
+      {/* Contact */}
+      <section id="contact" className="relative overflow-hidden">
+        {/* Corner arc background motif, bottom-left, green then blue at 0.13
+            opacity - per the design handoff. Purely decorative. */}
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-0 hidden h-full w-full sm:block"
+          preserveAspectRatio="xMinYMax slice"
+          viewBox="0 0 1240 560"
+        >
+          <g fill="none" strokeWidth={14} opacity={0.13}>
+            <path d="M 0 240 A 200 200 0 0 1 200 440" stroke="#1B7A3E" />
+            <path d="M 0 280 A 240 240 0 0 1 240 480" stroke="#1B7A3E" />
+            <path d="M 0 320 A 280 280 0 0 1 280 520" stroke="#1B7A3E" />
+            <path d="M 0 140 A 100 100 0 0 1 100 240" stroke="#1F51A8" />
+            <path d="M 0 170 A 130 130 0 0 1 130 270" stroke="#1F51A8" />
+            <path d="M 0 200 A 160 160 0 0 1 160 320" stroke="#1F51A8" />
+          </g>
+        </svg>
+        <div className="relative z-10 mx-auto grid max-w-[1240px] items-center gap-16 px-5 sm:px-10 pb-12 sm:pb-24 pt-12 sm:pt-[84px] [grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))]">
           <div className="flex flex-col gap-[22px]">
-            <p className="text-[13px] font-semibold uppercase tracking-[0.24em] text-outcomes-on-dark">
-              Where software stops
+            <p className="text-[13px] font-semibold uppercase tracking-[0.24em] text-outcomes">
+              See it on your own material
             </p>
-            <h2 className="text-[28px] sm:text-[40px] font-semibold leading-[1.08] tracking-[-0.02em] text-paper">
-              Judgement is not a feature.
+            <h2 className="text-[28px] sm:text-[40px] font-semibold leading-[1.08] tracking-[-0.02em]">
+              Thirty minutes, your own policies on screen, no slide deck.
             </h2>
-            <p className="text-[17px] leading-[1.55] text-[#C9C4B6]">
-              A portal can tell you a procedure was signed. It cannot tell you
-              whether the procedure was the right one for your service, your
-              rooms and your team. VeriClever comes with people who have run
-              services and sat through assessment — available when the decision
-              needs a human.
+            <p className="text-[17px] leading-[1.55] text-ink-muted">
+              Bring one policy and the procedures that sit under it.
+              We&apos;ll build the cycle in front of you and you can judge
+              whether it holds up in your service.
             </p>
             <div className="flex flex-wrap gap-[14px] pt-1.5">
               <a
                 href={CONTACT}
-                className="bg-paper px-[26px] py-[15px] text-[16px] text-ink hover:bg-[#e6e2d6] hover:text-ink"
+                className="bg-outcomes px-[26px] py-[15px] text-[16px] text-paper hover:bg-outcomes-hover hover:text-paper"
               >
-                Talk to a consultant
+                Book a walkthrough
+              </a>
+              <a
+                href={CONTACT}
+                className="border border-ink px-[26px] py-[15px] text-[16px] text-ink hover:bg-ink hover:text-paper"
+              >
+                Send a question
               </a>
             </div>
           </div>
           <div className="flex justify-center">
             <svg
-              viewBox="0 0 340 220"
+              viewBox="0 0 340 240"
               className="block w-full max-w-[400px]"
               aria-hidden="true"
             >
-              <g fill="none" stroke="#6FBF8B" strokeWidth={5}>
-                <path d="M 60 200 A 40 40 0 0 1 140 200" />
-                <path d="M 44 200 A 56 56 0 0 1 156 200" />
-                <path d="M 28 200 A 72 72 0 0 1 172 200" />
-              </g>
-              <g fill="none" stroke="#E4A73A" strokeWidth={5}>
-                <path d="M 200 200 A 40 40 0 0 1 280 200" />
-                <path d="M 184 200 A 56 56 0 0 1 296 200" />
-                <path d="M 168 200 A 72 72 0 0 1 312 200" />
+              <g fill="none" strokeWidth={6}>
+                <path d="M 320 220 A 150 150 0 0 0 170 70" stroke="#1F51A8" />
+                <path d="M 296 220 A 126 126 0 0 0 170 94" stroke="#1F51A8" />
+                <path d="M 272 220 A 102 102 0 0 0 170 118" stroke="#1F51A8" />
+                <path d="M 170 70 A 150 150 0 0 0 20 220" stroke="#1B7A3E" />
+                <path d="M 170 94 A 126 126 0 0 0 44 220" stroke="#1B7A3E" />
+                <path d="M 170 118 A 102 102 0 0 0 68 220" stroke="#1B7A3E" />
               </g>
               <line
                 x1="10"
-                y1="200"
+                y1="220"
                 x2="330"
-                y2="200"
-                stroke="#FFFFFF"
+                y2="220"
+                stroke="#1A1A17"
                 strokeWidth={1.5}
-                opacity={0.4}
+                opacity={0.3}
               />
             </svg>
           </div>
         </div>
       </section>
 
-      {/* Contact */}
-      <section
-        id="contact"
-        className="mx-auto grid max-w-[1240px] items-center gap-16 px-5 sm:px-10 pb-12 sm:pb-24 pt-12 sm:pt-[84px] [grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))]"
-      >
-        <div className="flex flex-col gap-[22px]">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.24em] text-outcomes">
-            See it on your own material
-          </p>
-          <h2 className="text-[28px] sm:text-[40px] font-semibold leading-[1.08] tracking-[-0.02em]">
-            Thirty minutes, your own policies on screen, no slide deck.
-          </h2>
-          <p className="text-[17px] leading-[1.55] text-ink-muted">
-            Bring one policy and the procedures that sit under it. We&apos;ll
-            build the chain in front of you and you can judge whether it holds up
-            in your service.
-          </p>
-          <div className="flex flex-wrap gap-[14px] pt-1.5">
-            <a
-              href={CONTACT}
-              className="bg-outcomes px-[26px] py-[15px] text-[16px] text-paper hover:bg-outcomes-hover hover:text-paper"
-            >
-              Book a walkthrough
-            </a>
-            <a
-              href={CONTACT}
-              className="border border-ink px-[26px] py-[15px] text-[16px] text-ink hover:bg-ink hover:text-paper"
-            >
-              Send a question
-            </a>
-          </div>
-        </div>
-        <div className="flex justify-center">
-          <svg
-            viewBox="0 0 340 240"
-            className="block w-full max-w-[400px]"
-            aria-hidden="true"
-          >
-            <g fill="none" strokeWidth={6}>
-              <path d="M 320 220 A 150 150 0 0 0 170 70" stroke="#1F51A8" />
-              <path d="M 296 220 A 126 126 0 0 0 170 94" stroke="#1F51A8" />
-              <path d="M 272 220 A 102 102 0 0 0 170 118" stroke="#1F51A8" />
-              <path d="M 170 70 A 150 150 0 0 0 20 220" stroke="#1B7A3E" />
-              <path d="M 170 94 A 126 126 0 0 0 44 220" stroke="#1B7A3E" />
-              <path d="M 170 118 A 102 102 0 0 0 68 220" stroke="#1B7A3E" />
-            </g>
-            <line
-              x1="10"
-              y1="220"
-              x2="330"
-              y2="220"
-              stroke="#1A1A17"
-              strokeWidth={1.5}
-              opacity={0.3}
-            />
-          </svg>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t-4 border-ink">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-6 p-10">
-          <div className="flex items-center gap-3">
-            <LogoMark size={24} />
-            <span className="font-plex-mono text-[12px] font-semibold tracking-[0.16em] text-ink-faint">
-              vericlever.com.au &middot; Victoria, Australia
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-6 text-[14px]">
-            <a href="#chain" className="text-ink-muted hover:text-ink">
-              How it works
-            </a>
-            <a href="#consultancy" className="text-ink-muted hover:text-ink">
-              Consultancy
-            </a>
-            <a href="#contact" className="text-ink-muted hover:text-ink">
-              Contact
-            </a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

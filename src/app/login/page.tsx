@@ -34,12 +34,12 @@ export default function LoginPage() {
           </Link>
           <div className="flex flex-none items-center gap-6 whitespace-nowrap">
             <span className="text-[15px] text-ink-muted">Not set up yet?</span>
-            <Link
-              href="/"
+            <a
+              href="mailto:info@vericlever.com.au"
               className="border border-ink px-[18px] py-2.5 text-[15px] text-ink hover:bg-ink hover:text-paper"
             >
               Book a walkthrough
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -121,8 +121,8 @@ export default function LoginPage() {
               Inside the portal
             </p>
             <p className="text-[clamp(24px,2.6vw,30px)] font-medium leading-[1.2] text-pretty">
-              Every procedure your team signs closes a ring &mdash; and stays
-              closed until something changes.
+              Every procedure your team signs completes a cycle, and it stays
+              complete until something changes.
             </p>
           </div>
 

@@ -11,6 +11,7 @@ const PUBLIC_PATHS = new Set([
   "/login",
   "/forgot-password",
   "/auth/confirm",
+  "/faq",
   // The service worker script must be fetchable with no session at all - a
   // browser checks for updates to it in the background, logged in or not,
   // and the self-destructing version (Step 12, PWA removed 15 September
@@ -33,7 +34,14 @@ const NOTICE_GATE_PATH = "/accept-terms";
 const NOTICE_GATE_EXEMPT = new Set([...PUBLIC_PATHS, NOTICE_GATE_PATH, "/logout"]);
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Forwarded as a request header (not a response header) so that
+  // next/headers' headers() can read it during server-side rendering - the
+  // root layout uses it to tell a fully public page like /faq apart from the
+  // portal routes, since usePathname() isn't available in a server component.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,7 +55,7 @@ export async function updateSession(request: NextRequest) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }

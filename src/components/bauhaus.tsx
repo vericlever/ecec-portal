@@ -173,6 +173,44 @@ export function PortalBackdrop() {
   );
 }
 
+const ARCH_COLOR = {
+  blue: "#1F51A8",
+  amber: "#C98A0E",
+  vermilion: "#C8451F",
+  green: "#1B7A3E",
+} as const;
+
+export type ArchColour = keyof typeof ARCH_COLOR;
+
+// Three concentric semicircles springing from a baseline, used as the header
+// graphic above each FAQ question (and as spare-corner decoration elsewhere).
+// 160x92 viewBox, centre (80,84), radii 58/42/26 - fixed geometry from the
+// design handoff, not meant to be resized by changing the numbers.
+export function ArchMotif({
+  colour,
+  size = 80,
+}: {
+  colour: ArchColour;
+  size?: number;
+}) {
+  const stroke = ARCH_COLOR[colour];
+  return (
+    <svg
+      viewBox="0 0 160 92"
+      width={size}
+      height={(size * 92) / 160}
+      aria-hidden="true"
+    >
+      <g fill="none" stroke={stroke} strokeWidth={5}>
+        <path d="M 22 84 A 58 58 0 0 1 138 84" />
+        <path d="M 38 84 A 42 42 0 0 1 122 84" />
+        <path d="M 54 84 A 26 26 0 0 1 106 84" />
+      </g>
+      <line x1="6" y1="84" x2="154" y2="84" stroke="#1A1A17" strokeWidth={2} />
+    </svg>
+  );
+}
+
 export function Wordmark({ size = 30 }: { size?: number }) {
   return (
     <span className="flex items-center gap-3">

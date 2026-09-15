@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { Jost, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -49,6 +50,14 @@ export default async function RootLayout({
     profile && (isManager(profile.access_tier) || profile.hr_manager),
   );
 
+  // /faq is public and owns its own layout (marketing header/footer), same
+  // as the landing page - but unlike the landing page it doesn't redirect a
+  // signed-in visitor away, so without this check a logged-in staff member
+  // opening it would get the portal's nav and backdrop wrapped around the
+  // marketing page as well, squeezed into the portal's narrower main column.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const showPortalChrome = Boolean(profile) && pathname !== "/faq";
+
   // Admin-editable label shown next to the staff member's own name in the
   // nav - falls back to the account name (organisations.name, RLS-locked to
   // a platform superuser) when no display_name has been set yet.
@@ -85,8 +94,8 @@ export default async function RootLayout({
   return (
     <html lang="en-AU" className={`${jost.variable} ${plexMono.variable}`}>
       <body className="font-jost min-h-screen bg-paper text-slate-900 antialiased">
-        {profile && <PortalBackdrop />}
-        {profile && (
+        {showPortalChrome && <PortalBackdrop />}
+        {showPortalChrome && profile && (
           <header className="relative z-40 border-b-[10px] border-ink bg-paper">
             <SiteNav
               fullName={profile.full_name}
@@ -108,7 +117,7 @@ export default async function RootLayout({
             />
           </header>
         )}
-        {showOnboardingPrompt && (
+        {showPortalChrome && showOnboardingPrompt && (
           <div className="relative z-30 border-b border-amber-200 bg-amber-50">
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-2 text-sm text-amber-900">
               <span>Your onboarding details are not complete yet.</span>
@@ -121,7 +130,7 @@ export default async function RootLayout({
             </div>
           </div>
         )}
-        {staffToSignOff > 0 && (
+        {showPortalChrome && staffToSignOff > 0 && (
           <div className="relative z-30 border-b border-amber-200 bg-amber-50">
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-2 text-sm text-amber-900">
               <span>
@@ -138,12 +147,13 @@ export default async function RootLayout({
             </div>
           </div>
         )}
-        {profile ? (
+        {showPortalChrome ? (
           <main className="relative z-10 mx-auto max-w-3xl px-4 py-8">
             {children}
           </main>
         ) : (
-          // Public pages (landing, sign-in, forgot-password) own their layout.
+          // Public pages (landing, sign-in, forgot-password, FAQ) own their
+          // own layout, whether or not the visitor happens to be signed in.
           children
         )}
       </body>
