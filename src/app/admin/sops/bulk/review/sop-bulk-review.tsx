@@ -17,7 +17,7 @@ import {
   MAX_QUALITY_AREAS,
   MAX_CHILD_SAFE_STANDARDS,
 } from "@/lib/tags";
-import { TagPicker } from "@/app/admin/_tags/tag-picker";
+import { TagSelect } from "@/app/admin/_tags/tag-select";
 import { finishBulkSops, discardBulkSopBatch } from "../../actions";
 import { readBulkSopDefaults } from "../bulk-defaults";
 
@@ -403,8 +403,8 @@ export function SopBulkReview({
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                  <TagPicker
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <TagSelect
                     legend="NQS quality areas"
                     options={NQS_QUALITY_AREAS}
                     selectedIds={s.qualityAreaIds}
@@ -417,7 +417,7 @@ export function SopBulkReview({
                       })
                     }
                   />
-                  <TagPicker
+                  <TagSelect
                     legend="Child safe standards"
                     options={CHILD_SAFE_STANDARDS}
                     selectedIds={s.childSafeStandardIds}
