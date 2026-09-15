@@ -11,7 +11,15 @@ import {
   cleanSigningWindow,
   type SopSigningWindow,
 } from "@/lib/constants";
+import {
+  NQS_QUALITY_AREAS,
+  CHILD_SAFE_STANDARDS,
+  MAX_QUALITY_AREAS,
+  MAX_CHILD_SAFE_STANDARDS,
+} from "@/lib/tags";
+import { TagPicker } from "@/app/admin/_tags/tag-picker";
 import { finishBulkSops, discardBulkSopBatch } from "../../actions";
+import { readBulkSopDefaults } from "../bulk-defaults";
 
 type Row = {
   stagingId: string;
@@ -37,6 +45,8 @@ type State = {
   reviewPeriod: number;
   signingWindow: SopSigningWindow;
   linkedPolicyIds: string[];
+  qualityAreaIds: number[];
+  childSafeStandardIds: number[];
   publish: boolean;
 };
 
@@ -65,8 +75,9 @@ export function SopBulkReview({
     flagged: number;
   } | null>(null);
 
-  const [state, setState] = useState<Record<string, State>>(() =>
-    Object.fromEntries(
+  const [state, setState] = useState<Record<string, State>>(() => {
+    const defaults = readBulkSopDefaults(batchId);
+    return Object.fromEntries(
       rows.map((r) => [
         r.stagingId,
         {
@@ -75,17 +86,19 @@ export function SopBulkReview({
           // library might already have this content, per Step 47's intent
           // of protecting a dirty library rather than silently doubling it.
           action: (r.duplicateOfId ? "skip" : "create") as Action,
-          jobRoleIds: [] as string[],
-          categoryId: "",
-          serviceId: "",
-          reviewPeriod: 6,
-          signingWindow: "week" as SopSigningWindow,
+          jobRoleIds: [...defaults.jobRoleIds],
+          categoryId: defaults.categoryId,
+          serviceId: defaults.serviceId,
+          reviewPeriod: defaults.reviewPeriod,
+          signingWindow: defaults.signingWindow,
           linkedPolicyIds: [] as string[],
+          qualityAreaIds: [...defaults.qualityAreaIds],
+          childSafeStandardIds: [...defaults.childSafeStandardIds],
           publish: r.hasText && !r.duplicateOfId,
         },
       ]),
-    ),
-  );
+    );
+  });
 
   const policyName = useMemo(() => new Map(policies.map((p) => [p.id, p.name])), [policies]);
   const roleName = useMemo(() => new Map(jobRoles.map((r) => [r.id, r.name])), [jobRoles]);
@@ -112,6 +125,8 @@ export function SopBulkReview({
           reviewPeriod: s.reviewPeriod,
           signingWindow: s.signingWindow,
           linkedPolicyIds: s.linkedPolicyIds,
+          qualityAreaIds: s.qualityAreaIds,
+          childSafeStandardIds: s.childSafeStandardIds,
           publish: s.publish && r.hasText,
           replaceTargetId: s.action === "replace" ? r.duplicateOfId : null,
         };
@@ -386,6 +401,35 @@ export function SopBulkReview({
                       </select>
                     )}
                   </div>
+                </div>
+
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <TagPicker
+                    legend="NQS quality areas"
+                    options={NQS_QUALITY_AREAS}
+                    selectedIds={s.qualityAreaIds}
+                    max={MAX_QUALITY_AREAS}
+                    onToggle={(id, checked) =>
+                      patch(r.stagingId, {
+                        qualityAreaIds: checked
+                          ? [...s.qualityAreaIds, id]
+                          : s.qualityAreaIds.filter((x) => x !== id),
+                      })
+                    }
+                  />
+                  <TagPicker
+                    legend="Child safe standards"
+                    options={CHILD_SAFE_STANDARDS}
+                    selectedIds={s.childSafeStandardIds}
+                    max={MAX_CHILD_SAFE_STANDARDS}
+                    onToggle={(id, checked) =>
+                      patch(r.stagingId, {
+                        childSafeStandardIds: checked
+                          ? [...s.childSafeStandardIds, id]
+                          : s.childSafeStandardIds.filter((x) => x !== id),
+                      })
+                    }
+                  />
                 </div>
 
                 <label className="mt-3 flex items-center gap-1.5 text-sm">

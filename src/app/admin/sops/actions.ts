@@ -511,6 +511,8 @@ export type SopBulkFinishItem = {
   reviewPeriod: number;
   signingWindow: string;
   linkedPolicyIds: string[];
+  qualityAreaIds: number[];
+  childSafeStandardIds: number[];
   publish: boolean;
   replaceTargetId: string | null;
 };
@@ -541,6 +543,8 @@ export async function finishBulkSops(
     review_period_months: cleanReviewPeriod(i.reviewPeriod),
     signing_window: cleanSigningWindow(i.signingWindow),
     linked_policy_ids: i.linkedPolicyIds,
+    quality_area_ids: i.qualityAreaIds,
+    child_safe_standard_ids: i.childSafeStandardIds,
     publish: i.publish,
     replace_target_id: i.replaceTargetId,
   }));
