@@ -1,7 +1,7 @@
 import { requireManager, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { fmtDateTime } from "@/lib/format-date";
-import { generateParentAccessCode } from "./actions";
+import { setParentAccessCode, generateParentAccessCode } from "./actions";
 import { CopyButton } from "./copy-button";
 
 export const dynamic = "force-dynamic";
@@ -51,10 +51,11 @@ export default async function ParentPortalPage() {
         Each service has its own link and access code for the public,
         no-login page that lists its parent-facing policies as downloads.
         The code is shared by every parent at that service, the same way a
-        noticeboard door code would be - it is not a personal login.{" "}
+        noticeboard door code would be - it is not a personal login. Choose
+        something easy to say and print, like "timboonkids".{" "}
         {isAdmin(me.access_tier)
-          ? "Only an Admin can generate or reset a code."
-          : "Ask an Admin if a code needs to be generated or reset."}
+          ? "Only an Admin can set or change a code."
+          : "Ask an Admin if a code needs to be set or changed."}
       </p>
 
       <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
@@ -92,14 +93,37 @@ export default async function ParentPortalPage() {
               </div>
 
               {isAdmin(me.access_tier) && (
-                <form action={generateParentAccessCode.bind(null, s.id)}>
-                  <button
-                    type="submit"
-                    className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <form
+                    action={setParentAccessCode.bind(null, s.id)}
+                    className="flex items-center gap-2"
                   >
-                    {access ? "Reset code" : "Generate code"}
-                  </button>
-                </form>
+                    <input
+                      name="code"
+                      type="text"
+                      minLength={4}
+                      maxLength={32}
+                      required
+                      defaultValue={access?.code ?? ""}
+                      placeholder="e.g. timboonkids"
+                      className="w-40 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      {access ? "Save" : "Set code"}
+                    </button>
+                  </form>
+                  <form action={generateParentAccessCode.bind(null, s.id)}>
+                    <button
+                      type="submit"
+                      className="text-xs text-slate-400 underline hover:text-slate-600"
+                    >
+                      Use a random code instead
+                    </button>
+                  </form>
+                </div>
               )}
             </li>
           );
