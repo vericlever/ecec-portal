@@ -140,7 +140,7 @@ export function LogoMark({ size = 30 }: { size?: number }) {
 }
 
 // The faint concentric-arc field that sits behind a portal page. Corner
-// anchored, opacity ~0.13, never competing with text. Purely decorative.
+// anchored, opacity 0.14, never competing with text. Purely decorative.
 export function PortalBackdrop() {
   return (
     <div
@@ -152,7 +152,7 @@ export function PortalBackdrop() {
         preserveAspectRatio="xMaxYMax slice"
         className="h-full w-full"
       >
-        <g fill="none" strokeWidth={14} opacity={0.13}>
+        <g fill="none" strokeWidth={14} opacity={0.14}>
           <path d="M 1200 300 A 500 500 0 0 0 700 800" stroke="#1F51A8" />
           <path d="M 1200 340 A 460 460 0 0 0 740 800" stroke="#1F51A8" />
           <path d="M 1200 380 A 420 420 0 0 0 780 800" stroke="#1F51A8" />
@@ -163,7 +163,7 @@ export function PortalBackdrop() {
           <path d="M 1200 660 A 140 140 0 0 0 1060 800" stroke="#C8451F" />
           <path d="M 1200 700 A 100 100 0 0 0 1100 800" stroke="#C8451F" />
         </g>
-        <g fill="none" stroke="#1B7A3E" strokeWidth={14} opacity={0.13}>
+        <g fill="none" stroke="#1B7A3E" strokeWidth={14} opacity={0.14}>
           <path d="M 0 640 A 160 160 0 0 1 160 800" />
           <path d="M 0 600 A 200 200 0 0 1 200 800" />
           <path d="M 0 560 A 240 240 0 0 1 240 800" />
