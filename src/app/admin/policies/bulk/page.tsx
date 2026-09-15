@@ -1,11 +1,24 @@
 import Link from "next/link";
 import { requireContentEditor } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { policyCategories } from "@/lib/policy-categories";
 import { BulkUpload } from "./bulk-upload";
 
 export const dynamic = "force-dynamic";
 
 export default async function BulkPolicyUploadPage() {
-  await requireContentEditor();
+  const me = await requireContentEditor();
+  const supabase = createClient();
+
+  const [categories, { data: services }] = await Promise.all([
+    policyCategories(supabase),
+    supabase
+      .from("services")
+      .select("id, name")
+      .eq("organisation_id", me.organisation_id)
+      .order("name"),
+  ]);
+
   return (
     <div className="max-w-2xl">
       <Link
@@ -23,7 +36,10 @@ export default async function BulkPolicyUploadPage() {
         or a file with no readable text are all flagged there for you to
         decide, rather than silently becoming a policy.
       </p>
-      <BulkUpload />
+      <BulkUpload
+        categories={categories}
+        services={(services ?? []) as { id: string; name: string }[]}
+      />
     </div>
   );
 }

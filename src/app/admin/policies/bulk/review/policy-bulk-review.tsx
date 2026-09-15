@@ -5,7 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { REVIEW_PERIODS, REVIEW_PERIOD_LABELS } from "@/lib/constants";
 import type { PolicyCategory } from "@/lib/policy-categories";
+import {
+  NQS_QUALITY_AREAS,
+  CHILD_SAFE_STANDARDS,
+  MAX_QUALITY_AREAS,
+  MAX_CHILD_SAFE_STANDARDS,
+} from "@/lib/tags";
+import { TagPicker } from "@/app/admin/_tags/tag-picker";
 import { finishBulkPolicies, discardBulkPolicyBatch } from "../../actions";
+import { readBulkPolicyDefaults } from "../bulk-defaults";
 
 type Row = {
   stagingId: string;
@@ -31,6 +39,8 @@ type State = {
   nextReviewDate: string;
   publish: boolean;
   linkedSopIds: string[];
+  qualityAreaIds: number[];
+  childSafeStandardIds: number[];
 };
 
 function isoInDays(days: number): string {
@@ -65,23 +75,30 @@ export function PolicyBulkReview({
     flagged: number;
   } | null>(null);
 
-  const [state, setState] = useState<Record<string, State>>(() =>
-    Object.fromEntries(
+  const [state, setState] = useState<Record<string, State>>(() => {
+    const defaults = readBulkPolicyDefaults(batchId);
+    const defaultCategoryIds =
+      defaults.categoryIds.length > 0
+        ? defaults.categoryIds
+        : categories.filter((c) => c.slug === "general").map((c) => c.id);
+    return Object.fromEntries(
       rows.map((r, i) => [
         r.stagingId,
         {
           title: r.title,
           action: (r.duplicateOfId ? "skip" : "create") as Action,
-          categoryIds: categories.filter((c) => c.slug === "general").map((c) => c.id),
-          serviceId: "",
-          reviewPeriod: 6,
+          categoryIds: [...defaultCategoryIds],
+          serviceId: defaults.serviceId,
+          reviewPeriod: defaults.reviewPeriod,
           nextReviewDate: isoInDays(i * 7),
           publish: r.hasText && !r.duplicateOfId,
           linkedSopIds: [] as string[],
+          qualityAreaIds: [...defaults.qualityAreaIds],
+          childSafeStandardIds: [...defaults.childSafeStandardIds],
         },
       ]),
-    ),
-  );
+    );
+  });
 
   const sopName = useMemo(() => new Map(sops.map((s) => [s.id, s.name])), [sops]);
 
@@ -125,6 +142,8 @@ export function PolicyBulkReview({
           reviewPeriod: s.reviewPeriod,
           nextReviewDate: s.nextReviewDate,
           linkedSopIds: s.linkedSopIds,
+          qualityAreaIds: s.qualityAreaIds,
+          childSafeStandardIds: s.childSafeStandardIds,
           publish: s.publish && r.hasText,
           replaceTargetId: s.action === "replace" ? r.duplicateOfId : null,
         };
@@ -361,6 +380,35 @@ export function PolicyBulkReview({
                       </select>
                     )}
                   </div>
+                </div>
+
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <TagPicker
+                    legend="NQS quality areas"
+                    options={NQS_QUALITY_AREAS}
+                    selectedIds={s.qualityAreaIds}
+                    max={MAX_QUALITY_AREAS}
+                    onToggle={(id, checked) =>
+                      patch(r.stagingId, {
+                        qualityAreaIds: checked
+                          ? [...s.qualityAreaIds, id]
+                          : s.qualityAreaIds.filter((x) => x !== id),
+                      })
+                    }
+                  />
+                  <TagPicker
+                    legend="Child safe standards"
+                    options={CHILD_SAFE_STANDARDS}
+                    selectedIds={s.childSafeStandardIds}
+                    max={MAX_CHILD_SAFE_STANDARDS}
+                    onToggle={(id, checked) =>
+                      patch(r.stagingId, {
+                        childSafeStandardIds: checked
+                          ? [...s.childSafeStandardIds, id]
+                          : s.childSafeStandardIds.filter((x) => x !== id),
+                      })
+                    }
+                  />
                 </div>
 
                 <label className="mt-3 flex items-center gap-1.5 text-sm">

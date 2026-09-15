@@ -528,6 +528,8 @@ export type PolicyBulkFinishItem = {
   reviewPeriod: number;
   nextReviewDate: string;
   linkedSopIds: string[];
+  qualityAreaIds: number[];
+  childSafeStandardIds: number[];
   publish: boolean;
   replaceTargetId: string | null;
 };
@@ -556,6 +558,8 @@ export async function finishBulkPolicies(
     review_period_months: cleanReviewPeriod(i.reviewPeriod),
     next_review_date: ISO_DATE.test(i.nextReviewDate) ? i.nextReviewDate : null,
     linked_sop_ids: i.linkedSopIds,
+    quality_area_ids: i.qualityAreaIds,
+    child_safe_standard_ids: i.childSafeStandardIds,
     publish: i.publish,
     replace_target_id: i.replaceTargetId,
   }));
