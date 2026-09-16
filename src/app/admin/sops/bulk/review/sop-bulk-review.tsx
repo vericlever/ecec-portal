@@ -403,7 +403,7 @@ export function SopBulkReview({
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="mt-3 flex flex-col gap-3">
                   <TagSelect
                     legend="NQS quality areas"
                     options={NQS_QUALITY_AREAS}

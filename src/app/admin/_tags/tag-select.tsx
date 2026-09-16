@@ -60,7 +60,11 @@ export function TagSelect({
               if (!e.target.value) return;
               onToggle(Number(e.target.value), true);
             }}
-            className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+            // w-full, not content-sized - a native <select> otherwise sizes
+            // itself to its longest option (the Child Safe Standard names
+            // run much longer than the Quality Area ones), which pushed the
+            // closed box far past its column.
+            className="w-full max-w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
           >
             <option value="">Add…</option>
             {addable.map((o) => (
