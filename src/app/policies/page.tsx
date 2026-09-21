@@ -55,7 +55,7 @@ export default async function PoliciesPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Policies</h1>
+      <h1 className="text-xl font-semibold">My Policies</h1>
       {rows.length === 0 ? (
         <p className="mt-3 max-w-prose text-sm text-slate-500">
           There are no policies to view yet.

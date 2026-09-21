@@ -32,7 +32,7 @@ export default async function BulkSopUploadPage() {
   return (
     <div className="max-w-2xl">
       <Link href="/admin/sops" className="text-sm text-slate-500 hover:text-slate-900">
-        ← Procedures
+        ← Our Procedures
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Bulk upload procedures</h1>
       <p className="mt-1 max-w-prose text-sm text-slate-500">

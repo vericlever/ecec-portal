@@ -162,7 +162,7 @@ export default async function AdminPoliciesPage({
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Policies</h1>
+        <h1 className="text-xl font-semibold">Our Policies</h1>
         <div className="flex flex-wrap gap-2">
           <AdminListFilters
             basePath="/admin/policies"

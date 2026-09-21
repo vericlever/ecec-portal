@@ -55,7 +55,7 @@ export default async function PolicyDetailPage({
         href="/admin/policies"
         className="text-sm text-slate-500 hover:text-slate-900"
       >
-        ← Policies
+        ← Our Policies
       </Link>
 
       <PolicyEditor

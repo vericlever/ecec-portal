@@ -130,7 +130,7 @@ export default async function AdminSopsPage({
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Procedures</h1>
+        <h1 className="text-xl font-semibold">Our Procedures</h1>
         <div className="flex flex-wrap gap-2">
           <AdminListFilters
             basePath="/admin/sops"

@@ -54,7 +54,7 @@ export default async function PolicyViewPage({
         href="/policies"
         className="text-sm text-slate-500 hover:text-slate-900"
       >
-        ← Policies
+        ← My Policies
       </Link>
 
       <h1 className="mt-3 text-xl font-semibold">{policy.name}</h1>

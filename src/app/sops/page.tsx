@@ -32,7 +32,7 @@ export default async function SopListPage() {
   if (roleIds.length === 0) {
     return (
       <div>
-        <h1 className="text-xl font-semibold">Standard operating procedures</h1>
+        <h1 className="text-xl font-semibold">My Procedures</h1>
         <p className="mt-3 max-w-prose text-sm text-slate-500">
           You have not been assigned a job role yet, so you have no procedures to sign.
           Ask an administrator to set your job role.
@@ -105,7 +105,7 @@ export default async function SopListPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Standard operating procedures</h1>
+      <h1 className="text-xl font-semibold">My Procedures</h1>
       {rows.length === 0 ? (
         <p className="mt-3 max-w-prose text-sm text-slate-500">
           There are no published procedures for your role yet.

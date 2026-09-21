@@ -49,8 +49,11 @@ export function SiteNav(props: SiteNavProps) {
   }, []);
 
   // Plain staff (build addendum item 2, revised): Home, My details,
-  // Procedures, Policies. No admin-facing duplicate of anything exists for
-  // this tier, so there is nothing to disambiguate - the flat nav stays.
+  // My Procedures, My Policies - "My" throughout since these are this
+  // person's own destinations (matching the page headings themselves), the
+  // same reasoning as the leader's "My Portal" group below. No admin-facing
+  // duplicate of anything exists for this tier, so there is nothing to
+  // disambiguate - the flat nav stays flat, just labelled consistently.
   // Leaders get a different structure below: the personal ("My Portal") and
   // the administrative ("Our Staff" / "Our Workflow") views used to share
   // identical labels ("Procedures", "Policies") in two different places -
@@ -62,8 +65,8 @@ export function SiteNav(props: SiteNavProps) {
     : [
         { href: "/home", label: "Home" },
         { href: "/onboarding", label: "My details" },
-        { href: "/sops", label: "Procedures" },
-        { href: "/policies", label: "Policies" },
+        { href: "/sops", label: "My Procedures" },
+        { href: "/policies", label: "My Policies" },
       ];
 
   // My Portal: this person's own procedures, policies, agreements and
@@ -115,16 +118,18 @@ export function SiteNav(props: SiteNavProps) {
   // the previous "Manage > Library" group. Content editors get the full
   // authoring set; any manager keeps Procedures too, since Review cycle v2
   // lets manager_staff complete a review even though only a content editor
-  // may revise and republish the text.
+  // may revise and republish the text. Labelled "Our X" throughout (matching
+  // the page headings themselves) so this organisation-wide view never reads
+  // like the personal "My X" one in My Portal, even though several items
+  // share a destination path. Parent portal access sits last - it is
+  // day-to-day admin, not core content work, and used far less often than
+  // the items above it.
   const ourWorkflowGroups: NavGroup[] = [];
   if (canEditContent || canCountersign || canViewReports || canViewParentPortal) {
     const items: Item[] = [];
-    if (canEditContent) items.push({ href: "/admin/policies", label: "Policies" });
-    if (canViewParentPortal) {
-      items.push({ href: "/admin/parent-portal", label: "Parent portal access" });
-    }
+    if (canEditContent) items.push({ href: "/admin/policies", label: "Our Policies" });
     if (canEditContent || canCountersign) {
-      items.push({ href: "/admin/sops", label: "Procedures" });
+      items.push({ href: "/admin/sops", label: "Our Procedures" });
     }
     if (canCountersign) {
       items.push({ href: "/admin/outcome-flags", label: "Outcome flags" });
@@ -134,6 +139,9 @@ export function SiteNav(props: SiteNavProps) {
     }
     if (canViewReports) items.push({ href: "/reports", label: "Reports" });
     if (isAdmin) items.push({ href: "/admin/organisation", label: "Organisation" });
+    if (canViewParentPortal) {
+      items.push({ href: "/admin/parent-portal", label: "Parent portal access" });
+    }
     ourWorkflowGroups.push({ label: null, items });
   }
   const showOurWorkflow = ourWorkflowGroups.length > 0;
