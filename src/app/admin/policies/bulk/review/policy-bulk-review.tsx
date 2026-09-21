@@ -26,6 +26,7 @@ type Row = {
   duplicateScore: number | null;
   filenameFlag: boolean;
   blankFlag: boolean;
+  needsReview: boolean;
 };
 
 type Action = "create" | "skip" | "replace";
@@ -202,7 +203,7 @@ export function PolicyBulkReview({
       {rows.map((r) => {
         const s = state[r.stagingId];
         const linkable = sops.filter((p) => !s.linkedSopIds.includes(p.id));
-        const flagged = r.duplicateOfId || r.filenameFlag || r.blankFlag;
+        const flagged = r.duplicateOfId || r.filenameFlag || r.blankFlag || r.needsReview;
         return (
           <div
             key={r.stagingId}
@@ -234,6 +235,11 @@ export function PolicyBulkReview({
                   {r.filenameFlag && (
                     <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700">
                       Looks like a filename
+                    </span>
+                  )}
+                  {r.needsReview && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+                      Needs review
                     </span>
                   )}
                 </div>

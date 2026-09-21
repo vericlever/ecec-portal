@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { markdownToSpeechText } from "@/lib/markdown-to-speech";
 
 type Status = "idle" | "playing" | "paused";
 
@@ -80,7 +81,7 @@ export function ReadAloud({ text }: { text: string }) {
   function start() {
     const synth = window.speechSynthesis;
     synth.cancel();
-    chunks.current = text
+    chunks.current = markdownToSpeechText(text)
       .split(/(?<=[.!?:])\s+|\n+/)
       .map((s) => s.trim())
       .filter(Boolean);

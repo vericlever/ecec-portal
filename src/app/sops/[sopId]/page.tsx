@@ -13,6 +13,7 @@ import {
   signingState,
 } from "@/lib/signoff-clock";
 import { cleanSigningWindow } from "@/lib/constants";
+import { MarkdownBody } from "@/components/markdown-body";
 
 export const dynamic = "force-dynamic";
 
@@ -132,9 +133,11 @@ export default async function SopDetailPage({
       )}
 
       <article className="mt-3 rounded-lg border border-slate-200 bg-white p-5">
-        <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
-          {sop.published_body || "(No text)"}
-        </div>
+        {sop.published_body ? (
+          <MarkdownBody text={sop.published_body} />
+        ) : (
+          <p className="text-[15px] text-slate-800">(No text)</p>
+        )}
       </article>
 
       {policies.length > 0 && (

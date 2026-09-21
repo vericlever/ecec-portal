@@ -12,6 +12,7 @@ export type StoredDocument = {
   byte_size: number | null;
   extracted_text: string | null;
   extraction_note: string | null;
+  needs_review: boolean;
   created_at: string;
 };
 
@@ -40,6 +41,7 @@ export async function uploadAndExtract(opts: {
       storagePath: string;
       extractedText: string | null;
       extractionNote: string | null;
+      needsReview: boolean;
     }
   | { ok: false; error: string }
 > {
@@ -57,17 +59,20 @@ export async function uploadAndExtract(opts: {
 
   let extractedText: string | null = null;
   let extractionNote: string | null = null;
+  let needsReview = false;
   try {
     const extracted = await extractDocument(opts.fileName, opts.bytes);
     extractedText = extracted.text || null;
     extractionNote = extracted.note ?? null;
+    needsReview = extracted.needsReview;
   } catch (e) {
     extractionNote =
       "Could not read the document automatically: " +
       (e instanceof Error ? e.message : "unknown error");
+    needsReview = true;
   }
 
-  return { ok: true, storagePath: path, extractedText, extractionNote };
+  return { ok: true, storagePath: path, extractedText, extractionNote, needsReview };
 }
 
 // Store an uploaded file: put the bytes in the private bucket, extract text,
@@ -117,9 +122,12 @@ export async function storeDocument(opts: {
       storage_path: uploaded.storagePath,
       extracted_text: uploaded.extractedText,
       extraction_note: uploaded.extractionNote,
+      needs_review: uploaded.needsReview,
       uploaded_by: opts.uploadedBy,
     })
-    .select("id, file_name, mime_type, byte_size, extracted_text, extraction_note, created_at")
+    .select(
+      "id, file_name, mime_type, byte_size, extracted_text, extraction_note, needs_review, created_at",
+    )
     .single();
 
   if (error) {

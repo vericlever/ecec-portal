@@ -27,6 +27,7 @@ import {
 } from "../actions";
 import { setActionStatus } from "./review/actions";
 import { TagPicker } from "@/app/admin/_tags/tag-picker";
+import { MarkdownBody } from "@/components/markdown-body";
 import { ComprehensionEditor, type ComprehensionQuestionRow } from "./comprehension-editor";
 import {
   CHILD_SAFE_STANDARDS,
@@ -131,13 +132,20 @@ export function SopEditor({
   const published = sop.published_version != null;
   const dirty = body !== sop.published_body;
 
-  function act(fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) {
+  function act(
+    fn: () => Promise<{ ok: boolean; error?: string; needsReview?: boolean }>,
+    done?: string,
+  ) {
     start(async () => {
       setErr(null);
       setMsg(null);
       const r = await fn();
       if (r.ok) {
-        setMsg(done ?? "Saved");
+        setMsg(
+          r.needsReview
+            ? `${done ?? "Saved"}. This was converted automatically - please check headings and tables look right.`
+            : (done ?? "Saved"),
+        );
         router.refresh();
       } else {
         setErr(r.error ?? "Something went wrong.");
@@ -468,9 +476,9 @@ export function SopEditor({
             The procedure
           </h2>
           {published ? (
-            <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 font-mono text-xs text-slate-700">
-              {sop.published_body}
-            </pre>
+            <div className="mt-2 max-h-96 overflow-auto rounded-md bg-slate-50 p-3">
+              <MarkdownBody text={sop.published_body} />
+            </div>
           ) : (
             <p className="mt-2 text-sm text-slate-500">
               Not published yet. Only a content editor can add or publish the text.

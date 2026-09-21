@@ -95,13 +95,20 @@ export function PolicyEditor({
   const published = policy.published_version != null;
   const dirty = body !== policy.published_body;
 
-  function act(fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) {
+  function act(
+    fn: () => Promise<{ ok: boolean; error?: string; needsReview?: boolean }>,
+    done?: string,
+  ) {
     start(async () => {
       setErr(null);
       setMsg(null);
       const r = await fn();
       if (r.ok) {
-        setMsg(done ?? "Saved");
+        setMsg(
+          r.needsReview
+            ? `${done ?? "Saved"}. This was converted automatically - please check headings and tables look right.`
+            : (done ?? "Saved"),
+        );
         router.refresh();
       } else {
         setErr(r.error ?? "Something went wrong.");

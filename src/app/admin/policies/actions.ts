@@ -358,7 +358,7 @@ export async function deletePolicy(id: string): Promise<Result> {
 export async function uploadPolicyDocument(
   id: string,
   formData: FormData,
-): Promise<Result> {
+): Promise<{ ok: true; needsReview: boolean } | { ok: false; error: string }> {
   const owned = await ownedPolicy(id);
   if (!owned) return { ok: false, error: "Policy not found." };
   const file = formData.get("file");
@@ -402,7 +402,7 @@ export async function uploadPolicyDocument(
   await db.from("policies").update(patch).eq("id", id);
 
   revalidatePath(`/admin/policies/${id}`);
-  return { ok: true };
+  return { ok: true, needsReview: stored.document.needs_review };
 }
 
 export async function linkSop(policyId: string, sopId: string): Promise<Result> {
@@ -496,6 +496,7 @@ export async function stageBulkPolicies(
         duplicate_score: dup?.score ?? null,
         filename_flag: looksLikeFilename(title),
         blank_flag: isBlankContent(uploaded.extractedText),
+        needs_review: uploaded.needsReview,
         created_by: me.id,
       });
       if (error) failed += 1;

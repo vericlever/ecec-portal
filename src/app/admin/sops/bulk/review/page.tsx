@@ -41,7 +41,7 @@ export default async function SopBulkReviewPage({
     supabase
       .from("bulk_upload_staging")
       .select(
-        "id, organisation_id, kind, original_filename, derived_title, extracted_text, extraction_note, duplicate_of_id, duplicate_of_name, duplicate_score, filename_flag, blank_flag, status",
+        "id, organisation_id, kind, original_filename, derived_title, extracted_text, extraction_note, duplicate_of_id, duplicate_of_name, duplicate_score, filename_flag, blank_flag, needs_review, status",
       )
       .eq("batch_id", batchId)
       .eq("kind", "sop")
@@ -79,6 +79,7 @@ export default async function SopBulkReviewPage({
       duplicateScore: s.duplicate_score as number | null,
       filenameFlag: s.filename_flag as boolean,
       blankFlag: s.blank_flag as boolean,
+      needsReview: s.needs_review as boolean,
     }));
 
   const failed = Number(searchParams.failed ?? 0);

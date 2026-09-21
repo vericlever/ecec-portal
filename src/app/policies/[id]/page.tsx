@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { fmtDateTime } from "@/lib/format-date";
+import { MarkdownBody } from "@/components/markdown-body";
 
 export const dynamic = "force-dynamic";
 
@@ -77,8 +78,12 @@ export default async function PolicyViewPage({
         </p>
       )}
 
-      <article className="mt-5 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-5 text-sm leading-relaxed text-slate-800">
-        {policy.published_body || "(No text)"}
+      <article className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
+        {policy.published_body ? (
+          <MarkdownBody text={policy.published_body} />
+        ) : (
+          <p className="text-sm text-slate-800">(No text)</p>
+        )}
       </article>
 
       {(sops ?? []).length > 0 && (
