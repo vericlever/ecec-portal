@@ -326,6 +326,49 @@ export async function uploadSopDocument(
   return { ok: true, needsReview: stored.document.needs_review };
 }
 
+// The reverse direction of linkSop/unlinkSop in ../policies/actions.ts - same
+// policy_sop_links table, entered from the procedure side instead of the
+// policy side. Several SOPs are governed by more than one policy, so this is
+// a genuine many-to-many a director needs to manage from either record, not
+// just from the policy that happened to be open when the link was made.
+export async function linkPolicy(sopId: string, policyId: string): Promise<Result> {
+  const owned = await ownedSop(sopId);
+  if (!owned) return { ok: false, error: "Procedure not found." };
+  const db = createClient();
+  const { data: policy } = await db
+    .from("policies")
+    .select("id, organisation_id")
+    .eq("id", policyId)
+    .maybeSingle();
+  if (!policy || policy.organisation_id !== owned.sop.organisation_id) {
+    return { ok: false, error: "That policy is not in your organisation." };
+  }
+  const { error } = await db.from("policy_sop_links").insert({
+    organisation_id: owned.sop.organisation_id,
+    policy_id: policyId,
+    sop_id: sopId,
+  });
+  if (error && !error.message.includes("duplicate")) {
+    return { ok: false, error: error.message };
+  }
+  revalidatePath(`/admin/sops/${sopId}`);
+  return { ok: true };
+}
+
+export async function unlinkPolicy(sopId: string, policyId: string): Promise<Result> {
+  const owned = await ownedSop(sopId);
+  if (!owned) return { ok: false, error: "Procedure not found." };
+  const db = createClient();
+  const { error } = await db
+    .from("policy_sop_links")
+    .delete()
+    .eq("policy_id", policyId)
+    .eq("sop_id", sopId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/sops/${sopId}`);
+  return { ok: true };
+}
+
 export async function setJobRole(
   sopId: string,
   jobRoleId: string,

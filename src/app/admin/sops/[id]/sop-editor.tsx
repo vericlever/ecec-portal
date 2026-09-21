@@ -16,10 +16,12 @@ import { HISTORY_EVENT_LABELS, fmtReviewDate, reviewState } from "@/lib/sop-revi
 import { fmtDateTime } from "@/lib/format-date";
 import {
   deleteSop,
+  linkPolicy,
   publishSop,
   setJobRole,
   setSopChildSafeStandard,
   setSopQualityArea,
+  unlinkPolicy,
   unpublishSop,
   updateSopBody,
   updateSopMeta,
@@ -78,6 +80,8 @@ export function SopEditor({
   services,
   jobRoles,
   linkedRoleIds,
+  allPolicies,
+  linkedPolicies,
   qualityAreaIds,
   childSafeStandardIds,
   signOffCount,
@@ -95,6 +99,8 @@ export function SopEditor({
   services: { id: string; name: string }[];
   jobRoles: { id: string; name: string; is_placeholder: boolean }[];
   linkedRoleIds: string[];
+  allPolicies: { id: string; name: string }[];
+  linkedPolicies: { id: string; name: string }[];
   qualityAreaIds: number[];
   childSafeStandardIds: number[];
   signOffCount: number;
@@ -128,6 +134,7 @@ export function SopEditor({
 
   const fileRef = useRef<HTMLInputElement>(null);
   const linked = new Set(linkedRoleIds);
+  const [policyToAdd, setPolicyToAdd] = useState("");
 
   const published = sop.published_version != null;
   const dirty = body !== sop.published_body;
@@ -636,6 +643,65 @@ export function SopEditor({
                   )
                 }
               />
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Linked Policies
+            </h2>
+            {linkedPolicies.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">No policies linked.</p>
+            ) : (
+              <ul className="mt-2 space-y-1 text-sm">
+                {linkedPolicies.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between">
+                    <span>{p.name}</span>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        act(() => unlinkPolicy(sop.id, p.id), "Unlinked")
+                      }
+                      className="text-xs text-slate-400 underline hover:text-slate-700"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                list="policy-options"
+                value={policyToAdd}
+                onChange={(e) => setPolicyToAdd(e.target.value)}
+                placeholder="Find a policy by name"
+                className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              />
+              <datalist id="policy-options">
+                {allPolicies.map((p) => (
+                  <option key={p.id} value={p.name} />
+                ))}
+              </datalist>
+              <button
+                type="button"
+                disabled={pending || !policyToAdd.trim()}
+                onClick={() => {
+                  const match = allPolicies.find(
+                    (p) => p.name.toLowerCase() === policyToAdd.trim().toLowerCase(),
+                  );
+                  if (!match) {
+                    setErr("Pick a policy from the list.");
+                    return;
+                  }
+                  act(() => linkPolicy(sop.id, match.id), "Linked");
+                  setPolicyToAdd("");
+                }}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-40"
+              >
+                Link
+              </button>
             </div>
           </section>
 

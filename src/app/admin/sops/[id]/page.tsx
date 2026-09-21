@@ -18,11 +18,12 @@ export default async function SopDetailPage({
   const canEdit = canEditContent(me.access_tier);
   const supabase = createClient();
 
-  const [{ data: sop }, { data: services }, { data: jobRoles }] =
+  const [{ data: sop }, { data: services }, { data: jobRoles }, { data: allPolicies }] =
     await Promise.all([
       supabase.from("sops").select("*").eq("id", params.id).maybeSingle(),
       supabase.from("services").select("id, name").order("name"),
       supabase.from("job_roles").select("id, name, is_placeholder").order("name"),
+      supabase.from("policies").select("id, name").order("name"),
     ]);
 
   if (!sop || sop.organisation_id !== me.organisation_id) notFound();
@@ -34,6 +35,7 @@ export default async function SopDetailPage({
     { data: editHistory },
     { data: reviewHistory },
     { data: openActions },
+    { data: policyLinks },
   ] = await Promise.all([
     sop.source_document_id
       ? supabase
@@ -66,6 +68,7 @@ export default async function SopDetailPage({
       .eq("sop_id", params.id)
       .eq("status", "open")
       .order("due_date", { ascending: true }),
+    supabase.from("policy_sop_links").select("policy_id").eq("sop_id", params.id),
   ]);
 
   const actorIds = [
@@ -119,6 +122,8 @@ export default async function SopDetailPage({
   }));
 
   const linkedRoleIds = new Set((links ?? []).map((l) => l.job_role_id));
+  const linkedPolicyIds = new Set((policyLinks ?? []).map((l) => l.policy_id));
+  const policyName = new Map((allPolicies ?? []).map((p) => [p.id, p.name]));
   const tags = await documentTags(supabase, "sop", params.id);
   const categories = await procedureCategories(supabase);
   const reviewStatus = await sopReviewStatusFor(supabase, params.id);
@@ -177,6 +182,11 @@ export default async function SopDetailPage({
           }[]
         }
         linkedRoleIds={Array.from(linkedRoleIds) as string[]}
+        allPolicies={(allPolicies ?? []) as { id: string; name: string }[]}
+        linkedPolicies={Array.from(linkedPolicyIds).map((id) => ({
+          id: id as string,
+          name: policyName.get(id) ?? "Policy",
+        }))}
         qualityAreaIds={tags.qualityAreas}
         childSafeStandardIds={tags.childSafeStandards}
         signOffCount={signCount ?? 0}
