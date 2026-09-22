@@ -9,7 +9,7 @@ specs and the migration set on the live Supabase project.
 disagree, this file is the more recent and the discrepancies are listed under
 "Corrections against BUILD_PLAN.md" below.
 
-Last reconciled against `main` at commit `d977222` (8 September 2026).
+Last reconciled against `main` at commit `74d8822` (21 September 2026).
 
 ## External review status
 
@@ -31,37 +31,44 @@ done / in progress / not started as it is worked._
 
 ## Where things stand
 
-As of commit `d977222`, 8 September 2026.
+As of commit `74d8822`, 21 September 2026.
 
-- **Built and on `main`:** Steps 1 to 12, and Steps 14 to 27. The public marketing
-  site and sign-in restyle, and a portal-wide Bauhaus visual refresh, are also on
-  `main`.
+- **Built and on `main`, deployed:** Steps 1 to 12, 14 to 56 (see the step table; a
+  handful of numbers in that range were never allocated to a standalone step and
+  their work is described in the chronological log instead). The public marketing
+  site, sign-in restyle, portal-wide Bauhaus visual refresh, the parent portal, and
+  the full Markdown conversion pipeline are all on `main`. **The app is deployed on
+  Vercel** at `vericlever.site` and its `www` alias - no longer localhost-only. This
+  closes the single biggest blocker in the previous version of this log.
 - **Superseded:** Step 13 (compliance heatmap), folded into Step 27's admin overview
-  page.
-- **Parked, blocked on the sending domain:** Step 9 (Reg 172 parent notification), and
-  the outbound-email half of Steps 5, 7, 10, 11 and 19. Every in-portal side is built.
-  The daily reminder cron (Step 19) runs and sends nothing useful until `vericlever.site`
-  is verified in Resend and `RESEND_FROM` plus `CRON_SECRET` are set in Vercel.
+  page. Steps 20, 21 and 22 (the original SOP review cycle, practice observation and
+  outcome evidence design) were replaced wholesale by Review cycle v2
+  (`REVISION_REVIEW_CYCLE_V2.md`, migrations 0046 to 0050, 10 September) - see the
+  step table and "Corrections" below.
+- **RSG's real content is loaded.** 70 policies, 129 SOPs and their links were
+  restored via the admin bulk upload screens (not the original SQL importer), then
+  every document with a stored source file was reprocessed through the Step 56
+  Markdown pipeline on 21 September - 150 of 151 documents changed, 141 already-
+  published ones were re-published to a new version. See the Step 56 row and the
+  21 September chronological entry.
+- **Sending domain: very likely resolved, not reconfirmed in this log.**
+  `RESEND_FROM`, `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET` and `PARENT_ACCESS_SECRET` are
+  all set in `.env.local`, and the parent portal's access secret was walked through
+  live on Vercel with Zeke. Nobody has re-run a live email send-test since to put this
+  beyond doubt - worth a quick check before relying on it for the reminder engine or
+  Reg 172 notifications.
 - **Cut:** Step 5e (training.gov.au RTO register mirror), built then removed, migration
   0022. The original Step 12 webhook receiver for external course completions, cut
   3 September, never built.
-- **Not independently verified:** Steps 25, 26 and 27 carry Claude's own "verified"
-  note but have not been checked against real logins by Zeke. Step 26 in particular is
-  still marked "not started" in `BUILD_PLAN.md` although the code is on `main`.
+- **Not independently verified:** most work from Step 25 onward carries Claude's own
+  "verified" note (or no verification note at all in this log) but has not been
+  checked against real logins by Zeke. This got worse, not better, as pace picked up
+  from 9 September - see the per-step "Verified by Zeke" column, mostly "Not
+  recorded" for that stretch. The exceptions, checked live with Zeke in the room, are
+  the parent portal, the bulk upload defaults/tagging work, and Step 56.
 
-Migrations `0001` to `0038` are all applied to the Sydney (ap-southeast-2) Supabase
-project. `main` is in sync with `origin/main` (last fetch 8 September 2026, 09:38);
-treat the GitHub push as done but confirm on the remote.
-
-Two things still block RSG staff actually using the portal, both outside the numbered
-steps:
-
-1. **RSG's real SOPs and policies are not loaded.** They were cleared on 2 September
-   for a clean upload trial and never restored. Re-run `supabase/import/rsg/rsg_import.sql`
-   (70 policies, 129 SOPs, 56 links) plus seeds `0004` and `0005`, or upload the current
-   versions through the admin screens and classify them into categories.
-2. **Nothing is deployed.** It runs on localhost against the live Supabase database.
-   It needs to be on Vercel at a real address with the environment variables set.
+Migrations `0001` to `0073` are all applied to the Sydney (ap-southeast-2) Supabase
+project. `main` is in sync with `origin/main` as of this reconciliation.
 
 ## Step completion table
 
@@ -94,14 +101,34 @@ steps:
 | 18 | Payroll and screening | Done, on `main` | 0030 | `166f921` | Yes, against real logins |
 | Policy categories | Per-org policy categories, replaces the parent-facing checkbox | Done, on `main` | 0031 | `d8af549` | Yes |
 | 19 | Daily reminder engine | Done, on `main`. Sends nothing useful until the domain is verified | 0034 | `ab2f949`, `289fc40` | Dry run and a live run on localhost |
-| 20 | SOP review cycle and history log | Done, on `main` | 0036 | `b1ebf6b`, `c819da4` | Not independently verified |
-| 21 | SOP practice observation record | Done, on `main` | 0037 | `dc29b9c`, `f7b8dc5` | Claude end to end, not independently verified |
-| 22 | SOP outcome evidence capture, plus the RLS review | Done, on `main` | 0038 | `e9729bc`, `f4d22a0` | RLS review scripted and passed. Feature not independently verified |
+| 20 | SOP review cycle and history log | Superseded by Review cycle v2, 10 September (see below) | 0036, superseded by 0046-0050 | `b1ebf6b`, `c819da4` | Not independently verified |
+| 21 | SOP practice observation record | Superseded by Review cycle v2, 10 September (see below) | 0037, superseded by 0046-0050 | `dc29b9c`, `f7b8dc5` | Claude end to end, not independently verified |
+| 22 | SOP outcome evidence capture, plus the RLS review | Superseded by Review cycle v2, 10 September. The RLS review itself stands | 0038, superseded by 0046-0050 | `e9729bc`, `f4d22a0` | RLS review scripted and passed. Feature not independently verified |
 | 23 | Password reset, self-service and admin-triggered | Done, on `main`. Needs Step 19's email to actually send | 0035 | `98a4be1` | Claude end to end on localhost |
 | 24 | Two-page bulk upload wizard for SOPs and policies | Done, on `main` | 0032, 0033 | `bac7cf9`, `d15d09f`, `1087d7d` | Not independently verified. Trial-relevant |
 | 25 | Itemised outstanding items on the staff profile | Done, on `main` | (none) | `9065cf5` | Claude checked against Sam and the team roll-up, not independently verified |
 | 26 | Staff record editors for job role and access tier | Code on `main`, `BUILD_PLAN.md` still says "not started" | (none) | `5e97e24` | No. Trial blocker, needs a real check |
 | 27 | Admin overview page, folds in the old Step 13 heatmap | Done, on `main` | (none) | `172cf17` | Claude as admin and as manager_staff, not independently verified |
+| 28 | NQS quality area tagging, policies and SOPs | Done, on `main` | 0039 | `6a076da` | Not recorded in this log |
+| 29 | Victorian Child Safe Standard tagging, policies and SOPs | Done, on `main` | 0040 | `6a076da` | Not recorded in this log |
+| 30 to 38 | Reports page and 8 downloadable PDF reports | Done, on `main` | (none) | `38a84f2` | Not recorded in this log |
+| 39 | Contract signature revision: independent countersignature slot, hash of the signed document | Done, on `main` | 0042 | `4e2c49a`, `128be5e` | Not recorded in this log |
+| 40 | Admin can complete their own onboarding and self-edit | Done, on `main` | (none) | `a26bad1`, `eab3ac5` | Not recorded in this log |
+| 41 | Rename "SOP" to "Procedure" in every user-facing surface | Done, on `main` | (none) | `bb732d2` | Not recorded in this log |
+| 42 | Password field show/hide toggle | Done, on `main` | (none) | `cc1e53f` | Not recorded in this log |
+| Review cycle v2 | Replaces Steps 20 to 22: `sop_reviews` review event, review actions, 6-month default cadence, needs-revision queue behaviour, published-event fix | Done, on `main` | 0046, 0047, 0048, 0049, 0050 | `82c9411`, `4f46b07`, `72f9515`, `5a2e377`, `6f0f99a` | RLS cross-tenant probes extended and passed (`9cb9fa1`, `ed1d5ab`). Feature not independently verified |
+| 43 | Organisation timezone, fixes UTC/local date display bugs | Done, on `main` | 0056 | `a18326a` | Not recorded in this log |
+| 44 | Signing clock: per-procedure signing window, role-start-based due dates, pause/leave state | Done, on `main`. Field renamed "signing priority" to "signing window" the same week | 0057, 0058, 0059 | `8755da8`, `56160f6`, `70e370d` | Not recorded in this log |
+| 45 | Notification log: Resend delivery tracking and hard-bounce suppression | Done, on `main` | 0059 | `e69346b` | Not recorded in this log |
+| 46 | Comprehension checks before signing a procedure | Done, on `main` | 0062 | `b5e1fa1` | Not recorded in this log |
+| 47 | Bulk upload review queue and duplicate detection | Done, on `main`. Extended 15 September with batch defaults and NQS/Child Safe Standard tagging on the review screen (see 21 September entry) | 0060, 0069, 0070 | `258eefa`, `f97701e`, `ed9f738` | Not recorded in this log for the original step. Bulk review dropdown tagging checked live by Claude, confirmed by Zeke against two screenshots |
+| 48 | Search on the admin Procedures and Policies lists | Done, on `main` | 0061 | `4bb6a64` | Not recorded in this log |
+| 49 | Support contact points at a monitored address | Done, on `main` | (none) | `9f67a37` | Not recorded in this log |
+| 51 | Platform Terms of Use and Privacy Notice acceptance gate | Done, on `main` | 0064 | `3400407`, `cdf8769` | Not recorded in this log |
+| 53 | Chain graphic on the admin overview | Done, on `main` | (none) | `de3fb27`, `f56684a` | Not recorded in this log |
+| 54 | Split leader nav into My Portal, Our Staff and Our Workflow | Done, on `main`. Extended 21 September: Our Workflow's items renamed "Our Policies" / "Our Procedures" to read as distinct from the personal "My" pages, Parent portal access moved to the end of that menu, and the plain-staff flat nav (no admin duplicate to disambiguate from) renamed to match | 0039 to 0073, none specific to this step | `498a1a4`, `74d8822` | The original split not recorded in this log. The 21 September rename checked live by Claude against both tenants, confirmed by Zeke against a live screenshot |
+| 55 | Training status page | Done, on `main` | (none) | `9337d93` | Not recorded in this log |
+| 56 | Convert docx/html/pdf uploads to Markdown; backfill all 151 existing RSG documents; let a procedure link to its governing policies, not just the reverse | Done, on `main` | 0071, 0072, 0073 | `3ed7065`, `db50b6f` | Yes. Verified end to end against a hand-built test docx and against real RSG content (`scripts/reprocess-documents.ts` dry run then apply, `scripts/bulk-republish.ts`), including catching and fixing a real bug (an embedded image was being inlined as base64 into the stored body). Policy-procedure linking verified live on the Science Kinder tenant in both directions, then the test link removed |
 
 ## Migration register
 
@@ -148,6 +175,41 @@ written.
 | 0036_sop_history.sql | `sop_history` event log (edit / period_change / review) |
 | 0037_sop_observations.sql | `sop_observations` and `sops.needs_review` |
 | 0038_evidence_and_rls_review.sql | SOP suggested-evidence and per-observation file. RLS fixes: `documents_select` scoped to the owning record, `sign_offs_insert` and `policy_views_insert` restricted to self, `credentials` and `notification_rules` tightened |
+| 0039_quality_area_tagging.sql | Step 28. Global NQS quality area lookup (7, fixed by ACECQA) and the tagging junction table |
+| 0040_child_safe_standard_tagging.sql | Step 29. Same pattern as 0039, for the 11 Victorian Child Safe Standards |
+| 0041_fix_import_documents_fn.sql | Repairs `import_documents()` (0005), broken by schema changes since (renamed `sites` to `services` and others) |
+| 0042_contract_signatures.sql | Step 39. Independent countersignature slot alongside the original signed_at/signed_name, hash of the exact document signed |
+| 0043_default_job_roles.sql | Seeds the 5 standard job roles for every organisation automatically, so a new tenant's role picker is never empty |
+| 0044_rls_for_app_write_paths.sql | Stops every Server Action bypassing RLS via the service-role client. Makes RLS the real enforcement layer instead of a backstop nothing actually exercises |
+| 0045_sign_offs_countersign_fix.sql | Closes a self-countersign gap found while extending `rls-check.mjs` against the manager-cosign path |
+| 0046_review_event.sql | Review cycle v2, section 2. `sop_reviews`, dropping `sops.needs_review`, `sops.next_review_date` and `sop_observations` in the same migration - supersedes Steps 20-22 |
+| 0047_review_actions.sql | Review cycle v2 continued. Optional actions raised by a review |
+| 0048_review_period_default.sql | Review cycle v2 continued. 6-month default review cadence for SOPs and policies |
+| 0049_review_status_decision.sql | Review cycle v2 continued. A `needs_revision` decision surfaces in the content editor's queue as a query, not a stored boolean |
+| 0050_sop_history_published_event.sql | Fixes `sop_history_event_type_check` to allow the `published` event type the Review cycle v2 publish path writes |
+| 0051_procedure_categories.sql | Build addendum item 4. Procedure categories now share the policy taxonomy instead of a separate, drift-prone dropdown |
+| 0052_permanent_delete_fk_fixes.sql | Build addendum item 1. Fixes every foreign key referencing `profiles(id)` so a permanent staff delete actually succeeds regardless of linked history |
+| 0053_profiles_delete_admin_only.sql | Build addendum item 1 continued. Splits `profiles_write`'s shared USING clause so DELETE is Admin-only, separate from UPDATE |
+| 0054_profile_job_roles.sql | Supports more than one job role per profile (an Educational Leader needing both the Educator and Room Leader suites) |
+| 0055_sop_outcome_flags.sql | Build addendum, "My Outcomes". A staff member flags a procedure with a child-outcomes reflection, feeding the review cycle queue |
+| 0056_organisation_timezone.sql | Step 43. `organisations.timezone`, fixes timestamps rendering in server (UTC) time instead of the organisation's own |
+| 0057_signoff_priority.sql | Step 44, the signing clock. Per-procedure urgency; the clock starts from role assignment or first publish, whichever is later |
+| 0058_rename_signing_window.sql | Renames "priority to sign" to `signing_window`, clearing a name collision with the unrelated `sops.priority` display-order field |
+| 0059_signing_pause_and_notification_log.sql | Step 44 (pause/leave, modelled per person) and Step 45 (`notification_log`, Resend delivery tracking, hard-bounce suppression) |
+| 0060_bulk_upload_staging.sql | Step 47. `bulk_upload_staging`: a file is parsed and flagged before anything commits to `sops`/`policies`, instead of writing real rows on upload |
+| 0061_search_trigram.sql | Step 48. Trigram index so `ILIKE '%term%'` search on admin Procedures/Policies uses an index, not a sequential scan |
+| 0062_comprehension_checks.sql | Step 46. Reshapes the long-parked `comprehension_questions` table (0007, never used) into the real one-row-per-question design |
+| 0063_contracts_no_self_manage.sql | Raised while making Admin accounts visible as full staff members. Prevents an Admin managing their own contract |
+| 0064_platform_notice.sql | Step 51. The Vericlever Platform Terms of Use and Privacy Notice, authored by the Operator, same document for every tenant |
+| 0065_organisation_display_name.sql | Admin-editable organisation display name shown in the nav, separate from the canonical tenant name |
+| 0066_bulk_delete_content.sql | Admin portal management page: bulk-delete every procedure or every policy in one action, for a full library replacement |
+| 0067_parent_portal_access.sql | One shared access code per service, gating a public no-login page listing that service's parent-facing policies as downloads |
+| 0068_parent_portal_access_fk_fix.sql | Ties `service_parent_access.service_id` to the same `organisation_id` as the row itself, closing a cross-tenant write gap in 0067 |
+| 0069_bulk_sop_tags.sql | Gives the bulk SOP review screen the quality area / Child Safe Standard tagging every single-SOP edit already had |
+| 0070_bulk_policy_tags.sql | Same gap as 0069, on the policy side |
+| 0071_conversion_review_flag.sql | Step 56. `needs_review` boolean on `bulk_upload_staging` and `documents`, set automatically for every PDF and any docx/html the grouping-row heuristic couldn't confidently resolve |
+| 0072_bulk_sop_needs_review.sql | Step 56. Carries `bulk_upload_staging.needs_review` through to the `documents` row `commit_bulk_sops` creates |
+| 0073_bulk_policy_needs_review.sql | Step 56. Same change as 0072, on the policy side |
 
 ## Chronological log
 
@@ -205,6 +267,96 @@ click-through built. Public marketing site and restyled sign-in built. Portal-wi
 Bauhaus visual refresh, cosmetic only. Dropdown menu z-index fix. **Supabase dev review
 this date, revisions pending.**
 
+### 9 September 2026
+
+`BUILD_LOG.md` itself added as the consolidated build record (this file). Step 28 NQS
+quality area tagging and Step 29 Child Safe Standard tagging built together. Step 40
+Admin self-onboarding and self-edit built, then a follow-up keeping Agreements and My
+Details out of Admin's own top nav. Step 42 password show/hide toggle. Steps 30 to 38:
+the Reports page and 8 downloadable PDF reports built in one pass. Step 39 contract
+signature revision (independent countersignature slot, document hash) started and
+finished the same day. The 5 standard job roles seeded automatically for every
+organisation, so a new tenant's role picker is never empty (Zeke's feedback: Science
+Kinder only had its one throwaway isolation fixture). Step 41: "SOP" renamed
+"Procedure" across every user-facing surface. Practice observations renamed Procedure
+Outcomes and moved into the Library nav group. Claude Code's local settings file
+untracked from git.
+
+### 10 September 2026
+
+Reports found 500ing in production, fixed across three commits: `@react-pdf/renderer`
+marked external, then pdfkit's standard font files and its glyph-names chunk both had
+to be included in the deployed function - none of this surfaced locally, only once
+actually deployed. **A real architectural correction**: every Server Action had been
+doing its own tier check in TypeScript and then writing through the service-role
+client, which bypasses RLS entirely - meaning nothing in the database was actually
+enforcing the boundary the app relied on. Migration 0044 rewrites RLS to cover every
+app write path, making it the real enforcement layer rather than a backstop nothing
+exercised. A self-countersign gap closed the same way, found by extending
+`rls-check.mjs` to exercise the manager-cosign path. **Review cycle v2** built across
+four sections the same day: the ten deletions from the old design, the `sop_reviews`
+review event schema (migrations 0039 to 0041 per the original commit message, though
+the migrations as numbered on disk are 0046 to 0050 - see the migration register), the
+review event itself, and the consolidated procedure page. A reverse-direction
+cross-tenant probe added for `sop_reviews`. A final regression pass fixed a migration
+number collision and one real bug.
+
+### 11 September 2026
+
+Build addendum item 4: procedure categories now share the policy taxonomy instead of a
+separate dropdown that duplicated the job-role list and drove nothing. Build addendum
+item 1: staff account name, email, active status and permanent delete, plus a
+cross-tenant probe for the new profiles delete-admin-only policy. Fixed leaders landing
+on the staff destination instead of `/admin` after login. Build addendum item 2: staff
+home page. Build addendum item 1 continued: inactive staff greyed out and
+section-split on the staff list.
+
+### 12 September 2026
+
+Home page chain icons fixed and worklist items made clickable. Policies nav tab
+restored and the home page redesigned into four stage sections (Policy, Procedure,
+Training, Outcomes - the model the public marketing copy also uses). Multiple job
+roles per person supported (feeds "My Training" breakdown). Review cycle v2 branch
+merged into `step-staff-account-management`. Build addendum "My Outcomes": a staff
+member can flag a procedure with a child-outcomes reflection, feeding the review cycle
+queue. Organisation timezone added (Step 43), fixing timestamps that had been
+rendering in server (UTC) time rather than the organisation's own.
+
+### 13 September 2026
+
+Step 44, the signing clock: per-procedure signing priority and role-start-based due
+dates. A staff-list compliance denominator bug and a silent password-reset link loss
+bug both fixed. Signing priority renamed signing window, clearing a name collision with
+the unrelated display-order `sops.priority` field before it reached anyone outside the
+session. Step 44 continued: pause/leave state, modelled per person rather than per
+assignment, and a due-soon state for the signing clock. Step 45: notification log,
+Resend delivery tracking and hard-bounce suppression.
+
+### 14 September 2026
+
+A duplicate React key on the admin overview's integrity cards fixed. Step 47: bulk
+upload review queue and duplicate detection, so a file is parsed and flagged before
+anything commits to real `sops`/`policies` rows. Step 48: search on the admin
+Procedures and Policies lists, backed by a trigram index. Step 54: the leader nav split
+into My Portal, Our Staff and Our Workflow, replacing a single catch-all "Manage" menu
+that gave a manager no way to tell the personal and administrative views apart when
+they shared identical labels. Step 46: comprehension checks before signing a
+procedure. My Details made a permanent entry in the My Portal dropdown regardless of
+tier, admins included. The account-delete confirmation phrase simplified and made
+case-insensitive. Admin accounts made visible as full staff members everywhere (they
+have no job role but are still a staff member underneath). Contract self-management
+locked to Admin only, closing a gap the above opened. Step 55: training status page.
+Step 53: chain graphic on the admin overview, with a follow-up fixing its label
+alignment and box overflow. Step 49: support contact pointed at a monitored address.
+Wordmark's signal glyph replaced with the closed-ring mark. Step 51: Platform Terms of
+Use and Privacy Notice acceptance gate, with a same-day fix for a raw ISO date
+rendering on the notice page. A second "My Outcomes" entry point added on the
+Procedures page. Admin-editable organisation display name added, shown to all staff in
+the nav. The nav's access-tier label swapped for the organisation name, with the tier
+badge moved to `/account`. Admin portal management page built: subscription
+information, support contact, and a bulk-delete-library action for a full content
+replacement.
+
 ### 15 September 2026
 
 Step 12 reduced to mobile capture and mobile nav. The installable-app (PWA) half -
@@ -234,6 +386,83 @@ Revisit after the trial, specifically if connectivity at Timboon or Mortlake tur
 be a problem for staff reading procedures on the floor. If it is restored, the personal
 device question must be answered in the staff terms first, not after.
 
+The rest of 15 September: invite/reset link fallback URL fixed and standardised on the
+`www` domain. FAQ page added and the landing/sign-in copy aligned to the design handoff
+bundle (no em dashes, "cycle" not "chain", "clear" not "short", the consultancy section
+removed entirely). Unread policies stopped counting as outstanding staff items, a
+staff-list wrapping bug fixed. **Parent portal built**: a public, no-login page per
+service listing its parent-facing policies as downloads, gated by one shared access
+code (migrations 0067, 0068), fully server-mediated rather than built on browser-side
+RLS. A Director can set their own memorable code instead of only a random one. A
+Vercel build break from unescaped JSX quotes fixed. Portal background-arc opacity
+matched to the design handoff exactly (0.13 to 0.14). Bulk SOP and bulk policy upload
+both gained a step-1 "defaults for this batch" screen (job roles/category/site/review
+period/signing window) and NQS quality area / Child Safe Standard tagging on the step-2
+review screen (migrations 0069, 0070) - checked end to end by Claude, confirmed working
+live by Zeke. A cookie `path` scoping bug then found and fixed the same day: parent
+portal file downloads were 404ing because the access cookie was scoped to
+`/parent/[serviceId]` while the download route lives at `/api/parent-documents/[id]`,
+so the browser never sent it there.
+
+### 16 September 2026
+
+Parent-portal-review Child Safe Standard/NQS pickers changed from checkbox lists to a
+chip-plus-dropdown `TagSelect` component (matching the existing "Job roles" / "Linked
+policies" picker pattern), replacing `TagPicker` on both bulk review screens to cut
+page length on a long bulk upload. Follow-up fix the same day: the Child Safe Standard
+`<select>` was overflowing its column because an unconstrained `<select>` auto-sizes to
+its longest option text - fixed with `w-full max-w-full` and stacking the two pickers
+instead of a 2-column grid.
+
+### 21 September 2026
+
+**Step 56: Markdown conversion.** Flattened plain-text extraction (`unpdf`, no docx
+parser) was losing all table and heading structure on every upload - a two-column
+metadata table or an NQS/Child Safe Standard reference table lost its row pairing
+entirely, regardless of tenant template. Docx (via `mammoth` + `turndown`, with a
+custom always-convert table rule and shape-only grouping-row heading detection - never
+matched against RSG's specific wording, verified against a different tenant's naming),
+html and pdf (via `unpdf`'s existing text-item font/position metadata, no new
+dependency) now all convert to Markdown on upload, rendered client-side with
+`react-markdown`. A `needs_review` flag is set automatically for every PDF and any
+docx/html the grouping-row heuristic could not confidently resolve, surfaced in the
+bulk review queue without ever gating the upload itself. A real bug was caught and
+fixed mid-build: an embedded screenshot inside a real policy was being inlined as a
+roughly 58 KB base64 data URI directly into the stored body text; images now become a
+short placeholder (using the source document's alt text where the author set one)
+since the original file stays attached and downloadable for full fidelity.
+
+Backfilled onto RSG's real content the same day: `scripts/reprocess-documents.ts`
+re-extracted all 151 existing policies/procedures with a stored source file through the
+new pipeline (150 changed, only the Aboriginal Cultural Safety Policy - already
+reprocessed via an earlier live test - was unchanged), writing a local JSON backup of
+every draft body it overwrote first. `scripts/bulk-republish.ts` then promoted the
+refreshed draft into the published version for the 141 documents that were already
+live (98 policies, 43 procedures), deliberately leaving the 9 never-published
+procedures as drafts rather than publishing them for the first time as a side effect of
+a text-format refresh. Confirmed live on `vericlever.site` after deploy.
+
+**Procedure-to-policy linking.** `policy_sop_links` was already a many-to-many table,
+but the only UI for it lived on the policy editor - a director working from a
+procedure had no way to see or add the policies governing it. Added the mirror
+`linkPolicy`/`unlinkPolicy` actions and a matching "Linked Policies" section on the
+procedure editor. Verified live on the Science Kinder tenant in both directions, test
+link removed after.
+
+**Nav consistency.** Our Workflow's "Policies"/"Procedures" renamed "Our Policies"/"Our
+Procedures" so they read as distinct from the personal "My Policies"/"My Procedures" in
+My Portal even though several items share a destination path underneath. Parent portal
+access moved to the end of that menu (day-to-day admin, not core content work). The
+plain-staff flat nav (no admin-facing duplicate to disambiguate from, so previously left
+unlabelled as just "Procedures"/"Policies") renamed to match for the same reason.
+Extended to every "← Our X" / "← My X" back-link on the corresponding editor pages.
+
+Also noted while investigating: running `npm run build` (production build) while the
+dev server is also running corrupts the shared `.next` cache and produces flaky,
+misleading UI symptoms (a button that looks permanently disabled, a stale hydration
+mismatch) that have nothing to do with the code under test. Stop the dev server before
+a production build from now on.
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted
@@ -260,24 +489,39 @@ as the 7 and 8 September work landed and are corrected here:
    nothing ahead. The push appears done. Confirm on GitHub.
 6. **The Bauhaus visual refresh and the dropdown fix** (commits `9795d59` and
    `d977222`, 8 September) are not recorded anywhere in BUILD_PLAN.
+7. **`BUILD_PLAN.md` stops at Step 27** and was never extended to cover Steps 28
+   onward, Review cycle v2, or any of the numbered "build addendum" items from
+   9 September onward. This file is now the only record of that work; treat
+   `BUILD_PLAN.md` as historical for anything past Step 27.
 
 ## Outstanding and blocked
 
-- **Sending domain.** Buy the VeriClever domain, register the ABN, verify
-  `vericlever.site` with Resend, set `RESEND_FROM`, `NEXT_PUBLIC_SITE_URL` and
-  `CRON_SECRET`. Unblocks staff invite emails, SOP reminders, credential and contract
-  escalation, the Reg 172 parent digest and the admin-triggered password reset email in
-  one move. Zeke's action.
-- **Supabase dev revisions.** Pending, see the top of this file.
-- **RSG content not loaded.** Re-run the importer or upload through the admin screens,
-  then classify policies into categories and publish.
-- **Not deployed.** Connect Vercel, set the environment variables, confirm it runs
-  against the live database at a real address.
-- **Independent verification** of Steps 20 to 27 against real logins. Claude's own
-  checks are recorded but Zeke has not signed these off.
-- **Mobile and tablet polish pass** across every screen (Step 12 follow-up).
-- **Test data cleanup.** The throwaway Resend test account, and the demo records left
-  on Sam Rivers and others during verification.
+- **Sending domain - reconfirm with a live send.** `RESEND_FROM`,
+  `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET` and `PARENT_ACCESS_SECRET` are all set, and
+  the app is deployed and reachable at `vericlever.site`. Nobody has re-run an actual
+  email send-test since those were set, so treat SOP reminders, credential/contract
+  escalation, the Reg 172 parent digest and the admin-triggered password reset email
+  as very likely working but not proven in this log.
+- **Supabase dev revisions.** Still pending as of this reconciliation - no list has
+  arrived since the 8 September review, see the top of this file.
+- **Independent verification.** The great majority of work from 9 September onward
+  (Steps 28 to 55, Review cycle v2, every "build addendum" item) carries no Zeke
+  sign-off in this log at all, not just an unverified note - see the "Verified by
+  Zeke" column. Given the volume, a full re-walkthrough rather than a step-by-step
+  recheck is probably the practical way to close this out.
+- **Mobile and tablet polish pass** across every screen (Step 12 follow-up). Partially
+  addressed for Markdown-rendered body content (Step 56 tables scroll horizontally
+  within their own bounds rather than breaking page layout), not reviewed elsewhere.
+- **Test data cleanup.** The throwaway Resend test account, the demo records left on
+  Sam Rivers and others during verification, and two local JSON backup files
+  (`reprocess-backup-*.json`) sitting untracked in the repo root from the Step 56
+  content backfill - keep until the reprocessed content has been spot-checked, then
+  delete.
+- **Orphaned document rows.** Found during the Step 56 backfill: roughly 45 rows in
+  `documents` with `owner_type = 'sop'` point at SOP ids that no longer exist (leftover
+  from earlier bulk-upload test cleanups that deleted the SOP but not its attached
+  document/storage object). Harmless - nothing queries through them - but worth a
+  cleanup pass at some point.
 
 ## Companion documents
 
@@ -285,6 +529,9 @@ as the 7 and 8 September work landed and are corrected here:
 - `ROLE_ACCESS_MATRIX.md`: feature-by-role breakdown
 - `STAFF_ONBOARDING_NQAITS.md`: NQAITS field structure and verified dropdown lists
 - `CONTRACT_MANAGEMENT.md`: contract storage and renewal detail
-- `REVISION_SOP_REVIEW_CYCLE.md`: the spec behind Steps 19 to 27
+- `REVISION_SOP_REVIEW_CYCLE.md`: the spec behind Steps 19 to 27, its Steps 20-22
+  since superseded (see `REVISION_REVIEW_CYCLE_V2.md`)
+- `REVISION_REVIEW_CYCLE_V2.md`: supersedes Steps 20-22, the spec behind migrations
+  0046-0050, 10 September 2026
 - `SECURITY_REVIEW_2026-09.md`: the September RLS review, method and findings
 - `supabase/import/rsg/REVIEW_NOTES.md`: decisions made during the RSG import
