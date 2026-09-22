@@ -1,0 +1,51 @@
+-- 0080_exact_vector_search.sql
+--
+-- Removes the ivfflat approximate-nearest-neighbour index on
+-- content_chunks.embedding. This was the real cause of the Ask feature
+-- returning irrelevant sources, and it was severe: measured against the
+-- same data and the same query vectors, ivfflat returned zero rows for
+-- "what to do in a bushfire?" while exact search returned the Bush Fire
+-- Policy at 0.58 similarity, and returned finance procedures for "what if
+-- a child falls over?" where exact search returned Child Protection and
+-- Behaviour Guidance.
+--
+-- Two independent faults, either of which alone would have broken it:
+--
+-- 1. The index was created in migration 0075, in the same statement block
+--    that created the table - so it was built on zero rows. ivfflat works
+--    by clustering the vectors it can see at build time into lists and
+--    then, at query time, scanning only the list(s) whose centroid is
+--    nearest the query. Built on an empty table, those centroids are
+--    meaningless, and every row inserted afterwards is assigned to an
+--    arbitrary list. The result is not "slightly worse recall", it is a
+--    near-random subset of the corpus - and a stable one, which is why the
+--    same handful of unrelated documents kept coming back.
+--
+-- 2. Even with well-trained centroids, ivfflat's default probes = 1 scans
+--    a single list, and the query filters by organisation_id afterwards.
+--    That ordering is the deeper problem and it does not go away by
+--    retraining or by switching to HNSW: an approximate index searches the
+--    whole table for global nearest neighbours and the tenant filter is
+--    applied to whatever it happens to return. With one tenant in the
+--    table that is merely lossy. With sixty, a given tenant owns a small
+--    fraction of the rows, so the ANN candidate set can contain few or
+--    none of theirs and the search silently returns nothing - the exact
+--    "zero rows" failure above, which would get worse with every customer
+--    onboarded, and would look like "the AI can't find anything" rather
+--    than like an index problem.
+--
+-- So: no approximate index. Retrieval filters on organisation_id first
+-- (content_chunks_document_idx, and the partial index added in 0081) and
+-- computes exact cosine distance over that one tenant's rows. Perfect
+-- recall, nothing to tune, and correct by construction under multi-tenancy
+-- rather than correct only while the table is small.
+--
+-- The cost this trades away is real but not yet relevant: exact search is
+-- linear in the tenant's own chunk count, which is currently in the high
+-- hundreds per organisation and grows with their policy library, not with
+-- the number of customers. If a single organisation ever reaches a scale
+-- where this matters, the answer is a per-tenant partitioned or filtered
+-- ANN index - one that cannot return another tenant's rows in the first
+-- place - not a global one with a filter bolted on afterwards.
+
+drop index if exists public.content_chunks_embedding_idx;
