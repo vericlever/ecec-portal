@@ -19,6 +19,7 @@ export type SiteNavProps = {
   canEditContent: boolean;
   canViewReports: boolean;
   canViewParentPortal: boolean;
+  aiQaEnabled: boolean;
 };
 
 export function SiteNav(props: SiteNavProps) {
@@ -33,6 +34,7 @@ export function SiteNav(props: SiteNavProps) {
     canEditContent,
     canViewReports,
     canViewParentPortal,
+    aiQaEnabled,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -207,6 +209,14 @@ export function SiteNav(props: SiteNavProps) {
             </div>
           )}
         </Link>
+        {aiQaEnabled && (
+          <Link
+            href="/ask"
+            className="border-2 border-ink bg-ink px-2.5 py-1 text-xs font-medium text-paper hover:bg-ink/90"
+          >
+            Ask
+          </Link>
+        )}
         <form action="/logout" method="post">
           <button
             type="submit"
@@ -288,14 +298,24 @@ export function SiteNav(props: SiteNavProps) {
                 <div className="font-medium text-ink">{fullName}</div>
                 {orgName && <div className="text-xs text-ink-faint">{orgName}</div>}
               </Link>
-              <form action="/logout" method="post">
-                <button
-                  type="submit"
-                  className="border-2 border-ink px-3 py-1.5 text-xs font-medium text-ink"
-                >
-                  Sign out
-                </button>
-              </form>
+              <div className="flex items-center gap-2">
+                {aiQaEnabled && (
+                  <Link
+                    href="/ask"
+                    className="border-2 border-ink bg-ink px-2 py-1 text-xs font-medium text-paper"
+                  >
+                    Ask
+                  </Link>
+                )}
+                <form action="/logout" method="post">
+                  <button
+                    type="submit"
+                    className="border-2 border-ink px-3 py-1.5 text-xs font-medium text-ink"
+                  >
+                    Sign out
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         </div>

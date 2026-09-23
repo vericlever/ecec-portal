@@ -65,13 +65,15 @@ export default async function RootLayout({
   // nav - falls back to the account name (organisations.name, RLS-locked to
   // a platform superuser) when no display_name has been set yet.
   let orgName: string | null = null;
+  let aiQaEnabled = false;
   if (profile?.organisation_id) {
     const { data: org } = await createClient()
       .from("organisations")
-      .select("name, display_name")
+      .select("name, display_name, ai_qa_enabled")
       .eq("id", profile.organisation_id)
       .maybeSingle();
     orgName = (org?.display_name as string | null) || (org?.name as string | null) || null;
+    aiQaEnabled = Boolean(org?.ai_qa_enabled);
   }
 
   // Anyone with a job role is a worker who needs a Worker Register entry - and
@@ -118,6 +120,7 @@ export default async function RootLayout({
               canEditContent={canEditContent(profile.access_tier)}
               canViewReports={canViewReports(profile.access_tier)}
               canViewParentPortal={isManager(profile.access_tier)}
+              aiQaEnabled={aiQaEnabled}
             />
           </header>
         )}

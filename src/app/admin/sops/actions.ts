@@ -8,6 +8,7 @@ import { storeDocument, deleteDocument, uploadAndExtract } from "@/lib/documents
 import { cleanReviewPeriod, cleanSigningWindow } from "@/lib/constants";
 import { writeDocumentTag } from "@/lib/document-tags";
 import { bestDuplicateMatch, looksLikeFilename, isBlankContent } from "@/lib/bulk-import/dedup";
+import { aiQaEnabledFor } from "@/lib/ai/service";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -244,6 +245,23 @@ export async function publishSop(id: string): Promise<Result> {
     actorId: owned.me.id,
     note: `Published v${next}`,
   });
+
+  // AI Staff Q&A (build spec, migration 0076): queue a re-embed, only for a
+  // tenant with the feature on (aiQaEnabledFor - see src/lib/ai/service.ts).
+  // Failure here must never turn a successful publish into an error - the
+  // embedding job is picked up later by the cron worker regardless.
+  try {
+    if (await aiQaEnabledFor(db, owned.sop.organisation_id)) {
+      await db.from("embedding_jobs").insert({
+        organisation_id: owned.sop.organisation_id,
+        document_type: "sop",
+        document_id: id,
+        document_version: next,
+      });
+    }
+  } catch {
+    // Swallowed deliberately - see comment above.
+  }
 
   revalidatePath("/admin/sops");
   revalidatePath(`/admin/sops/${id}`);

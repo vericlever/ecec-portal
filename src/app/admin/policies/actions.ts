@@ -9,6 +9,7 @@ import { cleanReviewPeriod } from "@/lib/constants";
 import { reviewDateFromNow } from "@/lib/sop-review";
 import { writeDocumentTag } from "@/lib/document-tags";
 import { bestDuplicateMatch, looksLikeFilename, isBlankContent } from "@/lib/bulk-import/dedup";
+import { aiQaEnabledFor } from "@/lib/ai/service";
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -273,6 +274,24 @@ export async function publishPolicy(id: string): Promise<Result> {
     })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  // AI Staff Q&A (build spec, migration 0076): queue a re-embed, only for a
+  // tenant with the feature on (aiQaEnabledFor - see src/lib/ai/service.ts).
+  // Failure here must never turn a successful publish into an error - the
+  // embedding job is picked up later by the cron worker regardless.
+  try {
+    if (await aiQaEnabledFor(db, owned.policy.organisation_id)) {
+      await db.from("embedding_jobs").insert({
+        organisation_id: owned.policy.organisation_id,
+        document_type: "policy",
+        document_id: id,
+        document_version: next,
+      });
+    }
+  } catch {
+    // Swallowed deliberately - see comment above.
+  }
+
   revalidatePath("/admin/policies");
   revalidatePath(`/admin/policies/${id}`);
   revalidatePath("/policies");
