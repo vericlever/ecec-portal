@@ -7,7 +7,20 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const NO_MATCH_RESPONSE =
   "I couldn't find anything in the policies or procedures that answers this - ask your director.";
 
-const MIN_SIMILARITY = Number(process.env.AI_QA_MIN_SIMILARITY ?? "0.5");
+// Measured against RSG's real library rather than guessed: the correct
+// answer to a question typically scores 0.49 to 0.62 (the Bush Fire Policy
+// answers "what to do in a bushfire?" at 0.58), while unrelated content sits
+// around 0.30 to 0.38. The previous default of 0.5 cut through the middle of
+// the range real answers occupy and rejected plenty of them.
+//
+// The env var stays as a tuning knob, but the default has to be a usable
+// value rather than something that only works if an environment happens to
+// override it. A too-strict threshold does not fail loudly - it returns
+// "I couldn't find anything in the policies or procedures", which reads as
+// the library being incomplete rather than as a misconfiguration, so an
+// environment that quietly lacked the override would look broken in a way
+// nobody would think to attribute to a missing setting.
+const MIN_SIMILARITY = Number(process.env.AI_QA_MIN_SIMILARITY ?? "0.42");
 const MATCH_COUNT = Number(process.env.AI_QA_MATCH_COUNT ?? "8");
 
 export type DocumentType = "policy" | "sop";
