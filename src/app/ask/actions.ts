@@ -1,6 +1,7 @@
 "use server";
 
 import { requireProfile } from "@/lib/auth";
+import { isManager } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { answerQuestion, type Source } from "@/lib/ai/service";
 
@@ -8,7 +9,21 @@ type AskResult =
   | { ok: true; answer: string; sources: Source[]; grounded: boolean }
   | { ok: false; error: string; retryAt?: string };
 
-const DAILY_LIMIT = Number(process.env.AI_QA_DAILY_LIMIT_PER_STAFF ?? "30");
+// A cost guard, not a usage policy: it exists so one person (or one stuck
+// browser tab) cannot run up an unbounded bill, not to ration how much staff
+// may lean on the tool.
+//
+// Directors get a higher ceiling because their usage is genuinely different -
+// they field other people's questions, check what the tool says before
+// pointing staff at it, and do the compliance digging that prompts a run of
+// questions in one sitting. An educator asking about nappy changes on the
+// floor does not.
+//
+// isManager() rather than a new notion of "director": that set is
+// manager_staff, manager_policy and admin, which is already how the rest of
+// the portal draws the line.
+const STAFF_DAILY_LIMIT = Number(process.env.AI_QA_DAILY_LIMIT_PER_STAFF ?? "50");
+const MANAGER_DAILY_LIMIT = Number(process.env.AI_QA_DAILY_LIMIT_PER_MANAGER ?? "150");
 
 export async function askQuestion(question: string): Promise<AskResult> {
   const profile = await requireProfile();
@@ -29,13 +44,14 @@ export async function askQuestion(question: string): Promise<AskResult> {
     return { ok: false, error: "This isn't turned on for your organisation yet." };
   }
 
+  const dailyLimit = isManager(profile.access_tier) ? MANAGER_DAILY_LIMIT : STAFF_DAILY_LIMIT;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count } = await db
     .from("ai_interactions")
     .select("id", { count: "exact", head: true })
     .eq("staff_profile_id", profile.id)
     .gte("created_at", since);
-  if ((count ?? 0) >= DAILY_LIMIT) {
+  if ((count ?? 0) >= dailyLimit) {
     // The window is a rolling 24 hours, not a calendar day, so "try again
     // tomorrow" was misleading in both directions: a slot can free up
     // within the hour, or not until late tomorrow, depending on when the
@@ -57,7 +73,7 @@ export async function askQuestion(question: string): Promise<AskResult> {
 
     return {
       ok: false,
-      error: `You've asked ${DAILY_LIMIT} questions in the past 24 hours, which is the limit.`,
+      error: `You've asked ${dailyLimit} questions in the past 24 hours, which is the limit.`,
       retryAt,
     };
   }
