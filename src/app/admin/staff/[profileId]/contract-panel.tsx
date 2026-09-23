@@ -10,9 +10,12 @@ import {
   deleteContract,
   signOwnContract,
   countersignContract,
+  regenerateSignedCopy,
 } from "./actions";
 import { fmtDate as fmtDateOnly, fmtDateTime } from "@/lib/format-date";
 import { contractDueDate, dueSignoffPhrase, isOverdue } from "@/lib/signoff-clock";
+import { SignForm } from "@/components/sign-form";
+import { PDF_ONLY_STATEMENT } from "@/lib/signing/validate-pdf";
 
 // start_date/expiry_date are plain calendar dates (Step 43), never
 // timezone-converted; this just adds the null-handling the shared helper
@@ -61,8 +64,6 @@ export function ContractPanel({
     "fixed",
   );
   const [isDeed, setIsDeed] = useState(false);
-  const [employeeName, setEmployeeName] = useState("");
-  const [counterName, setCounterName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -99,25 +100,30 @@ export function ContractPanel({
     });
   };
 
-  const onSign = (id: string, name: string) => {
+  const onSign = (id: string, name: string, signatureDataUrl: string) => {
     start(async () => {
       setError(null);
-      const r = await signOwnContract(id, name);
-      if (r.ok) {
-        setEmployeeName("");
-        router.refresh();
-      } else setError(r.error);
+      const r = await signOwnContract(id, name, signatureDataUrl);
+      if (r.ok) router.refresh();
+      else setError(r.error);
     });
   };
 
-  const onCountersign = (id: string, name: string) => {
+  const onCountersign = (id: string, name: string, signatureDataUrl: string) => {
     start(async () => {
       setError(null);
-      const r = await countersignContract(id, name);
-      if (r.ok) {
-        setCounterName("");
-        router.refresh();
-      } else setError(r.error);
+      const r = await countersignContract(id, name, signatureDataUrl);
+      if (r.ok) router.refresh();
+      else setError(r.error);
+    });
+  };
+
+  const onRegenerate = (id: string) => {
+    start(async () => {
+      setError(null);
+      const r = await regenerateSignedCopy(id);
+      if (r.ok) router.refresh();
+      else setError(r.error);
     });
   };
 
@@ -185,82 +191,95 @@ export function ContractPanel({
             </p>
           )}
 
+          {!active.is_deed && !active.signed_at && active.document_id && (
+            <iframe
+              src={`/api/documents/${active.document_id}`}
+              className="mt-2 h-80 w-full rounded-md border border-slate-200"
+              title="Contract preview"
+            />
+          )}
+
           {canSign && !active.is_deed && !active.signed_at && (
-            <form
-              className="mt-2 space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSign(active.id, employeeName);
-              }}
-            >
-              <p className="text-amber-900">
-                Type your full legal name to read and accept this contract.
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+              <p className="mb-2 text-sm text-amber-900">
+                Sign to read and accept this contract.
               </p>
-              <input
-                value={employeeName}
-                onChange={(e) => setEmployeeName(e.target.value)}
-                placeholder="Full legal name"
-                required
-                disabled={pending}
-                className="w-full rounded-md border border-amber-300 px-2 py-1.5 text-sm"
+              <SignForm
+                pending={pending}
+                submitLabel="I have read this contract and I accept it"
+                onSign={({ name, signatureDataUrl }) => onSign(active.id, name, signatureDataUrl)}
               />
-              <button
-                type="submit"
-                disabled={pending || !employeeName.trim()}
-                className="rounded-md bg-amber-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-              >
-                I have read this contract and I accept it
-              </button>
-            </form>
+            </div>
           )}
 
           {canManage &&
             !active.is_deed &&
             active.signed_at &&
             !active.countersigned_at && (
-              <form
-                className="mt-2 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  onCountersign(active.id, counterName);
-                }}
-              >
-                <p className="text-slate-700">
-                  Type your full legal name to countersign this contract.
+              <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <p className="mb-2 text-sm text-slate-700">
+                  Countersign this contract.
                 </p>
-                <input
-                  value={counterName}
-                  onChange={(e) => setCounterName(e.target.value)}
-                  placeholder="Full legal name"
-                  required
-                  disabled={pending}
-                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                <SignForm
+                  pending={pending}
+                  submitLabel="Countersign"
+                  onSign={({ name, signatureDataUrl }) => onCountersign(active.id, name, signatureDataUrl)}
                 />
-                <button
-                  type="submit"
-                  disabled={pending || !counterName.trim()}
-                  className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-                >
-                  Countersign
-                </button>
-              </form>
+              </div>
             )}
-          <div className="mt-2 flex items-center gap-3 text-sm">
+
+          {!active.is_deed && active.signed_at && (
+            <div className="mt-2">
+              {active.signed_copy_document_id ? (
+                <iframe
+                  src={`/api/documents/${active.signed_copy_document_id}`}
+                  className="h-80 w-full rounded-md border border-slate-200"
+                  title="Signed contract preview"
+                />
+              ) : (
+                <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
+                  Signed copy being prepared - refresh in a moment.
+                  {canManage && (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => onRegenerate(active.id)}
+                      className="ml-2 text-slate-700 underline hover:text-slate-900"
+                    >
+                      Try again
+                    </button>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            {active.signed_copy_document_id ? (
+              <a
+                href={`/api/documents/${active.signed_copy_document_id}`}
+                className="font-medium text-slate-900 underline hover:text-slate-700"
+              >
+                Download signed contract
+              </a>
+            ) : null}
             {active.document_id ? (
               <a
                 href={`/api/documents/${active.document_id}`}
                 className="text-slate-700 underline hover:text-slate-900"
               >
-                Download contract
+                {active.signed_copy_document_id ? "Original as uploaded" : "Download contract"}
               </a>
             ) : (
               <span className="text-amber-700">No document on file</span>
             )}
-            <ReportDownloadButton
-              href={`/reports/contract?contract=${active.id}`}
-              label="Print signature summary (PDF)"
-              className="text-slate-700 underline hover:text-slate-900"
-            />
+            {(active.is_deed || !active.signed_copy_document_id) && (
+              <ReportDownloadButton
+                href={`/reports/contract?contract=${active.id}`}
+                label="Print signature summary (PDF)"
+                className="text-slate-700 underline hover:text-slate-900"
+              />
+            )}
             {canManage && (
               <button
                 type="button"
@@ -339,12 +358,12 @@ export function ContractPanel({
               type="file"
               name="file"
               required
-              accept=".pdf,.doc,.docx,.txt,image/*"
+              accept={isDeed ? undefined : ".pdf"}
               className="mt-1 block w-full text-sm"
             />
-            <span className="mt-1 block text-xs text-slate-400">
-              A PDF or Word file, or a photo of the signed pages.
-            </span>
+            {!isDeed && (
+              <span className="mt-1 block text-xs text-slate-400">{PDF_ONLY_STATEMENT}</span>
+            )}
           </label>
           <label className="block">
             <span className="text-slate-600">Start date</span>

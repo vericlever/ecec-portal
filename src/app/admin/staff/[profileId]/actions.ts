@@ -10,6 +10,10 @@ import { calcExpiry } from "@/lib/contracts";
 import { generatePasswordResetLink } from "@/lib/invite";
 import { emailEnabled, sendPasswordReset } from "@/lib/email";
 import { isEmailSuppressed, logNotification } from "@/lib/notifications";
+import { validatePdf } from "@/lib/signing/validate-pdf";
+import { storeSignature } from "@/lib/signing/store-signature";
+import { generateContractSignedCopy } from "@/lib/signing/signed-copy";
+import { notifyContractSigned, notifyContractCountersigned } from "@/lib/signing/notify";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -201,6 +205,15 @@ export async function uploadContract(
   // A deed is never signed in-app (see migration 0042) - HR/Admin flags it at
   // upload, based on the document they are looking at.
   const isDeed = formData.get("is_deed") === "on";
+  // Step 57: every contract requires countersignature - no per-upload
+  // choice. Deeds never use this field either way (see executionState()).
+  const requiresCountersign = true;
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!isDeed) {
+    const validation = await validatePdf(bytes, file.type || null, file.name);
+    if (!validation.ok) return { ok: false, error: validation.error };
+  }
 
   const supabase = createClient();
   const { data: contract, error } = await supabase
@@ -214,6 +227,7 @@ export async function uploadContract(
       expiry_date: expiry,
       notes,
       is_deed: isDeed,
+      requires_countersign: requiresCountersign,
       created_by: gate.me.id,
     })
     .select("id")
@@ -222,7 +236,6 @@ export async function uploadContract(
     return { ok: false, error: error?.message ?? "Could not save the contract." };
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
   const stored = await storeDocument({
     organisationId: gate.organisationId,
     ownerType: "contract",
@@ -231,6 +244,8 @@ export async function uploadContract(
     mimeType: file.type || null,
     bytes,
     uploadedBy: gate.me.id,
+    // Contracts hold pay rates and personal terms - no reason to extract text.
+    extract: false,
   });
   if (!stored.ok) {
     await supabase.from("contracts").delete().eq("id", contract.id);
@@ -256,6 +271,7 @@ export async function uploadContract(
 export async function signOwnContract(
   contractId: string,
   typedName: string,
+  signatureDataUrl: string,
 ): Promise<Result> {
   const me = await getProfile();
   if (!me) return { ok: false, error: "Sign in." };
@@ -265,7 +281,7 @@ export async function signOwnContract(
   const supabase = createClient();
   const { data: contract } = await supabase
     .from("contracts")
-    .select("id, profile_id, superseded_at, signed_at, is_deed, document_id")
+    .select("id, organisation_id, profile_id, superseded_at, signed_at, is_deed, document_id")
     .eq("id", contractId)
     .maybeSingle();
   if (!contract || contract.profile_id !== me.id) {
@@ -282,13 +298,33 @@ export async function signOwnContract(
   }
   if (contract.signed_at) return { ok: true };
 
+  const signature = await storeSignature({
+    dataUrl: signatureDataUrl,
+    organisationId: contract.organisation_id,
+    contractId,
+    uploadedBy: me.id,
+  });
+  if (!signature.ok) return { ok: false, error: signature.error };
+
   const hash = await documentSha256(contract.document_id);
   const { error } = await supabase.rpc("sign_own_contract", {
     p_contract_id: contractId,
     p_signed_name: name,
     p_signed_content_hash: hash,
+    p_signature_document_id: signature.documentId,
   });
   if (error) return { ok: false, error: error.message };
+
+  // Step 57, A5/A6: the signed copy and its email are best-effort follow-ups
+  // - a failure here never undoes the signature that just succeeded above.
+  // The panel shows "Signed copy being prepared" and retries on next load
+  // whenever signed_copy_document_id is still null.
+  try {
+    await generateContractSignedCopy(supabase, contractId);
+    await notifyContractSigned(supabase, contractId);
+  } catch (e) {
+    console.error("generateContractSignedCopy/notifyContractSigned failed:", e);
+  }
 
   revalidatePath("/onboarding");
   revalidatePath("/admin/staff", "layout");
@@ -302,6 +338,7 @@ export async function signOwnContract(
 export async function countersignContract(
   contractId: string,
   typedName: string,
+  signatureDataUrl: string,
 ): Promise<Result> {
   const me = await getProfile();
   if (!me || !isHrManager(me)) {
@@ -313,11 +350,14 @@ export async function countersignContract(
   const supabase = createClient();
   const { data: contract } = await supabase
     .from("contracts")
-    .select("id, profile_id, organisation_id, superseded_at, is_deed, document_id, countersigned_at")
+    .select("id, profile_id, organisation_id, superseded_at, is_deed, document_id, countersigned_at, requires_countersign")
     .eq("id", contractId)
     .maybeSingle();
   if (!contract || contract.organisation_id !== me.organisation_id) {
     return { ok: false, error: "Contract not found." };
+  }
+  if (contract.profile_id === me.id) {
+    return { ok: false, error: "You cannot countersign your own contract." };
   }
   if (!isAdmin(me.access_tier) && contract.profile_id) {
     const { data: worker } = await supabase
@@ -338,18 +378,62 @@ export async function countersignContract(
       error: "This contract is a deed and is signed on paper, not in the portal.",
     };
   }
+  if (!contract.requires_countersign) {
+    return { ok: false, error: "This contract does not require a countersignature." };
+  }
   if (contract.countersigned_at) return { ok: true };
+
+  const signature = await storeSignature({
+    dataUrl: signatureDataUrl,
+    organisationId: contract.organisation_id,
+    contractId,
+    uploadedBy: me.id,
+  });
+  if (!signature.ok) return { ok: false, error: signature.error };
 
   const hash = await documentSha256(contract.document_id);
   const { error } = await supabase.rpc("countersign_contract", {
     p_contract_id: contractId,
     p_signed_name: name,
     p_signed_content_hash: hash,
+    p_signature_document_id: signature.documentId,
   });
   if (error) return { ok: false, error: error.message };
 
+  try {
+    await generateContractSignedCopy(supabase, contractId);
+    await notifyContractCountersigned(supabase, contractId);
+  } catch (e) {
+    console.error("generateContractSignedCopy/notifyContractCountersigned failed:", e);
+  }
+
   revalidatePath("/admin/staff", "layout");
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+// Rebuild the signed copy from the current signature/typed-name data on
+// file, for when generation failed or the underlying original changed. Same
+// generator the sign/countersign paths call automatically. Same gate as
+// uploadContract/deleteContract (canManageContractFor), matching the rest
+// of this panel's canManage-controlled actions.
+export async function regenerateSignedCopy(contractId: string): Promise<Result> {
+  const supabase = createClient();
+  const { data: contract } = await supabase
+    .from("contracts")
+    .select("id, profile_id")
+    .eq("id", contractId)
+    .maybeSingle();
+  if (!contract) return { ok: false, error: "Contract not found." };
+  const gate = await canManageContractFor(contract.profile_id);
+  if (!gate.ok) return gate;
+
+  try {
+    await generateContractSignedCopy(supabase, contractId);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not build a signed copy." };
+  }
+  revalidatePath("/admin/staff", "layout");
   return { ok: true };
 }
 
@@ -361,7 +445,9 @@ export async function deleteContract(contractId: string): Promise<Result> {
   const supabase = createClient();
   const { data: contract } = await supabase
     .from("contracts")
-    .select("id, profile_id, organisation_id, document_id")
+    .select(
+      "id, profile_id, organisation_id, document_id, signed_signature_document_id, countersigned_signature_document_id, signed_copy_document_id",
+    )
     .eq("id", contractId)
     .maybeSingle();
   if (!contract || contract.organisation_id !== me.organisation_id) {
@@ -370,7 +456,16 @@ export async function deleteContract(contractId: string): Promise<Result> {
   const gate = await canManageContractFor(contract.profile_id);
   if (!gate.ok) return gate;
 
-  if (contract.document_id) await deleteDocument(contract.document_id);
+  // Step 57: a signed contract also owns a drawn signature (or two) and a
+  // generated signed copy, none of which cascade off the contracts row -
+  // clean up all four document rows, not just the original upload.
+  const docIds = [
+    contract.document_id,
+    contract.signed_signature_document_id,
+    contract.countersigned_signature_document_id,
+    contract.signed_copy_document_id,
+  ].filter((id): id is string => Boolean(id));
+  for (const id of docIds) await deleteDocument(id);
   await supabase.from("contracts").delete().eq("id", contractId);
 
   // Restore the most recent remaining period as the active one, so a mistaken

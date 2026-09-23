@@ -35,6 +35,10 @@ export async function uploadAndExtract(opts: {
   fileName: string;
   mimeType: string | null;
   bytes: Uint8Array;
+  // Step 57: contracts (and signatures/signed copies) hold pay rates and
+  // personal terms and have no reason to be text-extracted. Defaults true so
+  // every existing caller is unaffected.
+  extract?: boolean;
 }): Promise<
   | {
       ok: true;
@@ -60,16 +64,18 @@ export async function uploadAndExtract(opts: {
   let extractedText: string | null = null;
   let extractionNote: string | null = null;
   let needsReview = false;
-  try {
-    const extracted = await extractDocument(opts.fileName, opts.bytes);
-    extractedText = extracted.text || null;
-    extractionNote = extracted.note ?? null;
-    needsReview = extracted.needsReview;
-  } catch (e) {
-    extractionNote =
-      "Could not read the document automatically: " +
-      (e instanceof Error ? e.message : "unknown error");
-    needsReview = true;
+  if (opts.extract !== false) {
+    try {
+      const extracted = await extractDocument(opts.fileName, opts.bytes);
+      extractedText = extracted.text || null;
+      extractionNote = extracted.note ?? null;
+      needsReview = extracted.needsReview;
+    } catch (e) {
+      extractionNote =
+        "Could not read the document automatically: " +
+        (e instanceof Error ? e.message : "unknown error");
+      needsReview = true;
+    }
   }
 
   return { ok: true, storagePath: path, extractedText, extractionNote, needsReview };
@@ -90,12 +96,15 @@ export async function storeDocument(opts: {
     | "contract"
     | "credential"
     | "identity"
-    | "sop_evidence";
+    | "sop_evidence"
+    | "signature"
+    | "signed_copy";
   ownerId: string;
   fileName: string;
   mimeType: string | null;
   bytes: Uint8Array;
   uploadedBy: string;
+  extract?: boolean;
 }): Promise<
   { ok: true; document: StoredDocument } | { ok: false; error: string }
 > {
@@ -106,6 +115,7 @@ export async function storeDocument(opts: {
     fileName: opts.fileName,
     mimeType: opts.mimeType,
     bytes: opts.bytes,
+    extract: opts.extract,
   });
   if (!uploaded.ok) return uploaded;
 

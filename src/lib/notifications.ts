@@ -11,7 +11,11 @@ export type NotificationKind =
   | "staff_digest"
   | "manager_digest"
   | "account_created"
-  | "password_reset";
+  | "password_reset"
+  // Step 57
+  | "contract_signed"
+  | "contract_countersign_needed"
+  | "contract_countersigned";
 
 export async function isEmailSuppressed(
   profileId: string,

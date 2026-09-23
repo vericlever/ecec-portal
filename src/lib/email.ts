@@ -4,6 +4,12 @@
 
 export type SendResult = { ok: true; id: string } | { ok: false; error: string };
 
+// Step 57, A6: a signed copy attached to the confirmation email. Resend
+// expects base64 content per attachment; kept small deliberately (see the
+// 10 MB portal-link fallback in the signing actions - this module doesn't
+// enforce that limit itself, callers decide whether to attach or link).
+export type Attachment = { filename: string; content: string };
+
 export function emailEnabled(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM);
 }
@@ -15,6 +21,7 @@ export async function sendEmail(msg: {
   subject: string;
   html: string;
   text: string;
+  attachments?: Attachment[];
 }): Promise<SendResult> {
   return send(msg);
 }
@@ -24,6 +31,7 @@ async function send(msg: {
   subject: string;
   html: string;
   text: string;
+  attachments?: Attachment[];
 }): Promise<SendResult> {
   if (!emailEnabled()) {
     return { ok: false, error: "Email is not configured (RESEND_API_KEY / RESEND_FROM)." };
@@ -41,6 +49,7 @@ async function send(msg: {
         subject: msg.subject,
         html: msg.html,
         text: msg.text,
+        ...(msg.attachments?.length ? { attachments: msg.attachments } : {}),
       }),
     });
     if (!res.ok) {

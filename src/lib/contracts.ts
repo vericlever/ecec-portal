@@ -24,17 +24,27 @@ export type ContractRow = {
   countersigned_by: string | null;
   countersigned_content_hash: string | null;
   created_at: string;
+  // Step 57
+  requires_countersign: boolean;
+  signed_signature_document_id: string | null;
+  countersigned_signature_document_id: string | null;
+  signed_copy_document_id: string | null;
+  signed_copy_hash: string | null;
+  signed_copy_generated_at: string | null;
 };
 
-// Fully executed = both signature slots filled. A deed is reported as
-// "signed on paper" rather than unsigned or executed - it never goes through
-// either in-app slot (Step 39).
+// Fully executed = both signature slots filled, or just the employee's if
+// the contract doesn't require a countersignature (Step 57 - ticked off by
+// default on upload, unticked when the employer already signed the PDF). A
+// deed is reported as "signed on paper" rather than unsigned or executed -
+// it never goes through either in-app slot (Step 39).
 export type ExecutionState = "deed" | "unsigned" | "awaiting_countersign" | "executed";
 
 export function executionState(contract: ContractRow | null): ExecutionState {
   if (!contract) return "unsigned";
   if (contract.is_deed) return "deed";
   if (!contract.signed_at) return "unsigned";
+  if (!contract.requires_countersign) return "executed";
   if (!contract.countersigned_at) return "awaiting_countersign";
   return "executed";
 }

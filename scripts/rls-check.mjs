@@ -1198,6 +1198,98 @@ const appScenarios = () => [
     as: STAFF,
     probe: (c) => c.query(`select id from public.ai_interactions where id=$1`, [c._interactionId]),
   },
+
+  // Step 57 Part A: signed contract PDFs (migrations 0082, 0083). Each
+  // scenario inserts its own throwaway contract row in setup (run as the
+  // connection's own unrestricted role, before the identity switch) rather
+  // than depending on a hardcoded contract id - same reasoning
+  // resolveFixtures() above now uses for everything else in this file.
+  {
+    label: "staff writes requires_countersign directly on their own contract (blocked - contracts_write has no self-management branch at all)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.contracts (organisation_id, profile_id, start_date, period_type, requires_countersign)
+         values ($1,$2,current_date,'no_fixed_period',true) returning id`,
+        [RSG, STAFF],
+      );
+      c._contractId = r.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`update public.contracts set requires_countersign=false where id=$1`, [c._contractId]),
+  },
+  {
+    label: "staff attaches a signature to someone else's contract (blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.contracts (organisation_id, profile_id, start_date, period_type, requires_countersign)
+         values ($1,$2,current_date,'no_fixed_period',true) returning id`,
+        [RSG, ADMIN],
+      );
+      c._contractId = r.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.documents (organisation_id, owner_type, owner_id, file_name, storage_path)
+         values ($1,'signature',$2,'x.png','x')`,
+        [RSG, c._contractId],
+      ),
+  },
+  {
+    label: "staff reads/writes the signed_copy of their own contract (allowed - the self-sign flow needs this)",
+    expectOk: true,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.contracts (organisation_id, profile_id, start_date, period_type, requires_countersign)
+         values ($1,$2,current_date,'no_fixed_period',true) returning id`,
+        [RSG, STAFF],
+      );
+      c._contractId = r.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.documents (organisation_id, owner_type, owner_id, file_name, storage_path)
+         values ($1,'signed_copy',$2,'x.pdf','x')`,
+        [RSG, c._contractId],
+      ),
+  },
+  {
+    label: "admin countersigns their own contract via the RPC (blocked - the new self-countersign check)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.contracts (organisation_id, profile_id, start_date, period_type, requires_countersign)
+         values ($1,$2,current_date,'no_fixed_period',true) returning id`,
+        [RSG, ADMIN],
+      );
+      c._contractId = r.rows[0].id;
+    },
+    as: ADMIN,
+    probe: (c) =>
+      c.query(`select public.countersign_contract($1,'Zeke Pottage','deadbeef')`, [c._contractId]),
+  },
+  {
+    label: "SK admin reads an RSG contract's document row (cross-tenant, blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      const contract = await c.query(
+        `insert into public.contracts (organisation_id, profile_id, start_date, period_type, requires_countersign)
+         values ($1,$2,current_date,'no_fixed_period',true) returning id`,
+        [RSG, STAFF],
+      );
+      const doc = await c.query(
+        `insert into public.documents (organisation_id, owner_type, owner_id, file_name, storage_path)
+         values ($1,'contract',$2,'x.pdf','x') returning id`,
+        [RSG, contract.rows[0].id],
+      );
+      c._docId = doc.rows[0].id;
+    },
+    as: SK_ADMIN,
+    probe: (c) => c.query(`select id from public.documents where id=$1`, [c._docId]),
+  },
 ];
 
 await client.connect();

@@ -33,7 +33,6 @@ export function SiteNav(props: SiteNavProps) {
     fullName,
     orgName,
     isLeader,
-    isWorker,
     isAdmin,
     canManageStaff,
     canCountersign,
@@ -75,24 +74,23 @@ export function SiteNav(props: SiteNavProps) {
         { href: "/onboarding", label: "My details" },
         { href: "/sops", label: "My Procedures" },
         { href: "/policies", label: "My Policies" },
+        { href: "/agreements", label: "Agreements" },
       ];
 
-  // My Portal: this person's own procedures, policies, agreements and
-  // details - identical destinations to the plain-staff flat nav above,
+  // My Portal: this person's own procedures, policies, details and
+  // agreements - identical destinations to the plain-staff flat nav above,
   // just grouped since a leader also has administrative destinations to
-  // keep separate from them. My Details is every leader's own Worker
-  // Register record, admins included (an Admin normally has no job role but
-  // is still a staff member underneath, see isWorker() in lib/auth.ts) - it
-  // always appears, last, regardless of tier. My Agreements only applies to
-  // an actual employment record, so it stays behind isWorker.
+  // keep separate from them. My Agreements always appears here too, last,
+  // regardless of tier or whether this leader also holds a job role - it
+  // used to hide behind isWorker, which made it too hard to find.
   const myPortalGroups: NavGroup[] = [
     {
       label: null,
       items: [
         { href: "/sops", label: "My Procedures" },
         { href: "/policies", label: "My Policies" },
-        ...(isWorker ? [{ href: "/agreements", label: "My Agreements" }] : []),
         { href: "/onboarding", label: "My Details" },
+        { href: "/agreements", label: "My Agreements" },
       ],
     },
   ];
@@ -116,6 +114,10 @@ export function SiteNav(props: SiteNavProps) {
     }
     if (canEditContent) {
       items.push({ href: "/admin/job-roles", label: "Job roles" });
+      // Staff Agreements sits last here, not in Our Workflow - it's about
+      // the people (who has signed what), the same reasoning as the rest of
+      // this group, even though it is authored/edited by a content editor.
+      items.push({ href: "/admin/agreements", label: "Staff Agreements" });
     }
     ourStaffGroups.push({ label: null, items });
   }
@@ -141,9 +143,6 @@ export function SiteNav(props: SiteNavProps) {
     }
     if (canCountersign) {
       items.push({ href: "/admin/outcome-flags", label: "Outcome flags" });
-    }
-    if (canEditContent) {
-      items.push({ href: "/admin/agreements", label: "Agreements" });
     }
     if (canViewReports) items.push({ href: "/reports", label: "Reports" });
     if (isAdmin) items.push({ href: "/admin/organisation", label: "Organisation" });

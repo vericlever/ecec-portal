@@ -1,8 +1,83 @@
 import Link from "next/link";
 import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { executionState, type ContractRow } from "@/lib/contracts";
 
 export const dynamic = "force-dynamic";
+
+const EXECUTION_LABEL: Record<ReturnType<typeof executionState>, string> = {
+  deed: "Deed",
+  unsigned: "Unsigned",
+  awaiting_countersign: "Awaiting countersignature",
+  executed: "Executed",
+};
+const EXECUTION_TONE: Record<ReturnType<typeof executionState>, string> = {
+  deed: "bg-slate-100 text-slate-500",
+  unsigned: "bg-amber-100 text-amber-800",
+  awaiting_countersign: "bg-blue-100 text-blue-700",
+  executed: "bg-green-100 text-green-700",
+};
+
+// Step 57, A7. A fixed section, not created or deleted by anyone - contracts
+// are managed on each staff record, not authored here. Relies on
+// contracts_select RLS (profile_id = self, or covers_service) to show only
+// the contracts this viewer actually has reach over; a content editor with
+// no HR standing at any service correctly sees an empty list rather than
+// this page trying to second-guess that boundary itself.
+async function ContractsSection() {
+  const supabase = createClient();
+  const { data: contracts } = await supabase
+    .from("contracts")
+    .select(
+      "id, profile_id, is_deed, requires_countersign, signed_at, countersigned_at, superseded_at, start_date",
+    )
+    .is("superseded_at", null)
+    .order("start_date", { ascending: false });
+
+  // executionState() only reads is_deed/signed_at/requires_countersign/
+  // countersigned_at - this query doesn't select the rest of ContractRow's
+  // columns (period/expiry/signature ids etc.), so the cast is intentionally
+  // loose rather than claiming a full row shape this list doesn't need.
+  const rows = (contracts ?? []) as unknown as ContractRow[];
+  const profileIds = [...new Set(rows.map((r) => r.profile_id))];
+  const { data: profiles } = profileIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", profileIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameFor = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
+
+  return (
+    <section className="mb-8">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Contracts
+      </h2>
+      <p className="mt-1 max-w-prose text-xs text-slate-500">
+        Every active employment contract you have reach over. Upload or sign
+        stays on each person&apos;s own staff record.
+      </p>
+      <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        {rows.length === 0 && (
+          <li className="px-4 py-3 text-sm text-slate-500">No contracts to show.</li>
+        )}
+        {rows.map((c) => {
+          const state = executionState(c);
+          return (
+            <li key={c.id}>
+              <Link
+                href={`/admin/staff/${c.profile_id}`}
+                className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
+              >
+                <span className="text-sm font-medium">{nameFor.get(c.profile_id) ?? "Staff member"}</span>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${EXECUTION_TONE[state]}`}>
+                  {EXECUTION_LABEL[state]}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 type Row = {
   id: string;
@@ -58,8 +133,10 @@ export default async function AgreementsPage() {
 
   return (
     <div>
+      <ContractsSection />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Agreements</h1>
+        <h1 className="text-xl font-semibold">Staff Agreements</h1>
         <Link
           href="/admin/agreements/new"
           className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"

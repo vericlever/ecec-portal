@@ -16,7 +16,7 @@ export default async function AgreementsListPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Agreements</h1>
+      <h1 className="text-xl font-semibold">My Agreements</h1>
       <p className="mt-1 text-sm text-slate-500">
         Workplace agreements and acknowledgements you need to read and sign.
       </p>
