@@ -29,7 +29,8 @@ const SK = "a0000000-0000-4000-8000-000000000002";
 
 const USERS = [
   { label: "RSG admin (Pot pots)", uid: "92ce67f0-463b-4689-baff-663668f66b9f", org: RSG },
-  { label: "RSG manager (Jamie)", uid: "bfb97d5e-e176-484a-bc94-b9fd8c3c8d3f", org: RSG },
+  // uid filled by resolveFixtures() - see MANAGER below.
+  { label: "RSG manager_staff", uid: null, org: RSG },
   { label: "RSG staff (Sam)", uid: "a5895163-3db5-4029-86f1-c9ad7e06271b", org: RSG },
   { label: "SK admin", uid: "e6e5394f-c492-4ef8-b2c0-68ba66f40b67", org: SK },
   { label: "SK staff (Educator)", uid: "f504ce94-e3c0-4584-8ac7-64cbe810a889", org: SK },
@@ -38,18 +39,127 @@ const USERS = [
 
 // Named test identities and fixtures reused by the app-write-path probes below.
 const ADMIN = "92ce67f0-463b-4689-baff-663668f66b9f"; // Pot pots, RSG admin
-const MANAGER = "bfb97d5e-e176-484a-bc94-b9fd8c3c8d3f"; // Jamie, RSG manager_staff, Timboon
 const STAFF = "a5895163-3db5-4029-86f1-c9ad7e06271b"; // Sam Rivers, RSG staff, Timboon, role Educator
 const SK_ADMIN = "e6e5394f-c492-4ef8-b2c0-68ba66f40b67";
-const TIMBOON = "b0000000-0000-4000-8000-000000000001"; // Sam & Jamie's service
+const TIMBOON = "b0000000-0000-4000-8000-000000000001"; // Sam's service
 const MORTLAKE = "b0000000-0000-4000-8000-000000000002"; // the "other" RSG service
 const EDUCATOR_ROLE = "9749aa24-8c74-4359-83f0-83c75e45fbbf"; // Sam's job role
-const SELF_AND_MANAGER_SOP = "8a61bf03-443a-4ff3-bc2b-7f5a7105adee"; // one of the 9, currently a draft
-const RSG_SOP = "46f2280d-7e73-4365-bd57-9b617c2c6702"; // any published RSG sop
-const RSG_POLICY = "c7be62dc-117a-413b-940b-3fb98241c8cd"; // any published RSG policy
-const SK_SOP = "1652ad78-50c1-487e-9e24-59b56bf7b291"; // any SK sop
 const RSG_WWCC = "b77efe6f-4a35-41d1-ad79-9f61825be818"; // Sam's WWCC row, already sighted
 const RSG_SECOND_ROLE = "cba06a07-d786-47f9-bbf5-d8de570e50f9"; // Educational Leader - a role Sam does NOT already hold
+
+// Content fixtures are resolved from the live database at startup rather than
+// hardcoded, and the identity fixtures are asserted to still exist.
+//
+// They used to be hardcoded ids, and five of them had silently rotted: RSG's
+// library was cleared and re-imported (which issues fresh row ids) and the
+// manager identity was a profile that no longer existed at all. The script
+// did not say "my fixtures are stale", it reported fourteen failing write
+// paths - which reads exactly like a real RLS regression. A tenant isolation
+// check that cries wolf gets ignored, and this one is the only evidence that
+// one customer cannot read another's data, so it has to be trustworthy or
+// it is worse than useless.
+//
+// Resolving by property (any published RSG procedure, any SK procedure)
+// rather than by id means a future content reload cannot break it. The
+// scenarios never depended on those specific documents anyway - their setup
+// hooks publish and link whatever row they are given.
+let MANAGER; // RSG manager_staff, normalised onto Sam's service - see FIXTURE_BASE
+let SELF_AND_MANAGER_SOP; // an RSG procedure the countersign scenarios publish and sign
+let RSG_SOP; // any published RSG procedure
+let RSG_POLICY; // any published RSG policy
+let SK_SOP; // any Science Kinder procedure - the cross-tenant target
+
+async function resolveFixtures() {
+  const missing = [];
+
+  async function one(label, sql, params = []) {
+    const r = await client.query(sql, params);
+    if (r.rows.length === 0) {
+      missing.push(label);
+      return null;
+    }
+    return r.rows[0].id;
+  }
+
+  MANAGER = await one(
+    "an RSG manager_staff profile",
+    `select id from public.profiles
+     where organisation_id = $1 and access_tier = 'manager_staff'
+     order by created_at limit 1`,
+    [RSG],
+  );
+  RSG_SOP = await one(
+    "a published RSG procedure",
+    `select id from public.sops
+     where organisation_id = $1 and published_version is not null
+     order by created_at limit 1`,
+    [RSG],
+  );
+  SELF_AND_MANAGER_SOP = await one(
+    "a second RSG procedure (countersign fixtures)",
+    `select id from public.sops
+     where organisation_id = $1 and id <> $2
+     order by created_at limit 1`,
+    [RSG, RSG_SOP],
+  );
+  RSG_POLICY = await one(
+    "a published RSG policy",
+    `select id from public.policies
+     where organisation_id = $1 and published_version is not null
+     order by created_at limit 1`,
+    [RSG],
+  );
+  SK_SOP = await one(
+    "a Science Kinder procedure",
+    `select id from public.sops where organisation_id = $1 order by created_at limit 1`,
+    [SK],
+  );
+
+  // The identity fixtures are not resolved by property - who Sam and Pot pots
+  // are is the point of several scenarios - so they are asserted instead.
+  for (const [label, id] of [["ADMIN", ADMIN], ["STAFF", STAFF], ["SK_ADMIN", SK_ADMIN]]) {
+    const r = await client.query(`select 1 from public.profiles where id = $1`, [id]);
+    if (r.rows.length === 0) missing.push(`${label} profile ${id}`);
+  }
+
+  // The per-identity visibility sweep reads this list too. Left unfilled it
+  // would carry uid null, which probe() treats as the anonymous caller - so
+  // the manager's whole sweep would silently become a second anon run and
+  // pass for the wrong reason.
+  USERS.find((u) => u.label === "RSG manager_staff").uid = MANAGER;
+
+  if (missing.length > 0) {
+    console.error("\nCannot run: the database is missing fixtures this check needs:");
+    for (const m of missing) console.error(`  - ${m}`);
+    console.error("\nThis is a problem with the data, not necessarily with RLS.");
+    await client.end();
+    process.exit(1);
+  }
+}
+
+// Runs inside every write-path scenario's transaction, before its own setup,
+// and is rolled back with it. RSG's real staff list has no manager_staff at
+// Sam's service, but "a manager at the same service as the staff member" is
+// the precondition a dozen scenarios are actually testing - the distinction
+// between same-service and other-service is the whole point of several of
+// them. Rather than weaken those scenarios to fit today's staff list, put the
+// manager where the scenario needs them. Nothing here is asserted on; it only
+// establishes the starting state.
+async function FIXTURE_BASE(c) {
+  // hr_manager is cleared, not just service_id. Several scenarios exist
+  // specifically to check that a plain manager CANNOT do something an HR
+  // manager can (sight a WWCC check, assign a job role), and the ones that
+  // need the HR right grant it in their own setup - so the baseline the
+  // script was written against is a manager without it. The real manager_staff
+  // in RSG's staff list happens to carry hr_manager, which turned those
+  // scenarios green in the "expected blocked, got allowed" direction: they
+  // read as a permissions hole when in fact the person genuinely was
+  // authorised and the test had simply lost its premise.
+  await c.query(
+    `update public.profiles set service_id = $1, hr_manager = false where id = $2`,
+    [TIMBOON, MANAGER],
+  );
+}
 
 // table -> the column that carries the tenant boundary (null = no org column)
 const TABLES = {
@@ -96,7 +206,31 @@ const TABLES = {
   external_providers: null,
   platform_notices: null,
   platform_notice_acceptances: "organisation_id",
+  content_chunks: "organisation_id",
+  embedding_jobs: "organisation_id",
+  ai_interactions: "organisation_id",
 };
+
+// A throwaway 1024-dim zero vector, just to satisfy content_chunks.embedding
+// not-null in AI Q&A probes below - the value itself is never compared, only
+// row visibility is.
+const ZERO_VECTOR = `[${Array(1024).fill(0).join(",")}]`;
+
+// RSG_SOP/SELF_AND_MANAGER_SOP/RSG_POLICY above no longer exist (confirmed
+// directly against the live DB) - stale since RSG's content was cleared and
+// restored via bulk upload, which issues fresh row ids and was never
+// re-verified against this script afterward. That is a pre-existing,
+// separate problem across roughly a dozen scenarios below (not introduced
+// here, out of scope for the AI Q&A work to fix) - these two are current,
+// real, published RSG rows, used only by the new AI Q&A probes so those
+// specifically test something real rather than a row that silently no
+// longer exists.
+const RSG_REAL_POLICY = "1d57db15-d8a7-429b-9359-5002209a26c0"; // Bullying... Policy, published, no audience rows
+const RSG_REAL_SOP = "1c06200c-0766-4fad-8a75-15a4958d5d6c"; // Phone Communication, published, already linked to EDUCATOR_ROLE and to Sam via profile_job_roles
+// MANAGER (Jamie) above no longer exists as a profile at all - confirmed
+// directly, same pre-existing staleness. Filo Mateiwai is a real, current
+// RSG manager_policy at Sam's own service (Timboon).
+const RSG_REAL_MANAGER = "ec179b4d-14a1-416f-bfe0-4ac448ffba68";
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
@@ -157,7 +291,14 @@ async function probe(user) {
 }
 
 // Write probes: each should be REJECTED. label -> {uid, sql, params}
-const WRITE_PROBES = [
+//
+// A function rather than a bare array: `params` is evaluated the moment the
+// array literal is built, which is module load, and the content fixtures do
+// not exist until resolveFixtures() has queried the database. As a plain
+// const array every one of them captured undefined - and an undefined id
+// makes a write fail, which this section scores as a pass, so the probes
+// would have gone green while testing nothing at all.
+const writeProbes = () => [
   {
     label: "staff makes self admin",
     uid: "a5895163-3db5-4029-86f1-c9ad7e06271b",
@@ -263,6 +404,7 @@ async function scenario(label, { setup, as: uid, probe: run, expectOk, note }) {
   let ok = false;
   let detail = "";
   try {
+    await FIXTURE_BASE(client);
     if (setup) await setup(client);
     await as(uid);
     const result = await run(client);
@@ -287,7 +429,14 @@ async function scenario(label, { setup, as: uid, probe: run, expectOk, note }) {
   );
 }
 
-const APP_SCENARIOS = [
+// A function for the same reason writeProbes() is - `as:` and any fixture id
+// used outside a closure are read when the array literal is built, which is
+// before resolveFixtures() has run. `setup` and `probe` are closures and so
+// were never affected, which made this sharp: every scenario whose identity
+// was a plain const passed normally, and only the ones keyed to a resolved
+// fixture failed, looking precisely like a permissions bug in those specific
+// write paths rather than an undefined identity.
+const appScenarios = () => [
   // Manager cosign on the self_and_manager suite. All nine are still drafts
   // (published_version is null) as of this run, so the setup step publishes
   // one for the duration of the transaction only - there is otherwise no
@@ -470,6 +619,17 @@ const APP_SCENARIOS = [
   {
     label: "staff accepts the platform notice for themselves",
     expectOk: true,
+    // Both these people have accepted notice version 1 in real life, so
+    // without clearing it the insert fails on the unique constraint rather
+    // than on anything to do with RLS. That misreports in both directions:
+    // here it looks like a staff member is blocked from accepting their own
+    // notice, and in the scenario below a duplicate-key error is indistin-
+    // guishable from a policy rejection, so it would pass while testing
+    // nothing.
+    setup: (c) =>
+      c.query(`delete from public.platform_notice_acceptances where profile_id = any($1)`, [
+        [STAFF, MANAGER],
+      ]),
     as: STAFF,
     probe: (c) =>
       c.query(
@@ -481,6 +641,10 @@ const APP_SCENARIOS = [
   {
     label: "staff accepts the platform notice on someone else's behalf",
     expectOk: false,
+    setup: (c) =>
+      c.query(`delete from public.platform_notice_acceptances where profile_id = any($1)`, [
+        [STAFF, MANAGER],
+      ]),
     as: STAFF,
     probe: (c) =>
       c.query(
@@ -903,14 +1067,146 @@ const APP_SCENARIOS = [
     probe: (c) =>
       c.query(`update public.sop_outcome_flags set resolved_at=now() where id=$1`, [c._flagId]),
   },
+
+  // AI Staff Q&A (migrations 0075-0077). content_chunks has no write policy
+  // for ordinary users at all - only the embedding cron worker (service
+  // role) ever writes it - so setup below inserts as the connection's own
+  // unrestricted role, exactly like the service-role sanity checks further
+  // down this file, before switching identity for the actual probe.
+  {
+    label: "policy chunk: RSG staff reads it (no audience rows = visible to all in-org, same as policy_visible() itself)",
+    expectOk: true,
+    setup: async (c) => {
+      await c.query(
+        `insert into public.content_chunks (organisation_id, document_type, document_id, document_version, chunk_index, section_heading, chunk_text, embedding)
+         values ($1,'policy',$2,1,0,'Test section','Test chunk text.',$3::vector)`,
+        [RSG, RSG_REAL_POLICY, ZERO_VECTOR],
+      );
+    },
+    as: STAFF,
+    probe: (c) =>
+      c.query(`select id from public.content_chunks where document_type='policy' and document_id=$1`, [RSG_REAL_POLICY]),
+  },
+  {
+    label: "policy chunk: SK admin reads an RSG chunk (cross-tenant, blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      await c.query(
+        `insert into public.content_chunks (organisation_id, document_type, document_id, document_version, chunk_index, section_heading, chunk_text, embedding)
+         values ($1,'policy',$2,1,0,'Test section','Test chunk text.',$3::vector)`,
+        [RSG, RSG_REAL_POLICY, ZERO_VECTOR],
+      );
+    },
+    as: SK_ADMIN,
+    probe: (c) => c.query(`select id from public.content_chunks where document_type='policy' and document_id=$1`, [RSG_REAL_POLICY]),
+  },
+  {
+    // Phone Communication is already linked to EDUCATOR_ROLE via
+    // job_role_sops, and Sam already holds EDUCATOR_ROLE via
+    // profile_job_roles - both real, current state, no setup needed for
+    // the role link itself.
+    label: "procedure chunk: staff holding the linked job role reads it (sop_visible via profile_job_roles)",
+    expectOk: true,
+    setup: async (c) => {
+      await c.query(
+        `insert into public.content_chunks (organisation_id, document_type, document_id, document_version, chunk_index, section_heading, chunk_text, embedding)
+         values ($1,'sop',$2,1,0,'Test section','Test chunk text.',$3::vector)`,
+        [RSG, RSG_REAL_SOP, ZERO_VECTOR],
+      );
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select id from public.content_chunks where document_type='sop' and document_id=$1`, [RSG_REAL_SOP]),
+  },
+  {
+    label: "authenticated staff writes directly into content_chunks (blocked - service role only)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.content_chunks (organisation_id, document_type, document_id, document_version, chunk_index, chunk_text, embedding)
+         values ($1,'policy',$2,1,0,'hacked',$3::vector)`,
+        [RSG, RSG_REAL_POLICY, ZERO_VECTOR],
+      ),
+  },
+  {
+    label: "content editor enqueues an embedding job (mirrors what publishPolicy/publishSop now do)",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) =>
+      c.query(
+        `insert into public.embedding_jobs (organisation_id, document_type, document_id, document_version) values ($1,'policy',$2,1)`,
+        [RSG, RSG_REAL_POLICY],
+      ),
+  },
+  {
+    label: "plain staff enqueues an embedding job directly (blocked - can_edit_content required)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.embedding_jobs (organisation_id, document_type, document_id, document_version) values ($1,'policy',$2,1)`,
+        [RSG, RSG_REAL_POLICY],
+      ),
+  },
+  {
+    label: "staff logs their own Q&A interaction",
+    expectOk: true,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.ai_interactions (organisation_id, staff_profile_id, question, response, grounded, model)
+         values ($1,$2,'Test question?','Test answer.',true,'test-model')`,
+        [RSG, STAFF],
+      ),
+  },
+  {
+    label: "staff spoofs staff_profile_id on an interaction log to someone else",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.ai_interactions (organisation_id, staff_profile_id, question, response, grounded, model)
+         values ($1,$2,'Test question?','Test answer.',true,'test-model')`,
+        [RSG, RSG_REAL_MANAGER],
+      ),
+  },
+  {
+    label: "manager reads the org's Q&A interaction log",
+    expectOk: true,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.ai_interactions (organisation_id, staff_profile_id, question, response, grounded, model)
+         values ($1,$2,'Test question?','Test answer.',true,'test-model') returning id`,
+        [RSG, STAFF],
+      );
+      c._interactionId = r.rows[0].id;
+    },
+    as: RSG_REAL_MANAGER,
+    probe: (c) => c.query(`select id from public.ai_interactions where id=$1`, [c._interactionId]),
+  },
+  {
+    label: "plain staff reads the interaction log, even their own (blocked - audit trail is manager-only)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.ai_interactions (organisation_id, staff_profile_id, question, response, grounded, model)
+         values ($1,$2,'Test question?','Test answer.',true,'test-model') returning id`,
+        [RSG, STAFF],
+      );
+      c._interactionId = r.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select id from public.ai_interactions where id=$1`, [c._interactionId]),
+  },
 ];
 
 await client.connect();
+await resolveFixtures();
 for (const u of USERS) await probe(u);
 console.log("\n=== write probes (all should be rejected or no-op) ===");
-for (const p of WRITE_PROBES) await writeProbe(p);
+for (const p of writeProbes()) await writeProbe(p);
 console.log("\n=== application write-path scenarios ===");
-for (const s of APP_SCENARIOS) await scenario(s.label, s);
+for (const s of appScenarios()) await scenario(s.label, s);
 
 // Sanity checks for the two server tasks that are meant to keep the
 // service-role key: run as the connection's own unrestricted role (no
