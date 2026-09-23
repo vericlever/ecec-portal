@@ -22,6 +22,12 @@ export type SiteNavProps = {
   aiQaEnabled: boolean;
 };
 
+// Shared by the Ask link and the Sign out button in both the desktop header
+// and the mobile sheet, so the pair always render as the same size box. They
+// previously carried their own padding and text sizes and did not match.
+const ACTION_BUTTON =
+  "block whitespace-nowrap border-2 border-ink px-3 py-1 text-center text-xs font-medium";
+
 export function SiteNav(props: SiteNavProps) {
   const {
     fullName,
@@ -209,22 +215,26 @@ export function SiteNav(props: SiteNavProps) {
             </div>
           )}
         </Link>
-        {aiQaEnabled && (
-          <Link
-            href="/ask"
-            className="border-2 border-ink bg-ink px-2.5 py-1 text-xs font-medium text-paper hover:bg-ink/90"
-          >
-            Ask
-          </Link>
-        )}
-        <form action="/logout" method="post">
-          <button
-            type="submit"
-            className="border-2 border-ink px-3.5 py-1.5 text-sm text-ink hover:bg-ink hover:text-paper"
-          >
-            Sign out
-          </button>
-        </form>
+        {/* Stacked, not side by side: at a narrow desktop width "Sign out"
+            wrapped onto two lines next to a single-line "Ask", leaving two
+            boxes of visibly different heights. Both share ACTION_BUTTON so
+            their size cannot drift apart again, and the column sizes itself
+            to the wider label while each child stretches to match it. */}
+        <div className="flex flex-col items-stretch gap-1.5">
+          <form action="/logout" method="post">
+            <button
+              type="submit"
+              className={`${ACTION_BUTTON} w-full text-ink hover:bg-ink hover:text-paper`}
+            >
+              Sign out
+            </button>
+          </form>
+          {aiQaEnabled && (
+            <Link href="/ask" className={`${ACTION_BUTTON} bg-ink text-paper hover:bg-ink/90`}>
+              Ask
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Mobile menu button */}
@@ -298,23 +308,17 @@ export function SiteNav(props: SiteNavProps) {
                 <div className="font-medium text-ink">{fullName}</div>
                 {orgName && <div className="text-xs text-ink-faint">{orgName}</div>}
               </Link>
-              <div className="flex items-center gap-2">
-                {aiQaEnabled && (
-                  <Link
-                    href="/ask"
-                    className="border-2 border-ink bg-ink px-2 py-1 text-xs font-medium text-paper"
-                  >
-                    Ask
-                  </Link>
-                )}
+              <div className="flex flex-col items-stretch gap-1.5">
                 <form action="/logout" method="post">
-                  <button
-                    type="submit"
-                    className="border-2 border-ink px-3 py-1.5 text-xs font-medium text-ink"
-                  >
+                  <button type="submit" className={`${ACTION_BUTTON} w-full text-ink`}>
                     Sign out
                   </button>
                 </form>
+                {aiQaEnabled && (
+                  <Link href="/ask" className={`${ACTION_BUTTON} bg-ink text-paper`}>
+                    Ask
+                  </Link>
+                )}
               </div>
             </div>
           </div>
