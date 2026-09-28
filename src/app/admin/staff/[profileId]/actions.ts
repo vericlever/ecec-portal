@@ -202,18 +202,13 @@ export async function uploadContract(
   }
 
   const notes = String(formData.get("notes") ?? "").trim() || null;
-  // A deed is never signed in-app (see migration 0042) - HR/Admin flags it at
-  // upload, based on the document they are looking at.
-  const isDeed = formData.get("is_deed") === "on";
   // Step 57: every contract requires countersignature - no per-upload
-  // choice. Deeds never use this field either way (see executionState()).
+  // choice.
   const requiresCountersign = true;
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!isDeed) {
-    const validation = await validatePdf(bytes, file.type || null, file.name);
-    if (!validation.ok) return { ok: false, error: validation.error };
-  }
+  const validation = await validatePdf(bytes, file.type || null, file.name);
+  if (!validation.ok) return { ok: false, error: validation.error };
 
   const supabase = createClient();
   const { data: contract, error } = await supabase
@@ -226,7 +221,6 @@ export async function uploadContract(
       duration_months: durationMonths,
       expiry_date: expiry,
       notes,
-      is_deed: isDeed,
       requires_countersign: requiresCountersign,
       created_by: gate.me.id,
     })
