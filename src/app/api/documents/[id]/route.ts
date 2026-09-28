@@ -8,7 +8,7 @@ import { signedDocumentUrl } from "@/lib/documents/store";
 // Access is re-checked here against the owning record, not left to the
 // documents-table RLS.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const me = await getProfile();
@@ -56,7 +56,8 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const signed = await signedDocumentUrl(params.id);
+  const inline = request.nextUrl.searchParams.get("inline") === "1";
+  const signed = await signedDocumentUrl(params.id, { inline });
   if (!signed) return new NextResponse("Not found", { status: 404 });
   return NextResponse.redirect(signed.url);
 }

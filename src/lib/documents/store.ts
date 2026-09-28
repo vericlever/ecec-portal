@@ -154,6 +154,13 @@ export async function storeDocument(opts: {
 // bucket read itself has no separate RLS to hand it to anyway.
 export async function signedDocumentUrl(
   documentId: string,
+  // An <iframe> preview needs the browser to render the file inline - the
+  // default `download` disposition forces a save-file prompt instead and
+  // leaves the iframe blank, since a browser won't render an
+  // attachment-disposition response in place. Content-Type is already set
+  // correctly at upload time (storeDocument), so omitting `download` is
+  // enough for inline rendering to work.
+  opts?: { inline?: boolean },
 ): Promise<{ url: string; fileName: string } | null> {
   const admin = createAdminClient();
   const { data: doc } = await admin
@@ -165,7 +172,11 @@ export async function signedDocumentUrl(
 
   const { data, error } = await admin.storage
     .from(BUCKET)
-    .createSignedUrl(doc.storage_path, 120, { download: doc.file_name });
+    .createSignedUrl(
+      doc.storage_path,
+      120,
+      opts?.inline ? undefined : { download: doc.file_name },
+    );
   if (error || !data) return null;
   return { url: data.signedUrl, fileName: doc.file_name };
 }

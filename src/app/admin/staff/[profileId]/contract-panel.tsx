@@ -193,7 +193,7 @@ export function ContractPanel({
 
           {!active.is_deed && !active.signed_at && active.document_id && (
             <iframe
-              src={`/api/documents/${active.document_id}`}
+              src={`/api/documents/${active.document_id}?inline=1`}
               className="mt-2 h-80 w-full rounded-md border border-slate-200"
               title="Contract preview"
             />
@@ -232,7 +232,7 @@ export function ContractPanel({
             <div className="mt-2">
               {active.signed_copy_document_id ? (
                 <iframe
-                  src={`/api/documents/${active.signed_copy_document_id}`}
+                  src={`/api/documents/${active.signed_copy_document_id}?inline=1`}
                   className="h-80 w-full rounded-md border border-slate-200"
                   title="Signed contract preview"
                 />
