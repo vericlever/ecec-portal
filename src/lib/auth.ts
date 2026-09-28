@@ -8,6 +8,7 @@ import {
   canViewReports,
 } from "@/lib/roles";
 import { DEFAULT_ORG_TIMEZONE } from "@/lib/format-date";
+import { reachesService as reachesServiceReach } from "@/lib/service-reach";
 
 export * from "@/lib/roles";
 
@@ -20,6 +21,12 @@ export type Profile = {
   email: string;
   access_tier: AccessTier;
   hr_manager: boolean;
+  // Migration 0093: reach beyond the home service_id. all_services means
+  // every service in the organisation, including ones added later;
+  // service_ids is the explicit extra list (staff_service_assignments) for
+  // "these specific services, not all". See src/lib/service-reach.ts.
+  all_services: boolean;
+  service_ids: string[];
   // The organisation's IANA timezone (Step 43) - every user-facing timestamp
   // renders in this, not server time. Threaded through here so every
   // already-authenticated page has it without an extra query. Falls back to
@@ -44,7 +51,7 @@ export async function getProfile(): Promise<Profile | null> {
   const { data } = await supabase
     .from("profiles")
     .select(
-      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, signing_paused_at, signing_paused_reason, signing_paused_until, signing_paused_days_banked, organisations(timezone)",
+      "id, organisation_id, service_id, job_role_id, full_name, email, access_tier, hr_manager, all_services, signing_paused_at, signing_paused_reason, signing_paused_until, signing_paused_days_banked, organisations(timezone), staff_service_assignments(service_id)",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -52,13 +59,33 @@ export async function getProfile(): Promise<Profile | null> {
   if (!data) return null;
   const org = data.organisations as { timezone: string } | { timezone: string }[] | null;
   const timezone = Array.isArray(org) ? org[0]?.timezone : org?.timezone;
-  const { organisations: _organisations, ...rest } = data as typeof data & {
+  const assignments = data.staff_service_assignments as
+    | { service_id: string }[]
+    | null;
+  const {
+    organisations: _organisations,
+    staff_service_assignments: _assignments,
+    ...rest
+  } = data as typeof data & {
     organisations: unknown;
+    staff_service_assignments: unknown;
   };
   return {
-    ...(rest as Omit<Profile, "organisation_timezone">),
+    ...(rest as Omit<Profile, "organisation_timezone" | "service_ids">),
+    service_ids: (assignments ?? []).map((a) => a.service_id),
     organisation_timezone: timezone ?? DEFAULT_ORG_TIMEZONE,
   };
+}
+
+// A person's reach: their home service, every service if all_services is
+// set, or an explicit extra assignment (migration 0093). See
+// src/lib/service-reach.ts for the shared, non-server-only version of this
+// logic.
+export function reachesService(
+  viewer: Profile,
+  targetServiceId: string | null,
+): boolean {
+  return reachesServiceReach(viewer, targetServiceId);
 }
 
 // An HR manager: an admin, or anyone with the hr_manager flag. Gates document

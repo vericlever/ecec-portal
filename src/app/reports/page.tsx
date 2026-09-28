@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage() {
   const me = await requireReportsAccess();
   const admin = isAdmin(me.access_tier);
+  // A manager/HR manager whose reach spans every service (migration 0093)
+  // gets the same service selector as an Admin - the API layer honours it
+  // for them the same way (resolveReportScope), so hiding it would be
+  // misleading, not just decorative, exactly as the comment on
+  // ServiceReportCard already says for the Admin-only case.
+  const broadReach = admin || me.all_services;
   const supabase = createClient();
 
   const [{ data: services }, { data: staffRows }, coverage] = await Promise.all([
@@ -35,7 +41,7 @@ export default async function ReportsPage() {
     <div>
       <h1 className="text-xl font-semibold">Reports</h1>
       <p className="mt-1 text-sm text-slate-500">
-        {admin
+        {broadReach
           ? "Coverage checks and downloadable reports across your organisation."
           : "Coverage checks and downloadable reports for your service."}
       </p>
@@ -80,7 +86,7 @@ export default async function ReportsPage() {
           description="A per-service version of the admin overview: staff, sign-off and viewing rates, outstanding items."
           routeBase="/reports/service-overview"
           services={serviceList}
-          isAdmin={admin}
+          isAdmin={broadReach}
           ownServiceId={me.service_id}
           ownServiceName={ownServiceName}
           allowAll={false}
@@ -103,7 +109,7 @@ export default async function ReportsPage() {
           description="Everything expiring: credentials, WWCC, contracts."
           routeBase="/reports/hr-expiring-items"
           services={serviceList}
-          isAdmin={admin}
+          isAdmin={broadReach}
           ownServiceId={me.service_id}
           ownServiceName={ownServiceName}
         />
@@ -113,7 +119,7 @@ export default async function ReportsPage() {
           description="Every review date on the books, from the existing review clock."
           routeBase="/reports/review-calendar"
           services={serviceList}
-          isAdmin={admin}
+          isAdmin={broadReach}
           ownServiceId={me.service_id}
           ownServiceName={ownServiceName}
         />

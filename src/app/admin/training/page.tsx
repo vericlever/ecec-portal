@@ -42,6 +42,7 @@ export default async function TrainingStatusPage({
 }) {
   const me = await requireStaffAccess();
   const admin = isAdmin(me.access_tier);
+  const broadReach = admin || me.all_services;
   const supabase = createClient();
 
   const requested = searchParams.service ?? null;
@@ -117,7 +118,7 @@ export default async function TrainingStatusPage({
       <p className="mt-1 text-sm text-slate-500">
         Every procedure assigned to a staff member through their job role, whether
         it has been signed, and where it stands against the signing clock.
-        {!admin && ownServiceName && ` Scoped to ${ownServiceName}.`}
+        {!broadReach && ownServiceName && ` Scoped to ${ownServiceName}.`}
       </p>
 
       <div className="mt-4">
@@ -126,7 +127,7 @@ export default async function TrainingStatusPage({
           services={serviceList}
           jobRoles={(jobRoles ?? []) as { id: string; name: string }[]}
           sops={(sopList ?? []) as { id: string; name: string }[]}
-          showServiceFilter={admin}
+          showServiceFilter={broadReach}
           includeInactive={includeInactive}
         />
       </div>

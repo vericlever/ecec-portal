@@ -19,6 +19,7 @@ type StaffRow = {
   access_tier: AccessTier;
   is_active: boolean;
   service_id: string | null;
+  all_services: boolean;
   job_role_id: string | null;
   hr_manager: boolean;
   signing_paused_at: string | null;
@@ -39,7 +40,7 @@ export default async function StaffPage() {
       supabase
         .from("profiles")
         .select(
-          "id, full_name, email, access_tier, is_active, service_id, job_role_id, hr_manager, signing_paused_at",
+          "id, full_name, email, access_tier, is_active, service_id, all_services, job_role_id, hr_manager, signing_paused_at",
         )
         .order("full_name"),
       supabase.from("services").select("id, name"),
@@ -264,9 +265,11 @@ function StaffRowItem({
             {" · "}
             {roleLabel}
             {" · "}
-            {p.service_id
-              ? (serviceName.get(p.service_id) ?? "—")
-              : "all services"}
+            {p.all_services
+              ? "all services"
+              : p.service_id
+                ? (serviceName.get(p.service_id) ?? "—")
+                : "unassigned"}
             {" · "}
             {lastReminded
               ? `Last reminded ${fmtDateTime(lastReminded, timezone)}`

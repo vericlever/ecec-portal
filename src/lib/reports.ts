@@ -20,6 +20,7 @@ import { contractAlerts, renewalState, type ContractRow } from "@/lib/contracts"
 import { staffStatsByProfile, summariseTeam } from "@/lib/staff-stats";
 import { unsignedAgreementsByProfile } from "@/lib/agreements";
 import { assignedJobRoles, sopSuiteIdsForRoles } from "@/lib/staff-job-roles";
+import { contentAppliesToPerson } from "@/lib/service-reach";
 
 type ServerClient = ReturnType<typeof createClient>;
 
@@ -47,7 +48,12 @@ export function resolveReportScope(
   profile: Profile,
   requestedServiceId: string | null,
 ): { serviceId: string | null; restricted: boolean } {
-  if (isAdmin(profile.access_tier)) {
+  // An admin, or a manager/HR manager whose reach spans every service
+  // (migration 0093), picks any service or "all" the same way an admin does.
+  // Someone assigned a specific extra service (not all_services) is still
+  // pinned to their home service here for now - reporting across a named
+  // subset of services is a further step, not yet built.
+  if (isAdmin(profile.access_tier) || profile.all_services) {
     return { serviceId: requestedServiceId, restricted: false };
   }
   return { serviceId: profile.service_id, restricted: true };
@@ -207,7 +213,7 @@ export async function serviceOverviewData(
     supabase.from("services").select("name").eq("id", serviceId).maybeSingle(),
     supabase
       .from("profiles")
-      .select("id, job_role_id, service_id, is_active")
+      .select("id, job_role_id, service_id, all_services, is_active")
       .eq("service_id", serviceId)
       .eq("is_active", true),
   ]);
@@ -215,6 +221,7 @@ export async function serviceOverviewData(
     id: string;
     job_role_id: string | null;
     service_id: string | null;
+    all_services: boolean;
   }[];
   const stats = await staffStatsByProfile(supabase, people, currentProfileId);
   const team = summariseTeam(
@@ -249,6 +256,7 @@ export type TagSectionAction = {
   ownerName: string;
   dueDate: string;
   status: "open" | "done" | "cancelled";
+  effectiveness: "worked" | "did_not_work" | "too_early" | null;
 };
 
 export type TagSectionSop = {
@@ -264,6 +272,14 @@ export type TagSectionSop = {
   outcomeReflection: string | null;
   evidenceFileName: string | null;
   actions: TagSectionAction[];
+  // Step 59, B9: the reason line and evidence counts for the latest
+  // completed review - null when there is no review yet. Counts only
+  // records/flags actually attached to that review (confirmed links whose
+  // review_id points at it, flags resolved by it) - nothing unconfirmed or
+  // still pending ever appears here.
+  reviewReason: string | null;
+  outcomeRecordCount: number;
+  staffFlagCount: number;
 };
 
 export type TagSection = { option: TagOption; sops: TagSectionSop[] };
@@ -307,13 +323,14 @@ async function tagSectionsReport(
     practice_reflection: string;
     outcome_reflection: string;
     evidence_path: string | null;
+    reason: string | null;
   };
 
   const sopIdsInvolved = [...sopById.keys()];
   const { data: reviews } = sopIdsInvolved.length
     ? await supabase
         .from("sop_reviews")
-        .select("id, sop_id, reviewed_at, decision, practice_reflection, outcome_reflection, evidence_path")
+        .select("id, sop_id, reviewed_at, decision, practice_reflection, outcome_reflection, evidence_path, reason")
         .in("sop_id", sopIdsInvolved)
         .order("reviewed_at", { ascending: false })
     : { data: [] as ReviewRow[] };
@@ -329,9 +346,28 @@ async function tagSectionsReport(
   const { data: actionRows } = latestReviewIds.length
     ? await supabase
         .from("sop_review_actions")
-        .select("review_id, description, owner_id, due_date, status")
+        .select("review_id, description, owner_id, due_date, status, effectiveness")
         .in("review_id", latestReviewIds)
     : { data: [] as never[] };
+
+  // B9: evidence counts - only records/flags actually attached to the
+  // latest completed review.
+  const { data: linkRows } = latestReviewIds.length
+    ? await supabase.from("outcome_record_links").select("review_id").in("review_id", latestReviewIds)
+    : { data: [] as { review_id: string }[] };
+  const { data: flagRows } = latestReviewIds.length
+    ? await supabase.from("sop_outcome_flags").select("resolved_review_id").in("resolved_review_id", latestReviewIds)
+    : { data: [] as { resolved_review_id: string }[] };
+  const recordCountByReview = new Map<string, number>();
+  for (const l of linkRows ?? []) {
+    const id = l.review_id as string;
+    recordCountByReview.set(id, (recordCountByReview.get(id) ?? 0) + 1);
+  }
+  const flagCountByReview = new Map<string, number>();
+  for (const f of flagRows ?? []) {
+    const id = f.resolved_review_id as string;
+    flagCountByReview.set(id, (flagCountByReview.get(id) ?? 0) + 1);
+  }
 
   const ownerIds = [...new Set((actionRows ?? []).map((a) => a.owner_id as string))];
   const { data: owners } = ownerIds.length
@@ -347,6 +383,7 @@ async function tagSectionsReport(
       ownerName: ownerName.get(a.owner_id as string) ?? "Someone",
       dueDate: fmtReportDate(a.due_date as string),
       status: a.status as "open" | "done" | "cancelled",
+      effectiveness: (a.effectiveness as "worked" | "did_not_work" | "too_early" | null) ?? null,
     });
     actionsByReview.set(a.review_id as string, list);
   }
@@ -380,6 +417,9 @@ async function tagSectionsReport(
         outcomeReflection: review?.outcome_reflection ?? null,
         evidenceFileName: review?.evidence_path ? fileNameFromPath(review.evidence_path) : null,
         actions: review ? (actionsByReview.get(review.id) ?? []) : [],
+        reviewReason: review?.reason ?? null,
+        outcomeRecordCount: review ? (recordCountByReview.get(review.id) ?? 0) : 0,
+        staffFlagCount: review ? (flagCountByReview.get(review.id) ?? 0) : 0,
       };
     });
     sopsOut.sort((a, b) => a.name.localeCompare(b.name));
@@ -540,10 +580,16 @@ export async function perStaffComplianceData(
 ): Promise<PerStaffCompliance | null> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, service_id, job_role_id")
+    .select("id, full_name, service_id, all_services, job_role_id")
     .eq("id", profileId)
     .maybeSingle();
   if (!profile) return null;
+
+  const { data: serviceAssignments } = await supabase
+    .from("staff_service_assignments")
+    .select("service_id")
+    .eq("profile_id", profileId);
+  const extraServiceIds = (serviceAssignments ?? []).map((a) => a.service_id as string);
 
   const jobRoles = await assignedJobRoles(supabase, profileId);
   const jobRoleIds = jobRoles.map((r) => r.id);
@@ -593,8 +639,12 @@ export async function perStaffComplianceData(
     .eq("user_id", profileId);
   const viewedKeys = new Set((views ?? []).map((v) => `${v.policy_id}:${v.policy_version}`));
   type PubPolicy = { id: string; name: string; published_version: number; service_id: string | null };
-  const expected = ((orgPolicies ?? []) as PubPolicy[]).filter(
-    (p) => p.service_id == null || p.service_id === profile.service_id,
+  const expected = ((orgPolicies ?? []) as PubPolicy[]).filter((p) =>
+    contentAppliesToPerson(p.service_id, {
+      service_id: profile.service_id,
+      all_services: profile.all_services,
+      service_ids: extraServiceIds,
+    }),
   );
   const policiesOutstanding = expected
     .filter((p) => !viewedKeys.has(`${p.id}:${p.published_version}`))

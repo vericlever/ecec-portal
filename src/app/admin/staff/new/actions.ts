@@ -40,6 +40,13 @@ export async function createStaff(
   const tierInput = String(formData.get("access_tier") ?? "staff") as AccessTier;
   const jobRoleId = String(formData.get("job_role_id") ?? "").trim() || null;
   const serviceInput = String(formData.get("service_id") ?? "").trim() || null;
+  // Service access (all_services / extra service_ids): admin only, same as
+  // access tier - a manager creating a staff account cannot grant reach
+  // beyond their own service, matching staff_service_assignments' write RLS.
+  const allServices = isAdmin(me.access_tier) && formData.get("all_services") === "on";
+  const serviceIds = isAdmin(me.access_tier)
+    ? Array.from(new Set(formData.getAll("service_ids").map((v) => String(v))))
+    : [];
 
   if (!fullName || !email) {
     return { status: "error", error: "Name and email are required." };
@@ -54,6 +61,15 @@ export async function createStaff(
     : "staff";
   const serviceId = isAdmin(me.access_tier) ? serviceInput : me.service_id;
 
+  // Same rule as setStaffServiceAccess: no home service and nothing ticked
+  // would create an account with no service at all from the outset.
+  if (!allServices && serviceIds.length === 0 && !serviceId) {
+    return {
+      status: "error",
+      error: "Choose a home service, or tick a service (or All services) under Service access.",
+    };
+  }
+
   const supabase = createClient();
 
   if (serviceId) {
@@ -65,6 +81,17 @@ export async function createStaff(
       .maybeSingle();
     if (!service) {
       return { status: "error", error: "That service is not in your organisation." };
+    }
+  }
+
+  if (serviceIds.length > 0) {
+    const { data: validServices } = await supabase
+      .from("services")
+      .select("id")
+      .eq("organisation_id", me.organisation_id)
+      .in("id", serviceIds);
+    if ((validServices ?? []).length !== serviceIds.length) {
+      return { status: "error", error: "One of those services is not in your organisation." };
     }
   }
 
@@ -109,6 +136,7 @@ export async function createStaff(
     id: created.user.id,
     organisation_id: me.organisation_id,
     service_id: serviceId,
+    all_services: allServices,
     job_role_id: jobRoleId,
     full_name: fullName,
     email,
@@ -119,6 +147,16 @@ export async function createStaff(
   if (profileErr) {
     await admin.auth.admin.deleteUser(created.user.id);
     return { status: "error", error: profileErr.message };
+  }
+
+  if (serviceIds.length > 0) {
+    await supabase.from("staff_service_assignments").insert(
+      serviceIds.map((sid) => ({
+        profile_id: created.user.id,
+        service_id: sid,
+        organisation_id: me.organisation_id,
+      })),
+    );
   }
 
   // Mirrors the primary role into profile_job_roles too - a second role can

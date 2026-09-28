@@ -136,14 +136,14 @@ export function NewStaffForm({
         </select>
       </Field>
 
-      <Field label="Service" htmlFor="service_id">
+      <Field label="Home service" htmlFor="service_id">
         <select
           id="service_id"
           name="service_id"
           defaultValue=""
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         >
-          <option value="">All services</option>
+          <option value="">Unassigned</option>
           {services.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -151,6 +151,36 @@ export function NewStaffForm({
           ))}
         </select>
       </Field>
+
+      {canSetTier && (
+        <fieldset>
+          <legend className="block text-sm font-medium text-slate-700">
+            Service access
+          </legend>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Extra services this person&rsquo;s reach (as a manager or HR
+            manager) and applicable policies span, beyond their home service
+            above.
+          </p>
+          <div className="mt-2 space-y-1.5">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="all_services" value="on" className="h-4 w-4" />
+              <span>All services (including any added later)</span>
+            </label>
+            {services.map((s) => (
+              <label key={s.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="service_ids"
+                  value={s.id}
+                  className="h-4 w-4"
+                />
+                <span>{s.name}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       {state.status === "error" && (
         <p className="text-sm text-red-600">{state.error}</p>

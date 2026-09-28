@@ -1,4 +1,4 @@
-import { reportsProfileOrResponse, isAdmin } from "@/lib/auth";
+import { reportsProfileOrResponse } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { hrExpiringItemsData, organisationName, resolveReportScope } from "@/lib/reports";
 import { pdfResponse } from "@/lib/pdf";
@@ -13,10 +13,11 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const requested = url.searchParams.get("service");
-  // "all" is only meaningful for Admin; resolveReportScope pins everyone else
-  // to their own service regardless of what is asked for.
+  // "all" is only meaningful for an unrestricted viewer (Admin, or a manager/
+  // HR manager with all_services reach); resolveReportScope pins everyone
+  // else to their own service regardless of what is asked for.
   const requestedServiceId = requested === "all" || !requested ? null : requested;
-  const { serviceId } = resolveReportScope(profile, requestedServiceId);
+  const { serviceId, restricted } = resolveReportScope(profile, requestedServiceId);
 
   const supabase = createClient();
   const [orgName, service, people] = await Promise.all([
@@ -29,9 +30,9 @@ export async function GET(req: Request) {
 
   const scopeLabel = serviceId
     ? ((service.data?.name as string | undefined) ?? "Unknown service")
-    : isAdmin(profile.access_tier)
-      ? "All services"
-      : "Not assigned to a service";
+    : restricted
+      ? "Not assigned to a service"
+      : "All services";
 
   return pdfResponse(
     HrExpiringItemsPdf({ orgName, scopeLabel, people, timezone: profile.organisation_timezone }),

@@ -14,6 +14,7 @@ import {
   setProbation,
   setStaffAccessTier,
   setStaffJobRoles,
+  setStaffServiceAccess,
 } from "./actions";
 import {
   permanentlyDeleteStaff,
@@ -802,6 +803,117 @@ export function DeleteAccountControl({ profileId }: { profileId: string }) {
         >
           {pending ? "Deleting…" : "Delete permanently"}
         </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+// Which services this person's manager/HR reach (and, for anyone, their
+// applicable policy content) spans, beyond their home service. "All
+// services" covers every service in the organisation, including ones added
+// later; otherwise it's whichever boxes below are ticked, in addition to
+// their home service. Mirrors AccessTierControl's staged-choice-then-Save
+// shape, since several checkboxes changing together should not each fire
+// their own save.
+export function ServiceAccessControl({
+  profileId,
+  allServices,
+  serviceIds,
+  services,
+  homeServiceId,
+}: {
+  profileId: string;
+  allServices: boolean;
+  serviceIds: string[];
+  services: { id: string; name: string }[];
+  homeServiceId: string | null;
+}) {
+  const router = useRouter();
+  const [allChoice, setAllChoice] = useState(allServices);
+  const [idsChoice, setIdsChoice] = useState<string[]>(serviceIds);
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  const sameIds =
+    idsChoice.length === serviceIds.length &&
+    idsChoice.every((id) => serviceIds.includes(id));
+  const dirty = allChoice !== allServices || !sameIds;
+  // No home service to fall back on and nothing ticked here would leave this
+  // person with no service at all - not just a narrower reach, genuinely none.
+  const noReach = !allChoice && idsChoice.length === 0 && !homeServiceId;
+
+  function toggleService(id: string, checked: boolean) {
+    setIdsChoice((cur) => (checked ? [...cur, id] : cur.filter((x) => x !== id)));
+  }
+
+  return (
+    <div className="text-sm">
+      <span className="font-medium text-slate-700">Service access</span>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Extra services this person&rsquo;s reach (as a manager or HR manager)
+        and applicable policies span, beyond their home service above. Does
+        not change their home service.
+      </p>
+      <div className="mt-2 space-y-1.5">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={allChoice}
+            disabled={pending}
+            onChange={(e) => setAllChoice(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <span>All services (including any added later)</span>
+        </label>
+        {services.map((s) => (
+          <label
+            key={s.id}
+            className={`flex items-center gap-2 ${allChoice ? "text-slate-400" : ""}`}
+          >
+            <input
+              type="checkbox"
+              checked={allChoice || idsChoice.includes(s.id)}
+              disabled={pending || allChoice}
+              onChange={(e) => toggleService(s.id, e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span>{s.name}</span>
+          </label>
+        ))}
+      </div>
+      {noReach && (
+        <p className="mt-1.5 text-xs text-red-600">
+          This person has no home service, so at least one service (or All
+          services) must stay ticked.
+        </p>
+      )}
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!dirty || noReach || pending}
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              setMsg(null);
+              const r = await setStaffServiceAccess(profileId, {
+                allServices: allChoice,
+                serviceIds: idsChoice,
+              });
+              if (r.ok) {
+                setMsg("Saved");
+                router.refresh();
+              } else {
+                setError(r.error);
+              }
+            })
+          }
+          className="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+        {msg && <span className="text-xs text-green-700">{msg}</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
     </div>

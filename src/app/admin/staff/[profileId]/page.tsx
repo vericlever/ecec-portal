@@ -6,6 +6,7 @@ import {
   isHrManager,
   isAdmin,
   isManager,
+  reachesService,
   TIER_LABELS,
 } from "@/lib/auth";
 import { ASSIGNABLE_TIERS } from "@/lib/roles";
@@ -20,6 +21,7 @@ import {
   PasswordResetControl,
   ProbationControl,
   RefereeCheckControl,
+  ServiceAccessControl,
   SightingControl,
   SigningPauseControl,
 } from "./record-controls";
@@ -114,7 +116,7 @@ export default async function StaffRecordPage({
     supabase
       .from("profiles")
       .select(
-        "id, full_name, email, access_tier, hr_manager, service_id, job_role_id, is_active, signing_paused_at, signing_paused_reason, signing_paused_until, signing_paused_days_banked",
+        "id, full_name, email, access_tier, hr_manager, service_id, all_services, job_role_id, is_active, signing_paused_at, signing_paused_reason, signing_paused_until, signing_paused_days_banked, staff_service_assignments(service_id)",
       )
       .eq("id", params.profileId)
       .maybeSingle(),
@@ -175,12 +177,12 @@ export default async function StaffRecordPage({
   const isOwnRecord = me.id === person.id;
   const canManageContract =
     hrManager &&
-    (isAdmin(me.access_tier) || (me.service_id === person.service_id && !isOwnRecord));
+    (isAdmin(me.access_tier) || (reachesService(me, person.service_id) && !isOwnRecord));
   // Payroll, screening and referees: Admin anywhere, or an HR manager at the
   // person's service. Not the manager tiers.
   const canSeeSensitive =
     isAdmin(me.access_tier) ||
-    (me.hr_manager && me.service_id === person.service_id);
+    (me.hr_manager && reachesService(me, person.service_id));
 
   const [{ data: payroll }, { data: screening }, { data: referees }] =
     canSeeSensitive
@@ -508,7 +510,11 @@ export default async function StaffRecordPage({
           ? personRoles.map((r) => r.name).join(", ")
           : "no job role"}
         {" · "}
-        {person.service_id ? serviceName.get(person.service_id) : "all services"}
+        {person.all_services
+          ? "all services"
+          : person.service_id
+            ? serviceName.get(person.service_id)
+            : "unassigned"}
         {!person.is_active && " · inactive"}
       </p>
 
@@ -569,7 +575,7 @@ export default async function StaffRecordPage({
       )}
 
       {(isAdmin(me.access_tier) ||
-        (hrManager && me.service_id === person.service_id)) && (
+        (hrManager && reachesService(me, person.service_id))) && (
         <section className="mt-4 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Role and access
@@ -591,6 +597,17 @@ export default async function StaffRecordPage({
           {isAdmin(me.access_tier) && (
             <HrManagerToggle profileId={person.id} value={person.hr_manager} />
           )}
+          {isAdmin(me.access_tier) && (
+            <ServiceAccessControl
+              profileId={person.id}
+              allServices={person.all_services}
+              serviceIds={(
+                (person.staff_service_assignments as { service_id: string }[] | null) ?? []
+              ).map((a) => a.service_id)}
+              services={(services ?? []) as { id: string; name: string }[]}
+              homeServiceId={person.service_id}
+            />
+          )}
           <PasswordResetControl
             profileId={person.id}
             email={person.email}
@@ -605,7 +622,7 @@ export default async function StaffRecordPage({
 
       {person.id !== me.id &&
         (isAdmin(me.access_tier) ||
-          (isManager(me.access_tier) && me.service_id === person.service_id)) && (
+          (isManager(me.access_tier) && reachesService(me, person.service_id))) && (
           <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
             <SigningPauseControl
               profileId={person.id}

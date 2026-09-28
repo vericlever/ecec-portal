@@ -1,4 +1,4 @@
-import { requireManager, isAdmin } from "@/lib/auth";
+import { requireManager, isAdmin, reachesService } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { fmtDateTime } from "@/lib/format-date";
 import { setParentAccessCode, generateParentAccessCode } from "./actions";
@@ -23,7 +23,7 @@ export default async function ParentPortalPage() {
     .select("id, name")
     .order("name");
   const visibleServices = ((services ?? []) as ServiceRow[]).filter(
-    (s) => isAdmin(me.access_tier) || s.id === me.service_id,
+    (s) => isAdmin(me.access_tier) || reachesService(me, s.id),
   );
 
   // service_parent_access_select (migration 0067) is the real gate here: a

@@ -1,4 +1,4 @@
-import { reportsProfileOrResponse, isAdmin } from "@/lib/auth";
+import { reportsProfileOrResponse } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { organisationName, resolveReportScope, serviceOverviewData } from "@/lib/reports";
 import { pdfResponse } from "@/lib/pdf";
@@ -13,12 +13,10 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const requested = url.searchParams.get("service");
-  const { serviceId } = resolveReportScope(profile, requested || null);
+  const { serviceId, restricted } = resolveReportScope(profile, requested || null);
   if (!serviceId) {
     return new Response(
-      isAdmin(profile.access_tier)
-        ? "Choose a service."
-        : "You are not assigned to a service.",
+      restricted ? "You are not assigned to a service." : "Choose a service.",
       { status: 400 },
     );
   }

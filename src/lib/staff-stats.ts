@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { pendingSightingsByProfile } from "@/lib/verification";
 import { unsignedAgreementsByProfile } from "@/lib/agreements";
+import { contentAppliesToPerson } from "@/lib/service-reach";
 
 type ServerClient = ReturnType<typeof createClient>;
 
@@ -75,16 +76,36 @@ export function summariseTeam(
 // every table to rows the caller may see, which matches the people list.
 export async function staffStatsByProfile(
   supabase: ServerClient,
-  people: { id: string; job_role_id: string | null; service_id: string | null }[],
+  people: {
+    id: string;
+    job_role_id: string | null;
+    service_id: string | null;
+    all_services?: boolean;
+  }[],
   currentProfileId: string,
 ): Promise<Map<string, StaffStat>> {
   const peopleIds = people.map((p) => p.id);
-  const { data: roleLinks } = peopleIds.length
-    ? await supabase
-        .from("profile_job_roles")
-        .select("profile_id, job_role_id")
-        .in("profile_id", peopleIds)
-    : { data: [] as { profile_id: string; job_role_id: string }[] };
+  const [{ data: roleLinks }, { data: serviceAssignments }] = peopleIds.length
+    ? await Promise.all([
+        supabase
+          .from("profile_job_roles")
+          .select("profile_id, job_role_id")
+          .in("profile_id", peopleIds),
+        supabase
+          .from("staff_service_assignments")
+          .select("profile_id, service_id")
+          .in("profile_id", peopleIds),
+      ])
+    : [
+        { data: [] as { profile_id: string; job_role_id: string }[] },
+        { data: [] as { profile_id: string; service_id: string }[] },
+      ];
+  const extraServiceIdsByProfile = new Map<string, string[]>();
+  for (const a of serviceAssignments ?? []) {
+    const list = extraServiceIdsByProfile.get(a.profile_id as string) ?? [];
+    list.push(a.service_id as string);
+    extraServiceIdsByProfile.set(a.profile_id as string, list);
+  }
   const rolesByProfile = new Map<string, string[]>();
   for (const r of roleLinks ?? []) {
     const list = rolesByProfile.get(r.profile_id as string) ?? [];
@@ -267,8 +288,12 @@ export async function staffStatsByProfile(
       return pub.needsManager ? verified : true;
     }).length;
 
-    const expected = publishedPolicies.filter(
-      (pol) => pol.service_id == null || pol.service_id === p.service_id,
+    const expected = publishedPolicies.filter((pol) =>
+      contentAppliesToPerson(pol.service_id, {
+        service_id: p.service_id,
+        all_services: p.all_services ?? false,
+        service_ids: extraServiceIdsByProfile.get(p.id) ?? [],
+      }),
     );
     const policyTotal = expected.length;
     const viewed = viewedByUser.get(p.id) ?? new Set<string>();

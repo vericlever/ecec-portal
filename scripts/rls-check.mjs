@@ -200,6 +200,7 @@ const TABLES = {
   sop_review_actions: "organisation_id",
   sop_outcome_flags: "organisation_id",
   staff_import_records: "organisation_id",
+  staff_service_assignments: "organisation_id",
   comprehension_questions: "organisation_id",
   profile_job_roles: "organisation_id",
   credential_types: null,
@@ -209,6 +210,11 @@ const TABLES = {
   content_chunks: "organisation_id",
   embedding_jobs: "organisation_id",
   ai_interactions: "organisation_id",
+  ai_call_log: "organisation_id",
+  outcome_records: "organisation_id",
+  outcome_record_links: "organisation_id",
+  review_date_changes: "organisation_id",
+  policy_flags: "organisation_id",
 };
 
 // A throwaway 1024-dim zero vector, just to satisfy content_chunks.embedding
@@ -762,6 +768,62 @@ const appScenarios = () => [
     probe: (c) =>
       c.query(`update public.profiles set full_name=full_name where id=$1`, [STAFF]),
   },
+
+  // Migration 0093: all_services / staff_service_assignments. The scenario
+  // directly above (manager at Mortlake, staff at Timboon, blocked) is the
+  // regression guard these three widen from - all_services or an explicit
+  // assignment should be the only things that turn that same block into an
+  // allow.
+  {
+    label: "manager with all_services reaches a staff-tier colleague at a DIFFERENT service",
+    expectOk: true,
+    setup: async (c) => {
+      await c.query(
+        `update public.profiles set service_id=$1, all_services=true where id=$2`,
+        [MORTLAKE, MANAGER],
+      );
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(`update public.profiles set full_name=full_name where id=$1`, [STAFF]),
+  },
+  {
+    label: "manager with an explicit staff_service_assignments row reaches a colleague at that OTHER service",
+    expectOk: true,
+    setup: async (c) => {
+      await c.query(`update public.profiles set service_id=$1 where id=$2`, [MORTLAKE, MANAGER]);
+      await c.query(
+        `insert into public.staff_service_assignments (organisation_id, profile_id, service_id)
+         values ($1,$2,$3) on conflict do nothing`,
+        [RSG, MANAGER, TIMBOON],
+      );
+    },
+    as: MANAGER,
+    probe: (c) =>
+      c.query(`update public.profiles set full_name=full_name where id=$1`, [STAFF]),
+  },
+  {
+    label: "manager (not admin) grants themselves an extra service assignment (blocked - admin only)",
+    expectOk: false,
+    as: MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.staff_service_assignments (organisation_id, profile_id, service_id)
+         values ($1,$2,$3)`,
+        [RSG, MANAGER, MORTLAKE],
+      ),
+  },
+  {
+    label: "admin grants a colleague an extra service assignment",
+    expectOk: true,
+    as: ADMIN,
+    probe: (c) =>
+      c.query(
+        `insert into public.staff_service_assignments (organisation_id, profile_id, service_id)
+         values ($1,$2,$3)`,
+        [RSG, MANAGER, MORTLAKE],
+      ),
+  },
   // Migration 0053: DELETE on profiles is its own admin-only policy, split
   // out of the old for-all profiles_write so a same-service manager or
   // hr_manager-flagged account (both still fine for UPDATE) cannot delete a
@@ -1289,6 +1351,237 @@ const appScenarios = () => [
     },
     as: SK_ADMIN,
     probe: (c) => c.query(`select id from public.documents where id=$1`, [c._docId]),
+  },
+
+  // Step 58: ai_call_log (migration 0085). Admin-only read, no direct insert
+  // policy at all - only the shared client's own service-role write path
+  // (src/lib/ai/client.ts:logAiCall) ever inserts a row.
+  {
+    label: "authenticated staff inserts directly into ai_call_log (blocked - service role only)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.ai_call_log (organisation_id, feature, model_id, input_tokens, output_tokens) values ($1,'qa','test-model',1,1)`,
+        [RSG],
+      ),
+  },
+  {
+    label: "admin reads the org's ai_call_log",
+    expectOk: true,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.ai_call_log (organisation_id, feature, model_id, input_tokens, output_tokens) values ($1,'qa','test-model',1,1) returning id`,
+        [RSG],
+      );
+      c._callLogId = r.rows[0].id;
+    },
+    as: ADMIN,
+    probe: (c) => c.query(`select id from public.ai_call_log where id=$1`, [c._callLogId]),
+  },
+  {
+    label: "plain staff reads ai_call_log (blocked - admin-only audit trail)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.ai_call_log (organisation_id, feature, model_id, input_tokens, output_tokens) values ($1,'qa','test-model',1,1) returning id`,
+        [RSG],
+      );
+      c._callLogId = r.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select id from public.ai_call_log where id=$1`, [c._callLogId]),
+  },
+
+  // Step 59: outcome_records / outcome_record_links (migration 0088). Staff
+  // have no access to Our Outcomes at all - manager/admin only, both ways.
+  {
+    label: "manager uploads an outcome record",
+    expectOk: true,
+    as: RSG_REAL_MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2)`,
+        [RSG, RSG_REAL_MANAGER],
+      ),
+  },
+  {
+    label: "plain staff uploads an outcome record (blocked - no Our Outcomes access)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2)`,
+        [RSG, STAFF],
+      ),
+  },
+  {
+    label: "plain staff reads outcome_records (blocked, even though managers can)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        [RSG, RSG_REAL_MANAGER],
+      );
+      c._recordId = r.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select id from public.outcome_records where id=$1`, [c._recordId]),
+  },
+  {
+    label: "SK admin reads an RSG outcome record (cross-tenant, blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        [RSG, RSG_REAL_MANAGER],
+      );
+      c._recordId = r.rows[0].id;
+    },
+    as: SK_ADMIN,
+    probe: (c) => c.query(`select id from public.outcome_records where id=$1`, [c._recordId]),
+  },
+  {
+    label: "manager confirms a suggested outcome_record_link",
+    expectOk: true,
+    setup: async (c) => {
+      const rec = await c.query(
+        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        [RSG, RSG_REAL_MANAGER],
+      );
+      const link = await c.query(
+        `insert into public.outcome_record_links (organisation_id, record_id, sop_id, status) values ($1,$2,$3,'suggested') returning id`,
+        [RSG, rec.rows[0].id, RSG_REAL_SOP],
+      );
+      c._linkId = link.rows[0].id;
+    },
+    as: RSG_REAL_MANAGER,
+    probe: (c) =>
+      c.query(
+        `update public.outcome_record_links set status='confirmed', decided_by=$2, decided_at=now() where id=$1`,
+        [c._linkId, RSG_REAL_MANAGER],
+      ),
+  },
+  {
+    label: "plain staff reads outcome_record_links (blocked - suggestions are not staff-visible)",
+    expectOk: false,
+    setup: async (c) => {
+      const rec = await c.query(
+        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        [RSG, RSG_REAL_MANAGER],
+      );
+      const link = await c.query(
+        `insert into public.outcome_record_links (organisation_id, record_id, sop_id, status) values ($1,$2,$3,'suggested') returning id`,
+        [RSG, rec.rows[0].id, RSG_REAL_SOP],
+      );
+      c._linkId = link.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select id from public.outcome_record_links where id=$1`, [c._linkId]),
+  },
+
+  // Step 59: review_date_changes (migration 0089). Audit-only, never
+  // user-facing (B2) - manager/admin insert as themselves, manager/admin read.
+  {
+    label: "manager changes a procedure's review date, logged to review_date_changes",
+    expectOk: true,
+    as: RSG_REAL_MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.review_date_changes (organisation_id, item_type, item_id, old_date, new_date, changed_by)
+         values ($1,'sop',$2,null,current_date,$3)`,
+        [RSG, RSG_SOP, RSG_REAL_MANAGER],
+      ),
+  },
+  {
+    label: "plain staff writes review_date_changes directly (blocked)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.review_date_changes (organisation_id, item_type, item_id, old_date, new_date, changed_by)
+         values ($1,'sop',$2,null,current_date,$3)`,
+        [RSG, RSG_SOP, STAFF],
+      ),
+  },
+  {
+    label: "plain staff sets a procedure's review_date_override directly (blocked - sops_write requires content editor)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) => c.query(`update public.sops set review_date_override=current_date where id=$1`, [RSG_SOP]),
+  },
+  {
+    label: "manager_staff (not a content editor) moves a review date via set_review_date_override() - the RPC's whole reason to exist",
+    expectOk: true,
+    as: MANAGER,
+    probe: (c) => c.query(`select public.set_review_date_override('sop', $1, current_date + 30)`, [RSG_SOP]),
+  },
+  {
+    label: "plain staff calls set_review_date_override() directly (blocked - function re-checks is_manager() itself)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) => c.query(`select public.set_review_date_override('sop', $1, current_date + 30)`, [RSG_SOP]),
+  },
+  {
+    label: "RSG manager calls set_review_date_override() against an SK sop (cross-tenant, blocked)",
+    expectOk: false,
+    as: RSG_REAL_MANAGER,
+    probe: (c) => c.query(`select public.set_review_date_override('sop', $1, current_date + 30)`, [SK_SOP]),
+  },
+
+  // Step 59, B7a: policy_flags (migration 0090). Staff never see policy
+  // flags at all - manager/admin only, both ways.
+  {
+    label: "manager raises a policy flag",
+    expectOk: true,
+    as: RSG_REAL_MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.policy_flags (organisation_id, policy_id, note, source, raised_by) values ($1,$2,'test note','manager',$3)`,
+        [RSG, RSG_POLICY, RSG_REAL_MANAGER],
+      ),
+  },
+  {
+    label: "plain staff raises a policy flag (blocked)",
+    expectOk: false,
+    as: STAFF,
+    probe: (c) =>
+      c.query(
+        `insert into public.policy_flags (organisation_id, policy_id, note, source, raised_by) values ($1,$2,'test note','manager',$3)`,
+        [RSG, RSG_POLICY, STAFF],
+      ),
+  },
+  {
+    label: "plain staff reads policy_flags (blocked - staff never see these)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.policy_flags (organisation_id, policy_id, note, source, raised_by) values ($1,$2,'test note','manager',$3) returning id`,
+        [RSG, RSG_POLICY, RSG_REAL_MANAGER],
+      );
+      c._flagId = r.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select id from public.policy_flags where id=$1`, [c._flagId]),
+  },
+  {
+    label: "SK admin reads an RSG policy flag (cross-tenant, blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      const r = await c.query(
+        `insert into public.policy_flags (organisation_id, policy_id, note, source, raised_by) values ($1,$2,'test note','manager',$3) returning id`,
+        [RSG, RSG_POLICY, RSG_REAL_MANAGER],
+      );
+      c._flagId = r.rows[0].id;
+    },
+    as: SK_ADMIN,
+    probe: (c) => c.query(`select id from public.policy_flags where id=$1`, [c._flagId]),
   },
 ];
 

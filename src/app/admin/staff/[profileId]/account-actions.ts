@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getProfile, isAdmin, isHrManager } from "@/lib/auth";
+import { getProfile, isAdmin, isHrManager, reachesService } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -41,7 +41,7 @@ async function canManageAccountFor(
     return { ok: false, error: "Staff member not found." };
   }
   if (!isAdmin(me.access_tier)) {
-    if (target.service_id !== me.service_id) {
+    if (!reachesService(me, target.service_id)) {
       return { ok: false, error: "That staff member is not at your service." };
     }
     if (target.access_tier !== "staff") {

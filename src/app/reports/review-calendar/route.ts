@@ -1,4 +1,4 @@
-import { reportsProfileOrResponse, isAdmin } from "@/lib/auth";
+import { reportsProfileOrResponse } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { organisationName, resolveReportScope, reviewCalendarData } from "@/lib/reports";
 import { pdfResponse } from "@/lib/pdf";
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const requested = url.searchParams.get("service");
   const requestedServiceId = requested === "all" || !requested ? null : requested;
-  const { serviceId } = resolveReportScope(profile, requestedServiceId);
+  const { serviceId, restricted } = resolveReportScope(profile, requestedServiceId);
 
   const supabase = createClient();
   const [orgName, service, items] = await Promise.all([
@@ -27,9 +27,9 @@ export async function GET(req: Request) {
 
   const scopeLabel = serviceId
     ? ((service.data?.name as string | undefined) ?? "Unknown service")
-    : isAdmin(profile.access_tier)
-      ? "All services"
-      : "Not assigned to a service";
+    : restricted
+      ? "Not assigned to a service"
+      : "All services";
 
   return pdfResponse(
     ReviewCalendarPdf({ orgName, scopeLabel, items, timezone: profile.organisation_timezone }),

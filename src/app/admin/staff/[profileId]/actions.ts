@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProfile, isHrManager, isAdmin, isManager } from "@/lib/auth";
+import { getProfile, isHrManager, isAdmin, isManager, reachesService } from "@/lib/auth";
 import { type AccessTier, ASSIGNABLE_TIERS } from "@/lib/roles";
 import { storeDocument, deleteDocument, documentSha256 } from "@/lib/documents/store";
 import { calcExpiry } from "@/lib/contracts";
@@ -160,7 +160,7 @@ async function canManageContractFor(
   }
   if (
     !isAdmin(me.access_tier) &&
-    target.service_id !== me.service_id
+    !reachesService(me, target.service_id)
   ) {
     return { ok: false, error: "That staff member is not at your service." };
   }
@@ -365,7 +365,7 @@ export async function countersignContract(
       .select("service_id")
       .eq("id", contract.profile_id)
       .maybeSingle();
-    if (!worker || worker.service_id !== me.service_id) {
+    if (!worker || !reachesService(me, worker.service_id)) {
       return { ok: false, error: "That staff member is not at your service." };
     }
   }
@@ -522,8 +522,7 @@ export async function uploadIdentityDocument(
   const canManageOthers =
     isAdmin(me.access_tier) ||
     ((isManager(me.access_tier) || isHrManager(me)) &&
-      target.service_id != null &&
-      target.service_id === me.service_id);
+      reachesService(me, target.service_id));
   if (!mine && !canManageOthers) {
     return { ok: false, error: "You cannot add documents for this person." };
   }
@@ -591,7 +590,7 @@ export async function deleteIdentityDocument(id: string): Promise<Result> {
       .select("service_id")
       .eq("id", row.profile_id)
       .maybeSingle();
-    if (!target || target.service_id !== me.service_id) {
+    if (!target || !reachesService(me, target.service_id)) {
       return { ok: false, error: "You cannot remove this document." };
     }
   }
@@ -653,6 +652,80 @@ export async function setHrManager(
   return { ok: true };
 }
 
+// Which services this person's reach (as a manager/HR manager) or applicable
+// content (as anyone) spans, beyond their home service_id. Admin only,
+// matching setHrManager/setStaffAccessTier's own gate - this is the same kind
+// of account-configuration change (migration 0093).
+export async function setStaffServiceAccess(
+  profileId: string,
+  input: { allServices: boolean; serviceIds: string[] },
+): Promise<Result> {
+  const me = await getProfile();
+  if (!me || !isAdmin(me.access_tier)) {
+    return { ok: false, error: "Only an admin can change service access." };
+  }
+  const supabase = createClient();
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, organisation_id, service_id")
+    .eq("id", profileId)
+    .maybeSingle();
+  if (!target || target.organisation_id !== me.organisation_id) {
+    return { ok: false, error: "Staff member not found." };
+  }
+
+  const uniqueIds = Array.from(new Set(input.serviceIds));
+
+  // A person with no home service and nothing ticked here would end up with
+  // no service at all - worse than the single-service reach this feature
+  // replaces, since even that gave them their home service. Block it rather
+  // than silently accepting a no-reach, no-content state.
+  if (!input.allServices && uniqueIds.length === 0 && !target.service_id) {
+    return {
+      ok: false,
+      error:
+        "This person has no home service, so at least one service (or All services) must stay ticked.",
+    };
+  }
+
+  if (uniqueIds.length > 0) {
+    const { data: validServices } = await supabase
+      .from("services")
+      .select("id")
+      .eq("organisation_id", me.organisation_id)
+      .in("id", uniqueIds);
+    if ((validServices ?? []).length !== uniqueIds.length) {
+      return { ok: false, error: "One of those services is not in your organisation." };
+    }
+  }
+
+  const { error: allServicesErr } = await supabase
+    .from("profiles")
+    .update({ all_services: input.allServices })
+    .eq("id", profileId);
+  if (allServicesErr) return { ok: false, error: allServicesErr.message };
+
+  const { error: deleteErr } = await supabase
+    .from("staff_service_assignments")
+    .delete()
+    .eq("profile_id", profileId);
+  if (deleteErr) return { ok: false, error: deleteErr.message };
+
+  if (uniqueIds.length > 0) {
+    const { error: insertErr } = await supabase.from("staff_service_assignments").insert(
+      uniqueIds.map((serviceId) => ({
+        profile_id: profileId,
+        service_id: serviceId,
+        organisation_id: me.organisation_id,
+      })),
+    );
+    if (insertErr) return { ok: false, error: insertErr.message };
+  }
+
+  revalidatePath("/admin/staff", "layout");
+  return { ok: true };
+}
+
 // Change a staff member's job roles (a person can hold more than one, e.g.
 // an ed leader needs both Educator and Room Leader). Admin anywhere in the
 // organisation, or an HR manager for staff at their own service. Removing a
@@ -678,7 +751,7 @@ export async function setStaffJobRoles(
   }
   const allowed =
     isAdmin(me.access_tier) ||
-    (isHrManager(me) && person.service_id === me.service_id);
+    (isHrManager(me) && reachesService(me, person.service_id));
   if (!allowed) {
     return { ok: false, error: "You cannot change this person's job role." };
   }
@@ -827,7 +900,7 @@ export async function sendPasswordResetForStaff(
   }
   const allowed =
     isAdmin(me.access_tier) ||
-    (isHrManager(me) && person.service_id === me.service_id);
+    (isHrManager(me) && reachesService(me, person.service_id));
   if (!allowed) {
     return { ok: false, error: "You cannot reset this person's password." };
   }
@@ -909,7 +982,7 @@ async function canPauseFor(profileId: string) {
   if (!target || target.organisation_id !== me.organisation_id) return null;
   const allowed =
     isAdmin(me.access_tier) ||
-    (isManager(me.access_tier) && target.service_id === me.service_id);
+    (isManager(me.access_tier) && reachesService(me, target.service_id));
   if (!allowed) return null;
   return { me, supabase };
 }

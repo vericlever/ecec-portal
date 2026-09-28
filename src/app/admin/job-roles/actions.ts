@@ -7,6 +7,7 @@ import {
   isAdmin,
   isHrManager,
   canEditContent,
+  reachesService,
 } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -146,7 +147,7 @@ async function canAssignRoles(personServiceId: string | null) {
   const ok =
     isAdmin(me.access_tier) ||
     canEditContent(me.access_tier) ||
-    (isHrManager(me) && personServiceId === me.service_id);
+    (isHrManager(me) && reachesService(me, personServiceId));
   return ok ? me : null;
 }
 
