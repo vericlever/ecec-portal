@@ -23,14 +23,16 @@ const nextConfig = {
     // every PDF route 500s in production while working fine under `next dev`
     // (which reads straight from the full node_modules on disk). This forces
     // those font files to be included alongside every route that renders a
-    // PDF through @react-pdf/renderer - the report routes, and (Step 57) the
-    // signed-contract-copy path reached from the staff record, onboarding
-    // self-sign, and the contract backfill endpoint.
+    // PDF with @react-pdf/renderer - the report routes, and (Step 57) the
+    // contract signing routes that build a signed copy via
+    // src/lib/signing/signed-copy.ts's renderToBuffer(ExecutionPage(...)).
     outputFileTracingIncludes: {
       "/reports/**": ["./node_modules/pdfkit/js/standard-fonts/**/*.cjs"],
-      "/admin/staff/[profileId]": ["./node_modules/pdfkit/js/standard-fonts/**/*.cjs"],
+      "/admin/staff/**": ["./node_modules/pdfkit/js/standard-fonts/**/*.cjs"],
       "/onboarding": ["./node_modules/pdfkit/js/standard-fonts/**/*.cjs"],
-      "/api/admin/contract-backfill": ["./node_modules/pdfkit/js/standard-fonts/**/*.cjs"],
+      "/api/admin/contract-backfill": [
+        "./node_modules/pdfkit/js/standard-fonts/**/*.cjs",
+      ],
     },
   },
 };

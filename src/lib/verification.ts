@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { executionState, type ContractRow } from "@/lib/contracts";
+import { contractDueDate, dueSignoffPhrase } from "@/lib/signoff-clock";
 
 type ServerClient = ReturnType<typeof createClient>;
 
@@ -10,6 +12,8 @@ const SIGHTABLE_TABLES = [
   "training_records",
   "identity_documents",
 ] as const;
+
+type VerifiableTable = (typeof SIGHTABLE_TABLES)[number];
 
 // How many unsighted documents are waiting, per staff member. RLS already limits
 // the rows to workers the caller manages, so this is the caller's real queue.
@@ -33,4 +37,130 @@ export async function pendingSightingsByProfile(
     }
   }
   return counts;
+}
+
+export type VerificationItem =
+  | { kind: "sighting"; table: VerifiableTable; recordId: string; label: string }
+  | { kind: "contract_countersign"; contractId: string; label: string }
+  // Nothing for the viewer to act on - only the employee can sign their own
+  // contract - but shown so a leader can see who is behind and chase it up.
+  | { kind: "contract_unsigned"; label: string };
+
+export type VerificationGroup = {
+  profileId: string;
+  name: string;
+  items: VerificationItem[];
+};
+
+function sightingLabel(table: VerifiableTable, row: Record<string, unknown>): string {
+  switch (table) {
+    case "wwcc_checks":
+      return `Working with Children Check${row.check_number ? ` — ${row.check_number}` : ""}`;
+    case "teacher_registrations":
+      return `Teacher registration${row.check_number ? ` — ${row.check_number}` : ""}`;
+    case "qualifications":
+      return `Qualification — ${row.qualification_type ?? "unspecified"}`;
+    case "training_records":
+      return `Training — ${row.training_type}${row.other_description ? ` (${row.other_description})` : ""}`;
+    case "identity_documents": {
+      const kindLabel =
+        row.kind === "photo_id"
+          ? "Photo ID"
+          : row.kind === "visa"
+            ? "Visa document"
+            : "Identity document";
+      return row.label ? `${kindLabel} — ${row.label}` : kindLabel;
+    }
+  }
+}
+
+// Every outstanding sighting or contract-countersignature item, grouped by the
+// staff member it belongs to - the "Complete staff sign-off" hub. RLS already
+// limits every query here to workers the caller manages (or is HR for), so
+// this is the caller's real queue; the caller's own items are never their own
+// to act on, so they are excluded. Only active staff are included - someone
+// made inactive drops off this list along with everything else about them.
+export async function verificationGroups(
+  supabase: ServerClient,
+  excludeProfileId: string,
+): Promise<VerificationGroup[]> {
+  const [sightingResults, { data: contractRows }] = await Promise.all([
+    Promise.all(
+      SIGHTABLE_TABLES.map((table) =>
+        supabase.from(table).select("*").is("sighted_at", null),
+      ),
+    ),
+    supabase
+      .from("contracts")
+      .select(
+        "id, profile_id, is_deed, requires_countersign, signed_at, countersigned_at, superseded_at, created_at",
+      )
+      .is("superseded_at", null),
+  ]);
+
+  const byProfile = new Map<string, VerificationItem[]>();
+  function push(profileId: string, item: VerificationItem) {
+    if (profileId === excludeProfileId) return;
+    const list = byProfile.get(profileId);
+    if (list) list.push(item);
+    else byProfile.set(profileId, [item]);
+  }
+
+  SIGHTABLE_TABLES.forEach((table, i) => {
+    for (const row of sightingResults[i].data ?? []) {
+      push(row.profile_id as string, {
+        kind: "sighting",
+        table,
+        recordId: row.id as string,
+        label: sightingLabel(table, row),
+      });
+    }
+  });
+
+  const contracts = (contractRows ?? []) as unknown as ContractRow[];
+  const profileIds = [...new Set(contracts.map((c) => c.profile_id))];
+  const { data: signingProfiles } = profileIds.length
+    ? await supabase
+        .from("profiles")
+        .select("id, signing_paused_at, signing_paused_days_banked")
+        .in("id", profileIds)
+    : { data: [] as { id: string; signing_paused_at: string | null; signing_paused_days_banked: number | null }[] };
+  const pauseOf = new Map((signingProfiles ?? []).map((p) => [p.id, p]));
+
+  for (const contract of contracts) {
+    const state = executionState(contract);
+    if (state === "awaiting_countersign") {
+      push(contract.profile_id, {
+        kind: "contract_countersign",
+        contractId: contract.id,
+        label: "Employment contract — awaiting countersignature",
+      });
+    } else if (state === "unsigned") {
+      const pause = pauseOf.get(contract.profile_id);
+      const due = contractDueDate(contract.created_at, pause?.signing_paused_days_banked ?? 0);
+      const status = pause?.signing_paused_at ? "Paused" : dueSignoffPhrase(due);
+      push(contract.profile_id, {
+        kind: "contract_unsigned",
+        label: `Employment contract — not signed yet · ${status}`,
+      });
+    }
+  }
+
+  if (byProfile.size === 0) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name, is_active")
+    .in("id", [...byProfile.keys()]);
+  const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string]));
+  const activeOf = new Map((profiles ?? []).map((p) => [p.id, p.is_active as boolean]));
+
+  return [...byProfile.entries()]
+    .filter(([id]) => activeOf.get(id) ?? true)
+    .map(([profileId, items]) => ({
+      profileId,
+      name: nameOf.get(profileId) ?? "Unknown",
+      items,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
