@@ -233,7 +233,7 @@ export default async function OnboardingPage() {
       </section>
 
       {contracts.some((c) => !c.superseded_at) && (
-        <section className="mt-8">
+        <section id="contract" className="mt-8">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Your contract
           </h2>
