@@ -80,6 +80,7 @@ export default async function VerificationPage() {
           {groups.map((g) => (
             <section
               key={g.profileId}
+              id={g.profileId}
               className="overflow-hidden rounded-lg border border-slate-200 bg-white"
             >
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-2.5">

@@ -150,8 +150,7 @@ export async function verificationGroups(
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, is_active")
-    .in("id", [...byProfile.keys()]);
+    .select("id, full_name, is_active");
   const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string]));
   const activeOf = new Map((profiles ?? []).map((p) => [p.id, p.is_active as boolean]));
 

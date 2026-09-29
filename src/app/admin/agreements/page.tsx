@@ -63,7 +63,7 @@ async function ContractsSection() {
           return (
             <li key={c.id}>
               <Link
-                href={`/admin/staff/${c.profile_id}`}
+                href={`/admin/verification#${c.profile_id}`}
                 className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
               >
                 <span className="text-sm font-medium">{nameFor.get(c.profile_id) ?? "Staff member"}</span>
