@@ -5,6 +5,21 @@
 // endpoint, and every other integration in this codebase (mammoth,
 // turndown, unpdf) is chosen to keep the dependency footprint lean rather
 // than pull in a client library for one call shape.
+//
+// Kept in production after Step 58's onshoring work (28 September 2026):
+// tested against AWS Bedrock's only Sydney-available embedding model (Titan
+// Text Embeddings V2, via scripts/compare-embedding-models.ts) against 20
+// real staff questions, and Titan missed retrieval on several, including a
+// safety-critical one ("What do I do if a child has an allergic reaction?" -
+// Titan's top 3 results didn't include the Anaphylaxis Management Policy at
+// all; Voyage found it correctly). Titan's raw similarity scores also ran
+// far lower than Voyage's across the board, which alone would have needed a
+// re-tuned MIN_SIMILARITY threshold - but the retrieval misses were the
+// deciding factor. Claude inference still moved to Bedrock; only the
+// embeddings/search layer stayed on Voyage. See BUILD_LOG.md, 28 September
+// 2026, and the Platform Terms of Use and Privacy Notice update, which
+// keeps Voyage disclosed as an ongoing external provider rather than
+// removing it.
 
 const VOYAGE_EMBEDDINGS_URL = "https://api.voyageai.com/v1/embeddings";
 

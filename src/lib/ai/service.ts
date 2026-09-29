@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { generateText } from "./client";
+// Embeddings stay on Voyage after Step 58's onshoring work (28 September
+// 2026) - see src/lib/ai/voyage.ts's header comment for why. Claude
+// inference (generateText, above) moved to Bedrock; search/retrieval did not.
 import { embed, embedOne } from "./voyage";
-import { generate } from "./anthropic";
 import { chunkMarkdown } from "./chunk";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -169,8 +172,10 @@ export async function answerQuestion(
 
   const names = await sourceNames(supabase, chunks);
   const userMessage = buildUserMessage(question, chunks, names);
-  const answer = await generate({
-    taskType: "qa",
+  const answer = await generateText({
+    feature: "qa",
+    organisationId,
+    createdBy: staffProfileId,
     systemPrompt: SYSTEM_PROMPT,
     userMessage,
   });
@@ -192,7 +197,7 @@ export async function answerQuestion(
     grounded: true,
     chunkIds: chunks.map((c) => c.chunkId),
     sources,
-    model: process.env.AI_QA_MODEL || "claude-haiku-4-5-20251001",
+    model: process.env.AI_MODEL_FAST || "unset",
   });
 
   return { answer, sources, grounded: true };
