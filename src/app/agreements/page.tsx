@@ -3,14 +3,26 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { agreementsForProfile } from "@/lib/agreements";
 import { assignedJobRoleIds } from "@/lib/staff-job-roles";
+import { ContractPanel } from "@/app/admin/staff/[profileId]/contract-panel";
+import type { ContractRow } from "@/lib/contracts";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgreementsListPage() {
   const profile = await requireProfile();
   const supabase = createClient();
-  const jobRoleIds = await assignedJobRoleIds(supabase, profile.id);
+  const [jobRoleIds, { data: contractRows }] = await Promise.all([
+    assignedJobRoleIds(supabase, profile.id),
+    supabase
+      .from("contracts")
+      .select(
+        "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, signed_by, signed_content_hash, is_deed, countersigned_at, countersigned_name, countersigned_by, countersigned_content_hash, created_at, requires_countersign, signed_signature_document_id, countersigned_signature_document_id, signed_copy_document_id, signed_copy_hash, signed_copy_generated_at",
+      )
+      .eq("profile_id", profile.id)
+      .order("created_at", { ascending: false }),
+  ]);
   const items = await agreementsForProfile(supabase, { id: profile.id, jobRoleIds });
+  const contracts = (contractRows ?? []) as ContractRow[];
 
   const outstanding = items.filter((a) => !a.signed);
 
@@ -56,6 +68,23 @@ export default async function AgreementsListPage() {
             ))}
           </ul>
         </>
+      )}
+
+      {contracts.some((c) => !c.superseded_at) && (
+        <section className="mt-8">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Your contract
+          </h2>
+          <ContractPanel
+            profileId={profile.id}
+            contracts={contracts}
+            canManage={false}
+            canSign
+            timezone={profile.organisation_timezone}
+            paused={Boolean(profile.signing_paused_at)}
+            pausedDaysBanked={profile.signing_paused_days_banked}
+          />
+        </section>
       )}
     </div>
   );
