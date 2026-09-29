@@ -34,7 +34,17 @@ function ItemRow({ item, canAct }: { item: VerificationItem; canAct: boolean }) 
   if (item.kind === "contract_countersign") {
     return (
       <li className="px-4 py-3">
-        <p className="text-sm text-slate-800">{item.label}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-slate-800">{item.label}</p>
+          {item.documentId && (
+            <a
+              href={`/api/documents/${item.documentId}`}
+              className="shrink-0 text-xs text-slate-500 underline hover:text-slate-800"
+            >
+              View contract
+            </a>
+          )}
+        </div>
         {canAct ? (
           <CountersignControl contractId={item.contractId} />
         ) : (
@@ -46,7 +56,17 @@ function ItemRow({ item, canAct }: { item: VerificationItem; canAct: boolean }) 
   // contract_unsigned - the employee's own action, nothing to click here.
   return (
     <li className="px-4 py-3">
-      <p className="text-sm text-slate-500">{item.label}</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">{item.label}</p>
+        {item.documentId && (
+          <a
+            href={`/api/documents/${item.documentId}`}
+            className="shrink-0 text-xs text-slate-500 underline hover:text-slate-800"
+          >
+            View contract
+          </a>
+        )}
+      </div>
     </li>
   );
 }

@@ -41,10 +41,10 @@ export async function pendingSightingsByProfile(
 
 export type VerificationItem =
   | { kind: "sighting"; table: VerifiableTable; recordId: string; label: string }
-  | { kind: "contract_countersign"; contractId: string; label: string }
+  | { kind: "contract_countersign"; contractId: string; label: string; documentId: string | null }
   // Nothing for the viewer to act on - only the employee can sign their own
   // contract - but shown so a leader can see who is behind and chase it up.
-  | { kind: "contract_unsigned"; label: string };
+  | { kind: "contract_unsigned"; label: string; documentId: string | null };
 
 export type VerificationGroup = {
   profileId: string;
@@ -93,7 +93,7 @@ export async function verificationGroups(
     supabase
       .from("contracts")
       .select(
-        "id, profile_id, is_deed, requires_countersign, signed_at, countersigned_at, superseded_at, created_at",
+        "id, profile_id, is_deed, requires_countersign, signed_at, countersigned_at, superseded_at, created_at, document_id, signed_copy_document_id",
       )
       .is("superseded_at", null),
   ]);
@@ -129,11 +129,16 @@ export async function verificationGroups(
 
   for (const contract of contracts) {
     const state = executionState(contract);
+    // The signed copy (original + execution page, employee's signature already
+    // on it) once it exists - the document a countersigner should actually be
+    // reviewing - falling back to the as-uploaded original if it doesn't yet.
+    const documentId = contract.signed_copy_document_id ?? contract.document_id;
     if (state === "awaiting_countersign") {
       push(contract.profile_id, {
         kind: "contract_countersign",
         contractId: contract.id,
         label: "Employment contract — awaiting countersignature",
+        documentId,
       });
     } else if (state === "unsigned") {
       const pause = pauseOf.get(contract.profile_id);
@@ -142,6 +147,7 @@ export async function verificationGroups(
       push(contract.profile_id, {
         kind: "contract_unsigned",
         label: `Employment contract — not signed yet · ${status}`,
+        documentId,
       });
     }
   }
