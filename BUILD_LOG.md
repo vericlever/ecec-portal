@@ -611,7 +611,10 @@ role" section first for anything untagged; a procedure in several roles is liste
 each. Filtered and search views stay flat. Existing published procedures with no role
 are not touched or unpublished by this change; the "No job role" section is how to find
 them. The database function `commit_bulk_sops` itself is unchanged, so the rule lives
-in the app layer only. Typechecks clean; not yet viewed live.
+in the app layer only. The job role picker also moved into the procedure editor's Details
+section (replacing the Priority input, which is hidden but its saved value, used to
+order the staff list, is left untouched), with the separate lower section removed.
+Typechecks clean; not yet viewed live.
 
 ## Corrections against BUILD_PLAN.md
 
