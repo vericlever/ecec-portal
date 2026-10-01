@@ -93,7 +93,7 @@ export async function verificationGroups(
     supabase
       .from("contracts")
       .select(
-        "id, profile_id, is_deed, requires_countersign, signed_at, countersigned_at, superseded_at, created_at, document_id, signed_copy_document_id",
+        "id, profile_id, requires_countersign, signed_at, countersigned_at, superseded_at, created_at, document_id, signed_copy_document_id",
       )
       .is("superseded_at", null),
   ]);

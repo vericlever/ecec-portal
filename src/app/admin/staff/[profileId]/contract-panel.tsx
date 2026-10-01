@@ -63,7 +63,6 @@ export function ContractPanel({
   const [periodType, setPeriodType] = useState<"fixed" | "no_fixed_period">(
     "fixed",
   );
-  const [isDeed, setIsDeed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -72,7 +71,7 @@ export function ContractPanel({
   const execution = active ? executionState(active) : null;
   const contractDue = active ? contractDueDate(active.created_at, pausedDaysBanked) : null;
   const signOverdue =
-    active && !active.signed_at && !active.is_deed && !paused && contractDue
+    active && !active.signed_at && !paused && contractDue
       ? isOverdue(contractDue)
       : false;
 
@@ -83,7 +82,6 @@ export function ContractPanel({
       if (r.ok) {
         setShowForm(false);
         form.reset();
-        setIsDeed(false);
         router.refresh();
       } else {
         setError(r.error);
@@ -158,7 +156,7 @@ export function ContractPanel({
                 <dd className="text-slate-800">{active.notes}</dd>
               </>
             )}
-            {!active.is_deed && (
+            {(
               <>
                 <dt className="text-slate-500">Signed by staff member</dt>
                 <dd className={active.signed_at ? "text-slate-800" : signOverdue ? "font-medium text-red-700" : "text-slate-800"}>
@@ -178,20 +176,13 @@ export function ContractPanel({
             )}
           </dl>
 
-          {active.is_deed && (
-            <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-              This contract is a deed and is signed on paper, not in the
-              portal. The signed copy is the uploaded document.
-            </p>
-          )}
-
-          {!active.is_deed && execution === "executed" && (
+          {execution === "executed" && (
             <p className="mt-2 rounded-md border border-green-200 bg-green-50 p-2.5 text-sm text-green-800">
               Fully executed - signed by both parties.
             </p>
           )}
 
-          {!active.is_deed && !active.signed_at && active.document_id && (
+          {!active.signed_at && active.document_id && (
             <iframe
               src={`/api/documents/${active.document_id}?inline=1`}
               className="mt-2 h-80 w-full rounded-md border border-slate-200"
@@ -199,7 +190,7 @@ export function ContractPanel({
             />
           )}
 
-          {canSign && !active.is_deed && !active.signed_at && (
+          {canSign && !active.signed_at && (
             <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3">
               <p className="mb-2 text-sm text-amber-900">
                 Sign to read and accept this contract.
@@ -213,7 +204,6 @@ export function ContractPanel({
           )}
 
           {canManage &&
-            !active.is_deed &&
             active.signed_at &&
             !active.countersigned_at && (
               <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -228,7 +218,7 @@ export function ContractPanel({
               </div>
             )}
 
-          {!active.is_deed && active.signed_at && (
+          {active.signed_at && (
             <div className="mt-2">
               {active.signed_copy_document_id ? (
                 <iframe
@@ -273,7 +263,7 @@ export function ContractPanel({
             ) : (
               <span className="text-amber-700">No document on file</span>
             )}
-            {(active.is_deed || !active.signed_copy_document_id) && (
+            {!active.signed_copy_document_id && (
               <ReportDownloadButton
                 href={`/reports/contract?contract=${active.id}`}
                 label="Print signature summary (PDF)"
@@ -358,12 +348,10 @@ export function ContractPanel({
               type="file"
               name="file"
               required
-              accept={isDeed ? undefined : ".pdf"}
+              accept=".pdf"
               className="mt-1 block w-full text-sm"
             />
-            {!isDeed && (
-              <span className="mt-1 block text-xs text-slate-400">{PDF_ONLY_STATEMENT}</span>
-            )}
+            <span className="mt-1 block text-xs text-slate-400">{PDF_ONLY_STATEMENT}</span>
           </label>
           <label className="block">
             <span className="text-slate-600">Start date</span>
@@ -422,20 +410,6 @@ export function ContractPanel({
               rows={2}
               className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1"
             />
-          </label>
-          <label className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              name="is_deed"
-              checked={isDeed}
-              onChange={(e) => setIsDeed(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span className="text-slate-600">
-              This document is a deed. It will be signed on paper, not in the
-              portal - a deed generally needs an attesting witness, which a
-              typed name here cannot provide.
-            </span>
           </label>
           <div className="flex items-center gap-3">
             <button

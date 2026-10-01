@@ -586,6 +586,18 @@ fast-forward merged into `main`. Checking the live public site is a separate,
 later sanity check on the deploy pipeline itself, not a substitute for local
 verification.
 
+### 1 October 2026
+
+**Deed option removed from contracts.** The "this document is a deed, signed on paper"
+tick-box on contract upload is gone, along with every code path that special-cased it:
+the upload action (a PDF is now always required and validated), the sign and countersign
+guards, the "deed" execution state, the deed branches in the contract panel and both PDF
+reports, and the `is_deed` filters in the unsigned-contract counts and the signing
+backfill. The `contracts.is_deed` column is deliberately left in place (no migration, no
+destructive change). Two existing contracts in the live database have `is_deed = true`;
+as nothing reads the flag any more they now behave as ordinary unsigned contracts.
+Typechecks clean; not yet viewed live.
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted
