@@ -604,6 +604,12 @@ section (replacing the Priority input, which is hidden but its saved value, used
 order the staff list, is left untouched), with the separate lower section removed.
 Typechecks clean; not yet viewed live.
 
+**My Procedures (staff) grouped by job role.** The staff list is now one collapsible
+section per job role the person holds (a procedure in two of their roles appears under
+both), each with "n of m signed" and a red overdue count so a closed section cannot
+hide urgency. Unlike My Policies, the first section starts open and the rest closed.
+Order inside a section is unchanged (overdue, then unsigned, then signed).
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted
