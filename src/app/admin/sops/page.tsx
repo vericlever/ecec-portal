@@ -84,11 +84,19 @@ export default async function AdminSopsPage({
   if (statusFilter === "needs_content") query = query.is("published_version", null);
   query = query.order("name");
 
-  const [{ data: sops }, { data: services }, { data: roleLinks }, categories, reviewStatus] =
+  const [
+    { data: sops },
+    { data: services },
+    { data: roleLinks },
+    { data: jobRoles },
+    categories,
+    reviewStatus,
+  ] =
     await Promise.all([
       query,
       supabase.from("services").select("id, name"),
-      supabase.from("job_role_sops").select("sop_id"),
+      supabase.from("job_role_sops").select("sop_id, job_role_id"),
+      supabase.from("job_roles").select("id, name").order("name"),
       procedureCategories(supabase),
       sopReviewStatusMap(supabase),
     ]);
@@ -96,8 +104,14 @@ export default async function AdminSopsPage({
   const serviceName = new Map((services ?? []).map((s) => [s.id, s.name]));
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
   const roleCount = new Map<string, number>();
-  for (const l of roleLinks ?? [])
+  const rolesBySop = new Map<string, string[]>();
+  for (const l of roleLinks ?? []) {
     roleCount.set(l.sop_id, (roleCount.get(l.sop_id) ?? 0) + 1);
+    const list = rolesBySop.get(l.sop_id) ?? [];
+    list.push(l.job_role_id as string);
+    rolesBySop.set(l.sop_id, list);
+  }
+  const filtersActive = Boolean(q || categoryFilter || statusFilter);
 
   let rows = (sops ?? []).map((s) => ({
     ...s,
@@ -126,6 +140,79 @@ export default async function AdminSopsPage({
     (s) => s.published_version && reviewState(s.next_review_date).status === "overdue",
   ).length;
   const needsRevision = rows.filter((s) => s.latest_decision === "needs_revision").length;
+
+  function renderRow(s: SopRow, keyPrefix = "") {
+        const st = statusOf(s);
+        const roles = roleCount.get(s.id) ?? 0;
+        const rev = s.published_version ? reviewState(s.next_review_date) : null;
+        return (
+          <li key={keyPrefix + s.id}>
+            <Link
+              href={`/admin/sops/${s.id}`}
+              className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
+            >
+              <div className="min-w-0">
+                <div className="text-sm font-medium">
+                  {s.name}
+                  {s.signoff_type === "self_and_manager" && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800">
+                      Manager co-sign
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 text-xs text-slate-400">
+                  {s.category_id
+                    ? (categoryName.get(s.category_id) ?? "—")
+                    : "no category"}
+                  {s.service_id
+                    ? ` · ${serviceName.get(s.service_id) ?? "one site"} only`
+                    : ""}
+                  {roles > 0
+                    ? ` · ${roles} job role${roles === 1 ? "" : "s"}`
+                    : " · not in any role"}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {s.latest_decision === "needs_revision" && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                    Needs revision
+                  </span>
+                )}
+                {rev && (rev.status === "overdue" || rev.status === "soon") && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      rev.status === "overdue"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {rev.status === "overdue" ? "Review overdue" : "Review due"}
+                  </span>
+                )}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${TONE[st.tone]}`}
+                >
+                  {st.label}
+                </span>
+              </div>
+            </Link>
+          </li>
+        );
+  }
+
+  // Grouped by job role - the unit procedures are actually assigned and signed
+  // off by. A procedure in several roles is listed under each.
+  const groups: { key: string; label: string; rows: SopRow[] }[] = (jobRoles ?? []).map(
+    (r) => ({ key: r.id as string, label: r.name as string, rows: [] }),
+  );
+  const noRole: SopRow[] = [];
+  for (const r of rows) {
+    const ids = rolesBySop.get(r.id) ?? [];
+    if (ids.length === 0) noRole.push(r);
+    for (const id of ids) groups.find((g) => g.key === id)?.rows.push(r);
+  }
+  if (noRole.length) groups.unshift({ key: "none", label: "No job role", rows: noRole });
+  for (let i = groups.length - 1; i >= 0; i--) if (groups[i].rows.length === 0) groups.splice(i, 1);
 
   return (
     <div>
@@ -158,7 +245,7 @@ export default async function AdminSopsPage({
 
       <p className="mt-1 text-sm text-slate-500">
         {rows.length} procedure{rows.length === 1 ? "" : "s"}
-        {(q || categoryFilter || statusFilter) && " matching the current filters"}
+        {filtersActive && " matching the current filters"}
         {" · "}
         {publishedCount} published
         {needsContent > 0 && ` · ${needsContent} still need content`}
@@ -168,71 +255,44 @@ export default async function AdminSopsPage({
         {needsRevision > 0 && (
           <span className="text-red-700"> · {needsRevision} needing revision</span>
         )}
+        {!filtersActive &&
+          " · grouped by job role, so a procedure in several roles is listed under each and role counts add up to more than the total"}
       </p>
 
       {rows.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">No procedures match those filters.</p>
-      ) : (
+      ) : filtersActive ? (
         <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-          {rows.map((s) => {
-            const st = statusOf(s);
-            const roles = roleCount.get(s.id) ?? 0;
-            const rev = s.published_version ? reviewState(s.next_review_date) : null;
-            return (
-              <li key={s.id}>
-                <Link
-                  href={`/admin/sops/${s.id}`}
-                  className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
-                >
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">
-                      {s.name}
-                      {s.signoff_type === "self_and_manager" && (
-                        <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800">
-                          Manager co-sign
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 text-xs text-slate-400">
-                      {s.category_id
-                        ? (categoryName.get(s.category_id) ?? "—")
-                        : "no category"}
-                      {s.service_id
-                        ? ` · ${serviceName.get(s.service_id) ?? "one site"} only`
-                        : ""}
-                      {roles > 0
-                        ? ` · ${roles} job role${roles === 1 ? "" : "s"}`
-                        : " · not in any role"}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {s.latest_decision === "needs_revision" && (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                        Needs revision
-                      </span>
-                    )}
-                    {rev && (rev.status === "overdue" || rev.status === "soon") && (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          rev.status === "overdue"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-800"
-                        }`}
-                      >
-                        {rev.status === "overdue" ? "Review overdue" : "Review due"}
-                      </span>
-                    )}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${TONE[st.tone]}`}
-                    >
-                      {st.label}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
+          {rows.map((s) => renderRow(s))}
         </ul>
+      ) : (
+        <div className="mt-6 space-y-2">
+          {groups.map((g) => (
+            <details
+              key={g.key}
+              className="group rounded-lg border border-slate-200 bg-white"
+            >
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                <span
+                  aria-hidden
+                  className="inline-block text-slate-400 transition-transform group-open:rotate-90"
+                >
+                  ›
+                </span>
+                {g.label}
+                <span className="font-normal text-slate-400">{g.rows.length}</span>
+                {g.key === "none" && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-amber-800">
+                    Draft only until a job role is set
+                  </span>
+                )}
+              </summary>
+              <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                {g.rows.map((s) => renderRow(s, g.key + ":"))}
+              </ul>
+            </details>
+          ))}
+        </div>
       )}
     </div>
   );

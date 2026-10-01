@@ -128,7 +128,7 @@ export function SopBulkReview({
           linkedPolicyIds: s.linkedPolicyIds,
           qualityAreaIds: s.qualityAreaIds,
           childSafeStandardIds: s.childSafeStandardIds,
-          publish: s.publish && r.hasText,
+          publish: s.publish && r.hasText && s.jobRoleIds.length > 0,
           replaceTargetId: s.action === "replace" ? r.duplicateOfId : null,
         };
       });
@@ -228,7 +228,7 @@ export function SopBulkReview({
                   )}
                   {s.jobRoleIds.length === 0 && (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-500">
-                      No job role &middot; staff will not see it
+                      No job role &middot; will stay in draft
                     </span>
                   )}
                 </div>
@@ -441,11 +441,16 @@ export function SopBulkReview({
                 <label className="mt-3 flex items-center gap-1.5 text-sm">
                   <input
                     type="checkbox"
-                    checked={s.publish}
-                    disabled={!r.hasText}
+                    checked={s.publish && s.jobRoleIds.length > 0}
+                    disabled={!r.hasText || s.jobRoleIds.length === 0}
                     onChange={(e) => patch(r.stagingId, { publish: e.target.checked })}
                   />
                   Publish immediately
+                  {s.jobRoleIds.length === 0 && (
+                    <span className="text-xs text-amber-700">
+                      (tag a job role first, otherwise it stays in draft)
+                    </span>
+                  )}
                 </label>
               </>
             )}

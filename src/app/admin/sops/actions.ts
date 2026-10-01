@@ -225,6 +225,18 @@ export async function publishSop(id: string): Promise<Result> {
     return { ok: false, error: "Add the procedure text before publishing." };
   }
   const db = createClient();
+  // Job role tagging is compulsory: a procedure with no role is never assigned
+  // to anyone, so it stays in draft until one is set.
+  const { count: roleCount } = await db
+    .from("job_role_sops")
+    .select("sop_id", { count: "exact", head: true })
+    .eq("sop_id", id);
+  if ((roleCount ?? 0) === 0) {
+    return {
+      ok: false,
+      error: "Tag at least one job role before publishing. A procedure with no role is not assigned to anyone.",
+    };
+  }
   const next = (owned.sop.published_version ?? 0) + 1;
   const { error } = await db
     .from("sops")
@@ -414,6 +426,19 @@ export async function setJobRole(
       return { ok: false, error: error.message };
     }
   } else {
+    if (owned.sop.published_version != null) {
+      const { count: remaining } = await db
+        .from("job_role_sops")
+        .select("sop_id", { count: "exact", head: true })
+        .eq("sop_id", sopId)
+        .neq("job_role_id", jobRoleId);
+      if ((remaining ?? 0) === 0) {
+        return {
+          ok: false,
+          error: "A published procedure must keep at least one job role. Add another role first, or unpublish it.",
+        };
+      }
+    }
     const { error } = await db
       .from("job_role_sops")
       .delete()
@@ -610,6 +635,27 @@ export async function finishBulkSops(
     publish: i.publish,
     replace_target_id: i.replaceTargetId,
   }));
+
+  // Same rule as publishSop: no job role, no publish. A replace keeps the
+  // roles the existing procedure already has.
+  const replaceIds = items
+    .filter((i) => i.action === "replace" && i.replaceTargetId)
+    .map((i) => i.replaceTargetId as string);
+  const rolesOnTarget = new Set<string>();
+  if (replaceIds.length) {
+    const { data: existing } = await db
+      .from("job_role_sops")
+      .select("sop_id")
+      .in("sop_id", replaceIds);
+    for (const r of existing ?? []) rolesOnTarget.add(r.sop_id as string);
+  }
+  for (let n = 0; n < items.length; n++) {
+    const i = items[n];
+    const hasRole =
+      i.jobRoleIds.length > 0 ||
+      (i.action === "replace" && !!i.replaceTargetId && rolesOnTarget.has(i.replaceTargetId));
+    if (!hasRole) payload[n].publish = false;
+  }
 
   const { data, error } = await db.rpc("commit_bulk_sops", { p_items: payload });
   if (error) return { ok: false, error: error.message };

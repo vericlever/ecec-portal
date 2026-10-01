@@ -179,10 +179,20 @@ export function SopEditor({
             </p>
           </div>
           {canEdit && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {linkedRoleIds.length === 0 && (
+                <span className="text-xs text-amber-700">
+                  Tag a job role below to publish
+                </span>
+              )}
               <button
                 type="button"
-                disabled={pending}
+                disabled={pending || linkedRoleIds.length === 0}
+                title={
+                  linkedRoleIds.length === 0
+                    ? "Tag at least one job role first"
+                    : undefined
+                }
                 onClick={() =>
                   act(
                     () => publishSop(sop.id),
@@ -583,6 +593,10 @@ export function SopEditor({
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Job roles that must complete this procedure
             </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Required. A procedure with no job role stays in draft, because nobody is
+              assigned to sign it.
+            </p>
             <div className="mt-2 space-y-1.5">
               {jobRoles.map((r) => (
                 <label key={r.id} className="flex items-center gap-2 text-sm">

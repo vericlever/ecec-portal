@@ -586,6 +586,21 @@ fast-forward merged into `main`. Checking the live public site is a separate,
 later sanity check on the deploy pipeline itself, not a substitute for local
 verification.
 
+**Procedures: job role is compulsory to publish, and Our Procedures groups by job role.**
+Job role is what assigns a procedure to staff, so a procedure with no role is never
+signed by anyone. Now enforced in the server actions (no migration): `publishSop`
+refuses with no job role; `setJobRole` refuses to remove the last role from a published
+procedure; `finishBulkSops` forces `publish` off for any bulk row with no role (a
+replace keeps the roles the existing procedure already has). The editor's Publish
+button is disabled with a hint, and the bulk review's "Publish immediately" is disabled
+until a role is tagged. Unpublished procedures with no role simply stay in draft. Our
+Procedures now shows collapsed sections per job role (name and count), with a "No job
+role" section first for anything untagged; a procedure in several roles is listed under
+each. Filtered and search views stay flat. Existing published procedures with no role
+are not touched or unpublished by this change; the "No job role" section is how to find
+them. The database function `commit_bulk_sops` itself is unchanged, so the rule lives
+in the app layer only. Typechecks clean; not yet viewed live.
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted
