@@ -283,6 +283,34 @@ export function SopEditor({
                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 />
               </label>
+              <fieldset className="text-sm">
+                <legend className="font-medium text-slate-700">
+                  Job role <span className="font-normal text-red-600">(required)</span>
+                </legend>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Who must complete this procedure. A procedure can sit in more than one
+                  role. With no role it stays in draft, because nobody is assigned to
+                  sign it. Ticking saves straight away.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {jobRoles.map((r) => (
+                    <label key={r.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={linked.has(r.id)}
+                        disabled={pending}
+                        onChange={(e) =>
+                          act(
+                            () => setJobRole(sop.id, r.id, e.target.checked),
+                            e.target.checked ? "Added to role" : "Removed from role",
+                          )
+                        }
+                      />
+                      <span>{r.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-sm">
                   <span className="font-medium text-slate-700">Sign-off</span>
@@ -311,34 +339,21 @@ export function SopEditor({
                   </select>
                 </label>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block text-sm">
-                  <span className="font-medium text-slate-700">
-                    Priority <span className="font-normal text-slate-400">(optional)</span>
-                  </span>
-                  <input
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                    inputMode="numeric"
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-medium text-slate-700">Site</span>
-                  <select
-                    value={serviceId}
-                    onChange={(e) => setServiceId(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  >
-                    <option value="">All sites</option>
-                    {services.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} only
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Site</span>
+                <select
+                  value={serviceId}
+                  onChange={(e) => setServiceId(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">All sites</option>
+                  {services.map((sv) => (
+                    <option key={sv.id} value={sv.id}>
+                      {sv.name} only
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-sm">
                   <span className="font-medium text-slate-700">Review every</span>
@@ -589,39 +604,6 @@ export function SopEditor({
 
       {canEdit && (
         <>
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Job roles that must complete this procedure
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Required. A procedure with no job role stays in draft, because nobody is
-              assigned to sign it.
-            </p>
-            <div className="mt-2 space-y-1.5">
-              {jobRoles.map((r) => (
-                <label key={r.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={linked.has(r.id)}
-                    disabled={pending}
-                    onChange={(e) =>
-                      act(
-                        () => setJobRole(sop.id, r.id, e.target.checked),
-                        e.target.checked ? "Added to role" : "Removed from role",
-                      )
-                    }
-                  />
-                  <span>
-                    {r.name}
-                    {r.is_placeholder && (
-                      <span className="text-slate-400"> (no procedures attached yet)</span>
-                    )}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </section>
-
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Quality areas and child safe standards
