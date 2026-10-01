@@ -67,37 +67,50 @@ export default async function PoliciesPage() {
             you have seen the current version.
           </p>
 
-          <div className="mt-6 space-y-8">
-            {present.map((g) => (
-              <section key={g.key}>
-                {present.length > 1 && (
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          <div className="mt-6 space-y-2">
+            {present.map((g) => {
+              const seen = g.rows.filter(isViewed).length;
+              return (
+                <details
+                  key={g.key}
+                  className="group rounded-lg border border-slate-200 bg-white"
+                >
+                  <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                    <span
+                      aria-hidden
+                      className="inline-block text-slate-400 transition-transform group-open:rotate-90"
+                    >
+                      ›
+                    </span>
                     {g.label}
-                  </h2>
-                )}
-                <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-                  {g.rows.map((p) => (
-                    <li key={p.id}>
-                      <Link
-                        href={`/policies/${p.id}`}
-                        className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
-                      >
-                        <span className="text-sm">{p.name}</span>
-                        {isViewed(p) ? (
-                          <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                            Viewed
-                          </span>
-                        ) : (
-                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                            Not viewed
-                          </span>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
+                    <span className="font-normal normal-case tracking-normal text-slate-400">
+                      {seen} of {g.rows.length} viewed
+                    </span>
+                  </summary>
+                  <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                    {g.rows.map((p) => (
+                      <li key={p.id}>
+                        <Link
+                          href={`/policies/${p.id}`}
+                          className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
+                        >
+                          <span className="text-sm">{p.name}</span>
+                          {isViewed(p) ? (
+                            <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                              Viewed
+                            </span>
+                          ) : (
+                            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                              Not viewed
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              );
+            })}
           </div>
         </>
       )}
