@@ -18,7 +18,6 @@ export type ContractRow = {
   signed_name: string | null;
   signed_by: string | null;
   signed_content_hash: string | null;
-  is_deed: boolean;
   countersigned_at: string | null;
   countersigned_name: string | null;
   countersigned_by: string | null;
@@ -35,14 +34,11 @@ export type ContractRow = {
 
 // Fully executed = both signature slots filled, or just the employee's if
 // the contract doesn't require a countersignature (Step 57 - ticked off by
-// default on upload, unticked when the employer already signed the PDF). A
-// deed is reported as "signed on paper" rather than unsigned or executed -
-// it never goes through either in-app slot (Step 39).
-export type ExecutionState = "deed" | "unsigned" | "awaiting_countersign" | "executed";
+// default on upload, unticked when the employer already signed the PDF).
+export type ExecutionState = "unsigned" | "awaiting_countersign" | "executed";
 
 export function executionState(contract: ContractRow | null): ExecutionState {
   if (!contract) return "unsigned";
-  if (contract.is_deed) return "deed";
   if (!contract.signed_at) return "unsigned";
   if (!contract.requires_countersign) return "executed";
   if (!contract.countersigned_at) return "awaiting_countersign";
@@ -115,7 +111,7 @@ export async function contractAlerts(
   const { data } = await supabase
     .from("contracts")
     .select(
-      "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, signed_by, signed_content_hash, is_deed, countersigned_at, countersigned_name, countersigned_by, countersigned_content_hash, created_at",
+      "id, profile_id, start_date, period_type, duration_months, expiry_date, document_id, notes, superseded_at, signed_at, signed_name, signed_by, signed_content_hash, countersigned_at, countersigned_name, countersigned_by, countersigned_content_hash, created_at",
     )
     .is("superseded_at", null)
     .eq("period_type", "fixed");

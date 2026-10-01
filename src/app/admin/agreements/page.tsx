@@ -6,13 +6,11 @@ import { executionState, type ContractRow } from "@/lib/contracts";
 export const dynamic = "force-dynamic";
 
 const EXECUTION_LABEL: Record<ReturnType<typeof executionState>, string> = {
-  deed: "Deed",
   unsigned: "Unsigned",
   awaiting_countersign: "Awaiting countersignature",
   executed: "Executed",
 };
 const EXECUTION_TONE: Record<ReturnType<typeof executionState>, string> = {
-  deed: "bg-slate-100 text-slate-500",
   unsigned: "bg-amber-100 text-amber-800",
   awaiting_countersign: "bg-blue-100 text-blue-700",
   executed: "bg-green-100 text-green-700",
@@ -29,12 +27,12 @@ async function ContractsSection() {
   const { data: contracts } = await supabase
     .from("contracts")
     .select(
-      "id, profile_id, is_deed, requires_countersign, signed_at, countersigned_at, superseded_at, start_date",
+      "id, profile_id, requires_countersign, signed_at, countersigned_at, superseded_at, start_date",
     )
     .is("superseded_at", null)
     .order("start_date", { ascending: false });
 
-  // executionState() only reads is_deed/signed_at/requires_countersign/
+  // executionState() only reads signed_at/requires_countersign/
   // countersigned_at - this query doesn't select the rest of ContractRow's
   // columns (period/expiry/signature ids etc.), so the cast is intentionally
   // loose rather than claiming a full row shape this list doesn't need.

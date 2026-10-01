@@ -89,11 +89,7 @@ export function PerStaffCompliancePdf({
                 ? `Fixed term, expires ${data.contract.expiry_date}`
                 : "No fixed period"}
             </Text>
-            {data.contract.is_deed ? (
-              <Text style={styles.cell}>
-                This is a deed, signed on paper - see the uploaded document.
-              </Text>
-            ) : (
+            {(
               <>
                 <Text style={styles.cell}>
                   {data.contract.signed_at
