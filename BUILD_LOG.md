@@ -586,6 +586,18 @@ fast-forward merged into `main`. Checking the live public site is a separate,
 later sanity check on the deploy pipeline itself, not a substitute for local
 verification.
 
+### 1 October 2026
+
+**Our Policies page: categories collapsed by default.** A policy tagged to several
+categories is listed under each, so the unfiltered page showed hundreds of rows for
+116 policies. Each category is now a collapsed section (native `<details>`, no client
+JS) showing its name and count; opening it shows the same rows as before. Filtered and
+search views are unchanged (flat list). A line under the total explains why category
+counts add up to more than the total. Presentation only, no schema or data change.
+Typechecks clean; not yet viewed live. First step of a wider tidy-up of this page, with
+an expand-all/collapse-all control a possible follow-up. Change is in
+`src/app/admin/policies/page.tsx`.
+
 **Procedures: job role is compulsory to publish, and Our Procedures groups by job role.**
 Job role is what assigns a procedure to staff, so a procedure with no role is never
 signed by anyone. Now enforced in the server actions (no migration): `publishSop`
