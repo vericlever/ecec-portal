@@ -21,7 +21,11 @@ function SubmitButton() {
   );
 }
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { error?: string };
+}) {
   const [state, formAction] = useFormState(login, initialState);
 
   return (
@@ -94,6 +98,17 @@ export default function LoginPage() {
                 Forgot password
               </Link>
             </div>
+
+            {searchParams?.error === "link" && !state.error && (
+              <p className="border-l-2 border-training py-1 pl-3 text-[15px] text-ink">
+                That link has expired or has already been used. Sign in below,
+                or use{" "}
+                <Link href="/forgot-password" className="text-outcomes underline">
+                  Forgot password
+                </Link>{" "}
+                to get a fresh link.
+              </p>
+            )}
 
             {state.error && (
               <p className="border-l-2 border-training py-1 pl-3 text-[15px] text-ink">
