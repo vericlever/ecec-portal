@@ -142,21 +142,18 @@ function Area({
         </div>
       )}
 
-      <h3 className="mt-4 text-sm font-semibold text-slate-800">4. Procedure detail</h3>
+      <h3 className="mt-4 text-sm font-semibold text-slate-800">4. Procedures aligned to this area</h3>
       {area.procedures.length === 0 ? (
         <p className="text-sm text-slate-500">No procedure is aligned to this area.</p>
       ) : (
-        <Grid
-          head={["Procedure", "Role", "Policies served", "Last reviewed", "Next due", "Sign-off %"]}
-          rows={area.procedures.map((p) => [
-            p.name,
-            p.roles.length > 0 ? p.roles.join(", ") : "Not assigned",
-            p.policyNames.length > 0 ? p.policyNames.join(", ") : "No policy linked",
-            p.lastReviewed ?? "Not yet reviewed",
-            p.nextDue ? (p.overdue ? `${p.nextDue} (overdue)` : p.nextDue) : "Not set",
-            p.signOffPct === null ? "n/a" : `${p.signOffPct}%`,
-          ])}
-        />
+        <ul className="mt-1 text-sm text-slate-700">
+          {area.procedures.map((p) => (
+            <li key={p.id}>
+              {p.name}
+              {p.overdue ? " (review overdue)" : ""}
+            </li>
+          ))}
+        </ul>
       )}
 
       <h3 className="mt-4 text-sm font-semibold text-slate-800">5. QIP statement</h3>

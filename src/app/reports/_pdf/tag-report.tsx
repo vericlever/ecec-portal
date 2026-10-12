@@ -138,15 +138,6 @@ function AreaPages({ report, area, orgName, statement }: { report: TagReport; ar
     ["Procedure reviews that drew on outcomes data", ...s3.reviewsDrew.map(count)],
   ];
 
-  const procRows: ReactNode[][] = area.procedures.map((p) => [
-    p.name,
-    p.roles.length > 0 ? p.roles.join(", ") : "Not assigned",
-    p.policyNames.length > 0 ? p.policyNames.join(", ") : "No policy linked",
-    p.lastReviewed ?? "Not yet reviewed",
-    p.nextDue ? (p.overdue ? `${p.nextDue} (overdue)` : p.nextDue) : "Not set",
-    p.signOffPct === null ? "n/a" : `${p.signOffPct}%`,
-  ]);
-
   return (
     <>
       <Page size="A4" style={s.page}>
@@ -184,29 +175,17 @@ function AreaPages({ report, area, orgName, statement }: { report: TagReport; ar
             })}
           </View>
         )}
-      </Page>
 
-      <Page size="A4" style={s.page}>
-        <Chrome report={report} orgName={orgName} area={area} />
-        <Text style={s.h1}>
-          {area.option.code}: {area.option.name}
-        </Text>
-        <Text style={s.h2}>4. Procedure detail</Text>
-        {procRows.length === 0 ? (
+        <Text style={s.h2}>4. Procedures aligned to this area</Text>
+        {area.procedures.length === 0 ? (
           <Text style={s.note}>No procedure is aligned to this area.</Text>
         ) : (
-          <Table
-            fixedHeader
-            cols={[
-              { header: "Procedure", width: "30%" },
-              { header: "Role", width: "14%" },
-              { header: "Policies served", width: "24%" },
-              { header: "Last reviewed", width: "12%" },
-              { header: "Next due", width: "12%" },
-              { header: "Sign-off %", width: "8%", align: "right" },
-            ]}
-            rows={procRows}
-          />
+          area.procedures.map((p) => (
+            <Text key={p.id} style={s.listLine}>
+              {p.name}
+              {p.overdue ? " (review overdue)" : ""}
+            </Text>
+          ))
         )}
 
         <View wrap={false}>
