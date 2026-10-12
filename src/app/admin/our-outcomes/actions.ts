@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { extractOutcomeDocument } from "@/lib/documents/outcome-extract";
 import { redactOutcomeText } from "@/lib/redaction";
 import { generateText } from "@/lib/ai/client";
+import { sweepStaleQuarantineFiles } from "@/lib/outcome-quarantine";
 import { numberLines, buildSuggestUserMessage, verifySuggestions, SUGGEST_SYSTEM_PROMPT } from "@/lib/outcome-suggest";
 import { createHash } from "node:crypto";
 
@@ -30,6 +31,13 @@ export async function createQuarantineUploadUrl(fileName: string): Promise<
 > {
   const me = await requireManagerProfile();
   const admin = createAdminClient();
+  // Hold the one-hour rule on abandoned originals whenever uploads are in use
+  // (the daily cron is only the backstop). Best effort: never blocks an upload.
+  try {
+    await sweepStaleQuarantineFiles(admin, me.organisation_id!);
+  } catch (e) {
+    console.error("quarantine sweep failed:", e);
+  }
   const path = `${me.organisation_id}/${Date.now()}-${fileName.replace(/[^\w.\-]/g, "_")}`;
   const { data, error } = await admin.storage.from(QUARANTINE_BUCKET).createSignedUploadUrl(path);
   if (error || !data) return { ok: false, error: error?.message ?? "Could not prepare the upload." };

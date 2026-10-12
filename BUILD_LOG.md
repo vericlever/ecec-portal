@@ -978,6 +978,20 @@ destructive change). Two existing contracts in the live database have `is_deed =
 as nothing reads the flag any more they now behave as ordinary unsigned contracts.
 Typechecks clean; not yet viewed live.
 
+- **Deploy blocked by the hourly cron; cleanup changed (12 October 2026).** Vercel refused
+  the PR deployment: the project is on the Hobby plan, which only allows daily cron jobs,
+  and `quarantine-cleanup` was set to hourly. Zeke chose to stay on Hobby. The sweep now
+  lives in `src/lib/outcome-quarantine.ts` and runs (1) daily from the cron (`0 20 * * *`,
+  every organisation) and (2) at the start of every upload, for that organisation's folder
+  (`createQuarantineUploadUrl`, best effort, never blocks an upload). **This is a step
+  down from B5.7's "a cron job clears anything older than one hour":** while uploads are in
+  use the one-hour rule holds, but if nobody starts an upload an abandoned original (the
+  bucket holds the unredacted file) can sit up to about 24 hours. Save and cancel still
+  delete immediately. Upgrading to Vercel Pro would restore a true hourly cron: change the
+  schedule back to `0 * * * *`. Checked against the real bucket that the sweep runs and
+  leaves a fresh file alone; deleting a genuinely stale file was not exercised (cannot
+  backdate a Storage object).
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted
