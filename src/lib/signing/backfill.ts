@@ -43,12 +43,11 @@ export async function runContractBackfill(opts: { dryRun: boolean }): Promise<Ba
     .from("contracts")
     .select(
       `id, organisation_id, profile_id, document_id, signed_at, signed_name, signed_content_hash,
-       countersigned_at, countersigned_name, requires_countersign, is_deed, start_date, period_type,
+       countersigned_at, countersigned_name, requires_countersign, start_date, period_type,
        duration_months, expiry_date, signed_copy_document_id`,
     )
     .not("signed_at", "is", null)
-    .is("signed_signature_document_id", null)
-    .eq("is_deed", false);
+    .is("signed_signature_document_id", null);
   if (error) throw error;
 
   let succeeded = 0;

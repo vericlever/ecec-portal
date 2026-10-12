@@ -32,16 +32,7 @@ export function ContractPdf({
         {contract.notes && <Text style={styles.cell}>{contract.notes}</Text>}
       </View>
 
-      {contract.is_deed ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Execution</Text>
-          <Text style={styles.cell}>
-            This document is a deed, executed on paper with the required
-            witnessing. The signed copy is held as the uploaded document, not
-            recorded here.
-          </Text>
-        </View>
-      ) : (
+      {(
         <>
           <View style={styles.section} wrap={false}>
             <Text style={styles.sectionTitle}>Employee signature</Text>

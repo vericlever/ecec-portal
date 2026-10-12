@@ -2,7 +2,7 @@ import { PDFDocument } from "pdf-lib";
 
 // Step 57, A1. PDF is the only accepted upload for anything signed in the
 // portal - shared by contract upload (Part A) and agreement upload
-// (Part B). A deed keeps accepting any file type and never calls this.
+// (Part B).
 export const PDF_ONLY_STATEMENT =
   "To preserve the original document exactly as issued, contracts and agreements can only be uploaded as PDF files. If you have a Word document, save it as PDF first.";
 

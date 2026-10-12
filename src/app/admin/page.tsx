@@ -98,8 +98,7 @@ export default async function DashboardPage() {
     .from("contracts")
     .select("profile_id")
     .is("superseded_at", null)
-    .is("signed_at", null)
-    .eq("is_deed", false);
+    .is("signed_at", null);
 
   const activeStaff = (staff ?? []).filter((p) => p.is_active);
   const { data: roleLinks } = activeStaff.length

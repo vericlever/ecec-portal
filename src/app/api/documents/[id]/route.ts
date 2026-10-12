@@ -8,7 +8,7 @@ import { signedDocumentUrl } from "@/lib/documents/store";
 // Access is re-checked here against the owning record, not left to the
 // documents-table RLS.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const me = await getProfile();
@@ -37,10 +37,19 @@ export async function GET(
         return new NextResponse("Not found", { status: 404 });
       }
     }
-  } else if (doc.owner_type === "contract" || doc.owner_type === "identity") {
+  } else if (
+    doc.owner_type === "contract" ||
+    doc.owner_type === "signed_copy" ||
+    doc.owner_type === "signature" ||
+    doc.owner_type === "identity"
+  ) {
     // The staff member sees their own; a manager or HR manager sees it via the
     // RLS on the owning row (contracts_select / identity_documents_rw).
-    const table = doc.owner_type === "contract" ? "contracts" : "identity_documents";
+    // signed_copy and signature documents are owned by the contract they
+    // belong to (Step 57's signed-copy generation and signature-pad capture
+    // both set owner_id to the contract's id, not their own), so they share
+    // the same contracts lookup as the contract's own original document.
+    const table = doc.owner_type === "identity" ? "identity_documents" : "contracts";
     const { data: owner } = await supabase
       .from(table)
       .select("id")
@@ -56,7 +65,8 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const signed = await signedDocumentUrl(params.id);
+  const inline = request.nextUrl.searchParams.get("inline") === "1";
+  const signed = await signedDocumentUrl(params.id, { inline });
   if (!signed) return new NextResponse("Not found", { status: 404 });
   return NextResponse.redirect(signed.url);
 }

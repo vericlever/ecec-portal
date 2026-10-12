@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { assignedJobRoleIds, assignedRoleDates } from "@/lib/staff-job-roles";
+import { assignedJobRoles, assignedRoleDates } from "@/lib/staff-job-roles";
 import {
   earliestRoleStartBySop,
   sopDueDate,
@@ -28,7 +28,8 @@ export default async function SopListPage() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const roleIds = await assignedJobRoleIds(supabase, profile.id);
+  const myRoles = await assignedJobRoles(supabase, profile.id);
+  const roleIds = myRoles.map((r) => r.id);
   if (roleIds.length === 0) {
     return (
       <div>
@@ -103,6 +104,85 @@ export default async function SopListPage() {
 
   const signedCount = rows.filter((s) => state(s) === "signed").length;
 
+  const rank = (s: SopRow) =>
+    state(s) !== "not_signed" ? 2 : clockOf(s) === "overdue" ? 0 : 1;
+
+  function renderRow(sop: SopRow, keyPrefix: string) {
+    const st = state(sop);
+    const dueDate = st === "not_signed" ? due(sop) : null;
+    const clock = st === "not_signed" ? clockOf(sop) : null;
+    return (
+      <li key={keyPrefix + sop.id}>
+        <Link
+          href={`/sops/${sop.id}`}
+          className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
+        >
+          <span className="text-sm">{sop.name}</span>
+          <span className="flex shrink-0 items-center gap-2">
+            {clock === "paused" ? (
+              <span className="text-xs text-slate-400">Paused</span>
+            ) : (
+              dueDate && (
+                <span
+                  className={
+                    clock === "overdue"
+                      ? "text-xs font-medium text-red-700"
+                      : clock === "due_soon"
+                        ? "text-xs font-medium text-amber-700"
+                        : "text-xs text-slate-400"
+                  }
+                >
+                  {dueSignoffPhrase(dueDate)}
+                </span>
+              )
+            )}
+            {st === "signed" ? (
+              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                Signed
+              </span>
+            ) : st === "awaiting_manager" ? (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                Awaiting manager
+              </span>
+            ) : (
+              <span
+                className={
+                  clock === "overdue"
+                    ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                    : clock === "due_soon"
+                      ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                      : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500"
+                }
+              >
+                Not signed
+              </span>
+            )}
+          </span>
+        </Link>
+      </li>
+    );
+  }
+
+  // One collapsible section per job role the person holds. A procedure that
+  // sits in two of their roles is listed under both. The first section starts
+  // open (most staff hold one role), the rest start closed.
+  const sopsByRole = new Map<string, Set<string>>();
+  for (const l of links) {
+    const set = sopsByRole.get(l.job_role_id) ?? new Set<string>();
+    set.add(l.sop_id);
+    sopsByRole.set(l.job_role_id, set);
+  }
+  const groups = myRoles
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      rows: rows
+        .filter((s) => sopsByRole.get(r.id)?.has(s.id))
+        .sort((a, b) => rank(a) - rank(b)),
+    }))
+    .filter((g) => g.rows.length > 0);
+
+
   return (
     <div>
       <h1 className="text-xl font-semibold">My Procedures</h1>
@@ -115,70 +195,42 @@ export default async function SopListPage() {
           <p className="mt-1 text-sm text-slate-500">
             {signedCount} of {rows.length} signed
           </p>
-          <ul className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-            {rows
-              .slice()
-              .sort((a, b) => {
-                const rank = (s: SopRow) =>
-                  state(s) !== "not_signed" ? 2 : clockOf(s) === "overdue" ? 0 : 1;
-                return rank(a) - rank(b);
-              })
-              .map((sop) => {
-                const st = state(sop);
-                const dueDate = st === "not_signed" ? due(sop) : null;
-                const clock = st === "not_signed" ? clockOf(sop) : null;
-                return (
-                  <li key={sop.id}>
-                    <Link
-                      href={`/sops/${sop.id}`}
-                      className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
+          <div className="mt-6 space-y-2">
+            {groups.map((g, i) => {
+              const signed = g.rows.filter((s) => state(s) === "signed").length;
+              const overdue = g.rows.filter(
+                (s) => state(s) === "not_signed" && clockOf(s) === "overdue",
+              ).length;
+              return (
+                <details
+                  key={g.id}
+                  open={i === 0}
+                  className="group rounded-lg border border-slate-200 bg-white"
+                >
+                  <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                    <span
+                      aria-hidden
+                      className="inline-block text-slate-400 transition-transform group-open:rotate-90"
                     >
-                      <span className="text-sm">{sop.name}</span>
-                      <span className="flex shrink-0 items-center gap-2">
-                        {clock === "paused" ? (
-                          <span className="text-xs text-slate-400">Paused</span>
-                        ) : (
-                          dueDate && (
-                            <span
-                              className={
-                                clock === "overdue"
-                                  ? "text-xs font-medium text-red-700"
-                                  : clock === "due_soon"
-                                    ? "text-xs font-medium text-amber-700"
-                                    : "text-xs text-slate-400"
-                              }
-                            >
-                              {dueSignoffPhrase(dueDate)}
-                            </span>
-                          )
-                        )}
-                        {st === "signed" ? (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                            Signed
-                          </span>
-                        ) : st === "awaiting_manager" ? (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                            Awaiting manager
-                          </span>
-                        ) : (
-                          <span
-                            className={
-                              clock === "overdue"
-                                ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
-                                : clock === "due_soon"
-                                  ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
-                                  : "rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500"
-                            }
-                          >
-                            Not signed
-                          </span>
-                        )}
+                      ›
+                    </span>
+                    {g.name}
+                    <span className="font-normal normal-case tracking-normal text-slate-400">
+                      {signed} of {g.rows.length} signed
+                    </span>
+                    {overdue > 0 && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-red-700">
+                        {overdue} overdue
                       </span>
-                    </Link>
-                  </li>
-                );
-              })}
-          </ul>
+                    )}
+                  </summary>
+                  <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                    {g.rows.map((sop) => renderRow(sop, g.id + ":"))}
+                  </ul>
+                </details>
+              );
+            })}
+          </div>
         </>
       )}
       <OutcomesSection sops={rows.map((s) => ({ id: s.id, name: s.name }))} />

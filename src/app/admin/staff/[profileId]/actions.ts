@@ -202,18 +202,12 @@ export async function uploadContract(
   }
 
   const notes = String(formData.get("notes") ?? "").trim() || null;
-  // A deed is never signed in-app (see migration 0042) - HR/Admin flags it at
-  // upload, based on the document they are looking at.
-  const isDeed = formData.get("is_deed") === "on";
-  // Step 57: every contract requires countersignature - no per-upload
-  // choice. Deeds never use this field either way (see executionState()).
+  // Step 57: every contract requires countersignature - no per-upload choice.
   const requiresCountersign = true;
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!isDeed) {
-    const validation = await validatePdf(bytes, file.type || null, file.name);
-    if (!validation.ok) return { ok: false, error: validation.error };
-  }
+  const validation = await validatePdf(bytes, file.type || null, file.name);
+  if (!validation.ok) return { ok: false, error: validation.error };
 
   const supabase = createClient();
   const { data: contract, error } = await supabase
@@ -226,7 +220,6 @@ export async function uploadContract(
       duration_months: durationMonths,
       expiry_date: expiry,
       notes,
-      is_deed: isDeed,
       requires_countersign: requiresCountersign,
       created_by: gate.me.id,
     })
@@ -281,7 +274,7 @@ export async function signOwnContract(
   const supabase = createClient();
   const { data: contract } = await supabase
     .from("contracts")
-    .select("id, organisation_id, profile_id, superseded_at, signed_at, is_deed, document_id")
+    .select("id, organisation_id, profile_id, superseded_at, signed_at, document_id")
     .eq("id", contractId)
     .maybeSingle();
   if (!contract || contract.profile_id !== me.id) {
@@ -289,12 +282,6 @@ export async function signOwnContract(
   }
   if (contract.superseded_at) {
     return { ok: false, error: "This contract has been replaced." };
-  }
-  if (contract.is_deed) {
-    return {
-      ok: false,
-      error: "This contract is a deed and is signed on paper, not in the portal.",
-    };
   }
   if (contract.signed_at) return { ok: true };
 
@@ -350,7 +337,7 @@ export async function countersignContract(
   const supabase = createClient();
   const { data: contract } = await supabase
     .from("contracts")
-    .select("id, profile_id, organisation_id, superseded_at, is_deed, document_id, countersigned_at, requires_countersign")
+    .select("id, profile_id, organisation_id, superseded_at, document_id, countersigned_at, requires_countersign")
     .eq("id", contractId)
     .maybeSingle();
   if (!contract || contract.organisation_id !== me.organisation_id) {
@@ -371,12 +358,6 @@ export async function countersignContract(
   }
   if (contract.superseded_at) {
     return { ok: false, error: "This contract has been replaced." };
-  }
-  if (contract.is_deed) {
-    return {
-      ok: false,
-      error: "This contract is a deed and is signed on paper, not in the portal.",
-    };
   }
   if (!contract.requires_countersign) {
     return { ok: false, error: "This contract does not require a countersignature." };

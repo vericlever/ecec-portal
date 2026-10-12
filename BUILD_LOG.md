@@ -9,7 +9,7 @@ specs and the migration set on the live Supabase project.
 disagree, this file is the more recent and the discrepancies are listed under
 "Corrections against BUILD_PLAN.md" below.
 
-Last reconciled against `main` at commit `74d8822` (21 September 2026).
+Last reconciled against `main` at commit `bf5553d` (29 September 2026).
 
 ## External review status
 
@@ -67,8 +67,37 @@ As of commit `74d8822`, 21 September 2026.
   recorded" for that stretch. The exceptions, checked live with Zeke in the room, are
   the parent portal, the bulk upload defaults/tagging work, and Step 56.
 
-Migrations `0001` to `0073` are all applied to the Sydney (ap-southeast-2) Supabase
-project. `main` is in sync with `origin/main` as of this reconciliation.
+- **AI staff Q&A** (unnumbered build addendum, 22-24 September) built: pgvector,
+  content chunks, embedding jobs, an "Ask" widget over published policies and
+  procedures, with a per-tenant daily cap and an end-to-end cross-tenant isolation
+  check. See the step table and migrations 0074 to 0081.
+- **Step 57: contract signing redone to produce a real signed PDF** (23 September,
+  `813f7df`). Signing now captures a drawn signature and merges a new execution page
+  onto the original document rather than only recording a typed name, timestamp and
+  hash; countersignature is now mandatory; a signed copy is generated and emailed.
+  Migrations 0082 to 0084.
+- **Step 57 follow-ups, 28-29 September**, across two separate Claude Code sessions
+  and two GitHub pull requests (see the chronological log for the full list): a
+  Vercel-only production bug where signed PDFs 500ed, a blank-iframe bug on the
+  contract preview, the "Complete staff sign-off" hub rebuilt into a real per-staff
+  outstanding-items inbox at `/admin/verification`, the employment contract surfaced
+  on staff's own "My Agreements" page, and a document-access-control gap that 404'd a
+  staff member trying to view their own signed contract. No new migrations.
+- **Multi-service reach** (28 September, `9a419f1`, migration 0093): a manager or HR
+  manager can now be granted reach across more than one service, not just their home
+  service.
+- **GitHub push access was broken for Claude Code sessions in this repo until 28
+  September** - the Claude GitHub App was never installed on the `vericlever` GitHub
+  organisation at all. Now installed with write access. If a future session reports
+  push failing with a 403 naming "Claude doesn't have GitHub access", check
+  `github.com/apps/claude/installations/select_target` first, and note that a fix
+  there only takes effect for a session started after the fix, not the one that hit
+  the error.
+
+Migrations `0001` to `0084` and `0093` are applied to the Sydney (ap-southeast-2)
+Supabase project. **Migration numbers `0085` to `0092` and `0094` are taken but not
+yet applied or committed** - see "Outstanding and blocked" below, do not reuse them.
+`main` is in sync with `origin/main` as of this reconciliation.
 
 ## Step completion table
 
@@ -130,7 +159,9 @@ project. `main` is in sync with `origin/main` as of this reconciliation.
 | 55 | Training status page | Done, on `main` | (none) | `9337d93` | Not recorded in this log |
 | 56 | Convert docx/html/pdf uploads to Markdown; backfill all 151 existing RSG documents; let a procedure link to its governing policies, not just the reverse | Done, on `main` | 0071, 0072, 0073 | `3ed7065`, `db50b6f` | Yes. Verified end to end against a hand-built test docx and against real RSG content (`scripts/reprocess-documents.ts` dry run then apply, `scripts/bulk-republish.ts`), including catching and fixing a real bug (an embedded image was being inlined as base64 into the stored body). Policy-procedure linking verified live on the Science Kinder tenant in both directions, then the test link removed |
 | AI Q&A | Staff "Ask a question" assistant: retrieval-augmented Q&A over an org's own published policies/procedures. Built ad hoc alongside other steps and not recorded here until Step 58 asked for it. Call path: `src/app/ask/actions.ts` -> `src/lib/ai/service.ts:answerQuestion()` -> Voyage `voyage-3.5-lite` embeddings (REST, 1024 dimensions) for retrieval + Anthropic direct API (`claude-haiku-4-5-20251001`) for generation. Chunking by heading (`src/lib/ai/chunk.ts`), stored in `content_chunks.embedding vector(1024)`. Per-tenant flag `organisations.ai_qa_enabled`, RSG only. Superseded by Step 58, which moves both providers onto AWS Bedrock | Done, on `main`, pre-Step 58 | 0074-0081 | (built across several unlabelled commits) | Not independently verified before now. 50 real questions logged in `ai_interactions` from manual testing |
-| 57 Part A | Contract signing produces a real signed PDF (drawn signature via signature pad, merged as an execution page); countersignature no longer optional; "Staff Agreements" moved into Our Staff nav, "My Agreements" added to top-level staff nav and My Portal | Done, on `main` | 0082, 0083, 0084 | (this session) | Live-tested: caught and fixed `executionState()` silently misreporting (missing column selects) and `deleteContract` orphaning signature/signed-copy documents |
+| 57 | Contract signing redone to produce a real signed PDF: drawn signature merged onto the original document as a new execution page, mandatory countersignature, signed copy generated and emailed, one-off backfill route for contracts signed under the old typed-name-only flow | Done, on `main` | 0082, 0083, 0084 | `813f7df` | Not recorded in this log |
+| 57 (follow-up) | Two production-only bugs found and fixed after Step 57 shipped: signed PDFs 500ing on Vercel (pdfkit's font files not traced into the serverless function for the new routes - `next.config.mjs`), and contract preview iframes rendering blank (the signed URL forced `Content-Disposition: attachment`, which a browser won't render inline). `/admin/verification` rebuilt from a bare sighting-count list into a real per-staff outstanding-items hub (sighting checkboxes and contract countersignature inline, unsigned contracts shown read-only). The employment contract now also shows on staff's own "My Agreements" page. A document-access-control gap fixed: a staff member viewing their own signed contract got a blanket 404 because the two owner types Step 57 introduced (`signed_copy`, `signature`) were never added to `/api/documents/[id]`'s access check | Done, on `main` | (none) | `826d2d1`, `69c3159`, `ace8db0`, `a479c0f`, `3f9c80b`, `7afa440`, `bf5553d` | Yes - each change verified on `localhost` against real data before merging to `main`, then confirmed live on `vericlever.com.au` |
+| Multi-service reach | A manager or HR manager can be granted reach across more than one service, not just their home service | Done, on `main` | 0093 | `9a419f1` | Not recorded in this log |
 | 58 | Onshore AI: Claude inference and search embeddings both move to AWS Bedrock (`au.*` profiles, Sydney), replacing Anthropic's direct API and Voyage AI. One supplier, one bill | Code complete, unverified | 0085, 0086, 0087 | (this session) | Not yet - blocked on A4a's live model comparison and re-embed, which need real AWS Bedrock access this environment doesn't have. See "Outstanding and blocked" |
 | 59 | Our Outcomes: redacted outcome-record upload (Textract/Comprehend), AI-suggested procedure links, manager-editable review dates, review triggers/reasons/effectiveness verdicts, policy flags, report line | Code complete, unverified | 0088-0092 | (this session) | Not yet - the redaction/Textract path needs live AWS access this environment doesn't have; everything else (schema, RLS, review form, policy flags, dates, reports) is built and passes `rls-check.mjs` but has not been exercised through the UI on a deployed site. See "Outstanding and blocked" |
 
@@ -233,7 +264,7 @@ written.
 | 0090_policy_flags.sql | Step 59, B7a. `policy_flags`, manager/admin only both ways, cleared by policy version publish (no policy review event exists - see chronological log) |
 | 0091_review_date_rpc.sql | Step 59, B2. `policy_review_status` view (mirrors `sop_review_status` for policies) and `set_review_date_override()`, a SECURITY DEFINER RPC so a `manager_staff` (who cannot otherwise write `sops`/`policies` - `can_edit_content()` excludes that tier) can still move a review date, since "anyone who can complete a review" (`is_manager()`) is the spec's actual gate |
 | 0092_outcome_quarantine_bucket.sql | Step 59, B5.1. Private `outcome-quarantine` Storage bucket, 20 MB limit. No `storage.objects` policy - the browser uploads via a signed upload URL the app hands out after its own authorisation check |
-| 0093_multi_service_reach.sql | Concurrent work by another session while this one was mid-Step-58 - not this log's to describe. `profiles.all_services` and `resolveReportScope()` in `src/lib/reports.ts` reference it |
+| 0093_multi_service_reach.sql | A manager/HR manager's reach can now include more than one service (`profiles.all_services`, `staff_service_assignments`), not just their single home service. Rewrites `covers_service()`/`can_manage_worker()`/`can_manage_hr()` to go through the new `reaches_service()` function, and fixes `contracts_write`'s and `profiles_update`'s manager-reach branches, which had their own inline single-service checks that bypassed those functions entirely |
 | 0094_drop_unused_bedrock_embedding_column.sql | Step 58, A4a. Drops `content_chunks.embedding_bedrock` (0086) - the Voyage-to-Bedrock embedding cutover it was added for was cancelled after live testing found a real retrieval-quality regression. Originally written and applied as 0093, renumbered to 0094 after discovering another concurrent session had independently taken 0093 for unrelated work (see the 28 September 2026 chronological entry) |
 | 0095_outcome_records_periods.sql | Step 59, revision A. `outcome_records` becomes a periodic bulk record: `source_type` enum replaced (`incident_reports`, `staff_feedback`, `parent_feedback`, `regulator`, `other`), `event_date` replaced by `period_start`/`period_end` with a check constraint, overlap index added; `outcome_record_links.evidence` (jsonb, verified `{line, excerpt}` citations). The tables were confirmed empty first, so 0088's enum was dropped and recreated rather than migrated |
 
@@ -822,6 +853,131 @@ one separately in To sort. One file is still one record.
   path builds a provider and throws a clear error if `AWS_ROLE_ARN` is missing. The actual
   role assumption can only be tested on the deployed production site.
 
+### 22 to 24 September 2026
+
+AI staff Q&A built across several commits: pgvector and `content_chunks` schema, an
+embedding job queue and cron, an "Ask" widget wired into publishing and navigation,
+retrieval widened to search every published document in the organisation rather than
+one at a time, switched from approximate to exact vector search, boilerplate-chunk
+detection so repeated headers/footers don't dominate results, a measured similarity
+threshold, and a daily question cap that varies by tier. An end-to-end cross-tenant
+isolation check added for AI retrieval, and `rls-check.mjs` reworked to resolve its
+fixtures instead of hardcoding row ids.
+
+### 23 September 2026
+
+**Step 57: contract signing redone to produce a real signed PDF** (`813f7df`).
+Previously recorded only a typed name, timestamp and hash. Now: a drawn signature
+captured via a signature pad, merged onto a new execution page appended to the
+original document; contracts must be uploaded as PDF; countersignature made
+mandatory rather than optional; a downloadable signed copy generated and emailed to
+the employee and, where relevant, the countersigner; a one-off backfill route to
+generate a signed copy for contracts signed under the old flow. Also moved Staff
+Agreements from Our Workflow into the bottom of Our Staff, and made My Agreements
+reachable from the primary staff nav.
+
+### 28 to 29 September 2026
+
+**Discovered:** the Claude GitHub App had never been installed on the `vericlever`
+GitHub organisation, so no Claude Code session had working push access to this repo
+- every push failed with a 403. Installed 28 September with write access on all
+repositories. Confirmed working: a session must be started after the fix for it to
+take effect, not the one that hit the 403.
+
+**Two production-only bugs found and fixed**, neither reproducible under `next dev`,
+across two Claude Code sessions and two GitHub pull requests merged the same day
+(`3670e2f` from PR #1, `c530014` from PR #2):
+
+- Signed contract PDFs were 500ing on Vercel. `next.config.mjs`'s
+  `outputFileTracingIncludes` only traced pdfkit's font files into the `/reports/**`
+  routes (a bug already worked around once before, see the 10 September entry) - Step
+  57 added a second caller of the same `@react-pdf/renderer` path
+  (`src/lib/signing/signed-copy.ts`) on routes that were never added to the include
+  list (`826d2d1`, restated in `ace8db0` after a parallel session's clone picked up
+  the same gap independently).
+- Contract preview iframes rendered blank. `signedDocumentUrl()` always forced
+  `Content-Disposition: attachment` on the signed URL, correct for "Download" links
+  but unrenderable inline in an `<iframe>`. Fixed with an `?inline=1` param (`69c3159`).
+
+**`/admin/verification` rebuilt into a real per-staff outstanding-items hub**
+(`ace8db0`, `a479c0f`, `3f9c80b`). The "Complete staff sign-off" banner had linked to
+a page that only listed document sightings, with no way to act on a contract
+countersignature from there. Now grouped by staff member: sighting checkboxes and the
+full countersignature signature pad inline, unsigned-by-employee contracts shown
+read-only with a due date so a leader can chase them up, and a "View contract" link
+to the actual document on every item. Agreements (Code of Conduct, IFA etc.) are
+deliberately not included yet - pure employee self-sign today, no leader-side action
+exists to surface here. Caught and fixed along the way: an `.in()` filter on the
+staff-name lookup was silently swallowing a query error and showing "Unknown" for
+every group.
+
+**The employment contract now also shows on staff's own "My Agreements" page**
+(`7afa440`) - it only listed `hr_agreements` before, even though the contract is
+exactly the same kind of "something I need to read and sign" from a staff member's
+point of view. Reuses the same `ContractPanel` and query `/onboarding` already had.
+
+**Document access-control gap fixed** (`bf5553d`): `/api/documents/[id]`'s owner-type
+check enumerated `"contract"` and `"identity"`, falling through to a `canEditContent()`
+gate for anything else. Step 57 introduced two more owner types keyed to a contract's
+id - `"signed_copy"` and `"signature"` - never added here, so a staff member viewing
+their own fully executed contract's signed copy got a blanket 404. Both now share the
+contract's own ownership check.
+
+**Process change going forward**: earlier in this stretch, two changes were pushed
+straight to `main` without local verification first, which cost real time sorting out
+afterward. From `fix-signed-copy-access` (`bf5553d`) onward: new work goes to a branch,
+gets pulled and checked on `localhost` against real data first, and only then gets
+fast-forward merged into `main`. Checking the live public site is a separate,
+later sanity check on the deploy pipeline itself, not a substitute for local
+verification.
+
+### 1 October 2026
+
+**Our Policies page: categories collapsed by default.** A policy tagged to several
+categories is listed under each, so the unfiltered page showed hundreds of rows for
+116 policies. Each category is now a collapsed section (native `<details>`, no client
+JS) showing its name and count; opening it shows the same rows as before. Filtered and
+search views are unchanged (flat list). A line under the total explains why category
+counts add up to more than the total. Presentation only, no schema or data change.
+Typechecks clean; not yet viewed live. First step of a wider tidy-up of this page, with
+an expand-all/collapse-all control a possible follow-up. Change is in
+`src/app/admin/policies/page.tsx`.
+
+**Procedures: job role is compulsory to publish, and Our Procedures groups by job role.**
+Job role is what assigns a procedure to staff, so a procedure with no role is never
+signed by anyone. Now enforced in the server actions (no migration): `publishSop`
+refuses with no job role; `setJobRole` refuses to remove the last role from a published
+procedure; `finishBulkSops` forces `publish` off for any bulk row with no role (a
+replace keeps the roles the existing procedure already has). The editor's Publish
+button is disabled with a hint, and the bulk review's "Publish immediately" is disabled
+until a role is tagged. Unpublished procedures with no role simply stay in draft. Our
+Procedures now shows collapsed sections per job role (name and count), with a "No job
+role" section first for anything untagged; a procedure in several roles is listed under
+each. Filtered and search views stay flat. Existing published procedures with no role
+are not touched or unpublished by this change; the "No job role" section is how to find
+them. The database function `commit_bulk_sops` itself is unchanged, so the rule lives
+in the app layer only. The job role picker also moved into the procedure editor's Details
+section (replacing the Priority input, which is hidden but its saved value, used to
+order the staff list, is left untouched), with the separate lower section removed.
+Typechecks clean; not yet viewed live.
+
+**My Procedures (staff) grouped by job role.** The staff list is now one collapsible
+section per job role the person holds (a procedure in two of their roles appears under
+both), each with "n of m signed" and a red overdue count so a closed section cannot
+hide urgency. Unlike My Policies, the first section starts open and the rest closed.
+Order inside a section is unchanged (overdue, then unsigned, then signed).
+
+
+**Deed option removed from contracts.** The "this document is a deed, signed on paper"
+tick-box on contract upload is gone, along with every code path that special-cased it:
+the upload action (a PDF is now always required and validated), the sign and countersign
+guards, the "deed" execution state, the deed branches in the contract panel and both PDF
+reports, and the `is_deed` filters in the unsigned-contract counts and the signing
+backfill. The `contracts.is_deed` column is deliberately left in place (no migration, no
+destructive change). Two existing contracts in the live database have `is_deed = true`;
+as nothing reads the flag any more they now behave as ordinary unsigned contracts.
+Typechecks clean; not yet viewed live.
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted
@@ -922,6 +1078,74 @@ as the 7 and 8 September work landed and are corrected here:
   form, reports) needs a normal click-through pass regardless. Follow the spec's own "Verification"
   section (10 numbered checks) once Step 58 is verified - the spec is explicit that no real
   outcome data should be uploaded before then.
+- **A substantial body of work is sitting uncommitted, unpushed, and completely
+  undocumented anywhere else - found 29 September, not yet reviewed.** In the
+  contributor's original local clone (not any Claude Code session's own container,
+  which is ephemeral and holds nothing after the session ends), untracked and never
+  committed:
+  ```
+  BUILD_LOG_1.md
+  PRIVACY_NOTICE_UPDATE_DRAFT_STEP58.md
+  REVISION_REVIEW_CYCLE_V2.md          (note: a file of this name already exists,
+                                         tracked, on main - this may be a draft
+                                         revision of it, not the same content)
+  design_handoff_vericlever_site/       (untracked at repo root - likely relocated
+                                         from "Website visuals and Bauhaus motifs/
+                                         design_handoff_vericlever_site/" via a
+                                         filesystem move rather than `git mv`; see
+                                         the step-staff-account-management note below)
+  scripts/compare-embedding-models.ts
+  scripts/test-outcome-extraction.ts
+  scripts/test-redaction.ts
+  src/app/admin/our-outcomes/
+  src/app/api/cron/quarantine-cleanup/
+  src/instrumentation.ts
+  src/lib/ai/client.ts
+  src/lib/documents/outcome-extract.ts
+  src/lib/redaction.ts
+  src/lib/review-context.ts
+  src/lib/supabase/browser.ts
+  src/types/heic-convert.d.ts
+  supabase/migrations/0085_ai_call_log.sql
+  supabase/migrations/0086_content_chunks_bedrock_embedding.sql
+  supabase/migrations/0088_outcome_records.sql
+  supabase/migrations/0089_review_dates_and_reason.sql
+  supabase/migrations/0090_policy_flags.sql
+  supabase/migrations/0091_review_date_rpc.sql
+  supabase/migrations/0092_outcome_quarantine_bucket.sql
+  supabase/migrations/0094_drop_unused_bedrock_embedding_column.sql
+  ```
+  Migration numbers `0087` and `0093` are conspicuously absent from that list - both
+  are already committed on `main` separately (0093 is the multi-service reach
+  migration above), suggesting two lines of work were interleaved and only one made it
+  through. Working theory, not confirmed: an AI-assisted "outcomes" extraction feature
+  (redaction, a quarantine/review flow, Bedrock embeddings, an AI call log), built in
+  a prior session and never committed - quite possibly hitting the exact same GitHub
+  App access gap recorded above, or the session simply ending before a commit
+  happened. This is not the first time this has happened on this project - see
+  correction 5 below, `main` was once found unpushed to GitHub entirely. Read
+  `PRIVACY_NOTICE_UPDATE_DRAFT_STEP58.md` first, it is likely the clearest
+  description of what this work was actually for. **Do not discard, overwrite, or
+  "clean up" any of it without reviewing it with the person who has the folder.**
+- **The `step-staff-account-management` branch carries its own separate uncommitted
+  diff**, in that same original local clone - not reviewed at all. This branch has a
+  real history (it absorbed the Review cycle v2 branch on 12 September, see that
+  entry above), so treat it as an old integration branch, not a disposable scratch
+  branch. Checking it out on top of the working tree shows modifications to
+  `package.json`/`package-lock.json`/`vercel.json`, several admin pages, `site-nav.tsx`,
+  `src/lib/ai/service.ts` and `src/lib/ai/voyage.ts`, a deletion of
+  `src/lib/ai/anthropic.ts`, and a deletion of the whole
+  `Website visuals and Bauhaus motifs/design_handoff_vericlever_site/` subtree (see
+  the untracked `design_handoff_vericlever_site/` above - likely the same content,
+  moved rather than copied). Whether this branch has any of its own commits ahead of
+  `main` beyond this uncommitted diff has not been checked. Same caution as above:
+  investigate with the person who has the folder before changing anything.
+- **Update, 12 October 2026: the uncommitted work described in the first bullet above is
+  now committed.** It was the Step 58 and Step 59 work in this log (migrations 0085, 0086,
+  0088-0092, 0094, 0095, the shared Bedrock client, the redaction and outcome pipeline, Our
+  Outcomes). It sat on `step-58-onshore-ai`, pushed to GitHub and merged with `main`
+  in a single PR. `PRIVACY_NOTICE_UPDATE_DRAFT_STEP58.md` and `REVISION_REVIEW_CYCLE_V2.md`
+  are still untracked, and the `step-staff-account-management` caution above still stands.
 
 ## Companion documents
 
