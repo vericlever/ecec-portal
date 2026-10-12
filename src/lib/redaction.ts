@@ -1,4 +1,5 @@
 import { ComprehendClient, DetectPiiEntitiesCommand } from "@aws-sdk/client-comprehend";
+import { awsCredentials } from "@/lib/aws-credentials";
 
 // Step 59, B5: personal data is redacted in Australia before an outcome
 // record is ever stored or analysed. Two passes:
@@ -25,7 +26,7 @@ const MIN_CONFIDENCE = 0.5; // deliberately low - over-redaction is the right fa
 let cachedClient: ComprehendClient | null = null;
 function client(): ComprehendClient {
   if (cachedClient) return cachedClient;
-  cachedClient = new ComprehendClient({ region: REGION });
+  cachedClient = new ComprehendClient({ region: REGION, credentials: awsCredentials() });
   return cachedClient;
 }
 

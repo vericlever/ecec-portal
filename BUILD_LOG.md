@@ -809,6 +809,19 @@ one separately in To sort. One file is still one record.
   manual confirmation in To sort already catches a bad one. Revisit if more cross-overs
   appear.
 
+- **Production AWS credentials gap found and fixed before merge (12 October 2026).** The
+  Bedrock, Textract and Comprehend clients used the AWS SDK's default credential lookup,
+  which finds nothing on Vercel: A3's OIDC trust was set up on the AWS side but the app
+  never asked Vercel for a token, so every AI call would have failed in production
+  (Q&A included). New `src/lib/aws-credentials.ts` uses
+  `@vercel/oidc-aws-credentials-provider` (the current package; `@vercel/functions`'
+  version is deprecated) to assume `vericlever-ai` when `VERCEL_ENV` is production, and
+  returns undefined elsewhere so local keys keep working. Needs `AWS_ROLE_ARN` (the role's
+  ARN, Config not Secret) set in Vercel Production, alongside `AI_MODEL_FAST` (set on
+  12 October). Verified locally only: the local path with real AWS, and that the production
+  path builds a provider and throws a clear error if `AWS_ROLE_ARN` is missing. The actual
+  role assumption can only be tested on the deployed production site.
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted

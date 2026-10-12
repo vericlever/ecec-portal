@@ -16,6 +16,7 @@
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
+    "@vercel/oidc-aws-credentials-provider": "^3.3.11",
     "exceljs": "^4.4.0",
     "heic-convert": "^2.1.0",
     "mammoth": "^1.12.3",

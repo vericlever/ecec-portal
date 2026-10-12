@@ -11,6 +11,7 @@ import { TextractClient, DetectDocumentTextCommand } from "@aws-sdk/client-textr
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import { extractDocument } from "./extract";
+import { awsCredentials } from "@/lib/aws-credentials";
 
 const REGION = "ap-southeast-2";
 const MAX_SCANNED_PAGES = 20;
@@ -19,7 +20,7 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024; // B4: maximum 20 MB
 let cachedTextractClient: TextractClient | null = null;
 function textractClient(): TextractClient {
   if (cachedTextractClient) return cachedTextractClient;
-  cachedTextractClient = new TextractClient({ region: REGION });
+  cachedTextractClient = new TextractClient({ region: REGION, credentials: awsCredentials() });
   return cachedTextractClient;
 }
 

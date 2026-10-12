@@ -1,6 +1,7 @@
 import { AnthropicBedrock } from "@anthropic-ai/bedrock-sdk";
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { awsCredentials } from "@/lib/aws-credentials";
 
 // Shared Bedrock client for Claude inference. All calls run in Sydney
 // (ap-southeast-2) on the Australian (au.*) inference profile. Credentials
@@ -29,13 +30,17 @@ let cachedRuntimeClient: BedrockRuntimeClient | null = null;
 
 function anthropicClient(): AnthropicBedrock {
   if (cachedAnthropicClient) return cachedAnthropicClient;
-  cachedAnthropicClient = new AnthropicBedrock({ awsRegion: REGION });
+  const credentials = awsCredentials();
+  cachedAnthropicClient = new AnthropicBedrock({
+    awsRegion: REGION,
+    providerChainResolver: credentials ? async () => credentials : null,
+  });
   return cachedAnthropicClient;
 }
 
 function runtimeClient(): BedrockRuntimeClient {
   if (cachedRuntimeClient) return cachedRuntimeClient;
-  cachedRuntimeClient = new BedrockRuntimeClient({ region: REGION });
+  cachedRuntimeClient = new BedrockRuntimeClient({ region: REGION, credentials: awsCredentials() });
   return cachedRuntimeClient;
 }
 
