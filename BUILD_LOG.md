@@ -992,6 +992,52 @@ Typechecks clean; not yet viewed live.
   leaves a fresh file alone; deleting a genuinely stale file was not exercised (cannot
   backdate a Storage object).
 
+- **Reports rebuild: Child safety standards and Quality area reports (12 October 2026).**
+  Built from `Fix Reports section.md`. Both reports now read from one shared metrics function,
+  `tagReportData()` in `src/lib/tag-report.ts`, which feeds both the new on-screen preview
+  (`/reports/preview/[kind]`, with an editable QIP statement per area) and the PDF
+  (`src/app/reports/_pdf/tag-report.tsx`, routes support GET and a POST that carries the
+  edited statements). Per area: (1) procedures aligned with reviewed, overdue, due in 90 days
+  and never reviewed; (2) sign-off percentage and sign-offs by role, using the same rule as the
+  Service overview (published procedures in a person's job role suites, `self_and_manager`
+  counting only once countersigned); (3) uploads, staff flags, reflected on, and reviews that
+  drew on outcomes data; (4) procedure table, overdue first; (5) QIP statement. Plus a summary
+  page whose last row counts each procedure once. The Reports page cards for both reports now
+  have an All Services (default), Timboon, Mortlake dropdown (any service added later appears
+  automatically). The small count rule (0 to 3 shows as "0-3") is applied inside the data layer,
+  including for the generated statements. The PDF now flows: rows grow to fit, rows never split
+  across pages, the procedure table header repeats on each page, each area starts a new page, and
+  the header carries the service and period. Checked by extracting every text item from the
+  rendered PDFs (all six combinations): 0 overlapping text pairs. The old per-procedure reflection
+  blocks and their data function were removed. `scripts/test-tag-report.ts` checks the rules and
+  the live numbers (reviewed 0, overdue 3 across tagged procedures, as the spec expects);
+  `scripts/render-tag-report-pdf.mts` renders the PDFs.
+  **Data model gaps found (build step 1):**
+  - Staff flags (`sop_outcome_flags`) carry no theme, so the **Themes** metric cannot be built
+    and is left out. It needs a theme field on flags (or on the upload links) first.
+  - Staff flags carry no service, so every flag is treated as whole-of-organisation (the spec's
+    fallback), and the same masked count shows in every service column. Using the flagger's home
+    service instead would be a small change if wanted.
+  - Uploads relate to an area through `outcome_record_links` (suggested or confirmed, never
+    dismissed) to a tagged procedure; that chain exists. Uploads have a service only when one
+    was chosen at upload; otherwise they are listed as "Whole-of-organisation upload" in a
+    single service view.
+  - "Reflected on" counts confirmed upload links decided in the period plus policy flags raised
+    from an upload where the policy is tagged to the area. "Flag a policy" cannot be tied to a
+    procedure, because `policy_flags` does not record which link it replaced.
+  - "Reviews that drew on outcomes data" counts reviews in the period where a staff flag or a
+    confirmed upload link on that procedure is dated before the review. A stricter version could
+    use `sop_outcome_flags.resolved_review_id` and `outcome_record_links.review_id`.
+  - Reviews recorded under the old model (`sops.last_reviewed_at`) count as recorded reviews.
+  - Report headers use the organisation name as entered ("Ready Set Go"), not a separate
+    registered name. Decision (Zeke): leave it; an admin function to edit the legal / trading
+    name is a later addition.
+  Known data issues from the spec still apply (Outdoor Play Safety & Risk has no policy; Quarterly
+  BAS is linked to the Fatigue Management Policy; no procedure has a recorded review, so the
+  12 month review metrics read 0). Not yet viewed signed in on screen: the dev server compiled
+  the new pages and redirected to login, and the numbers and PDFs were checked against the live
+  database with the service role instead.
+
 ## Corrections against BUILD_PLAN.md
 
 `BUILD_PLAN.md` is accurate step by step up to about 3 September. The following drifted

@@ -1,145 +1,272 @@
-import { StyleSheet, Text, View } from "@react-pdf/renderer";
-import { ReportShell, styles } from "./shell";
-import type { TagSection } from "@/lib/reports";
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import type { ReactNode } from "react";
+import { fmtDateLong } from "@/lib/format-date";
+import { WHOLE_OF_ORG_LABEL, type AreaReport, type SmallCount, type TagReport } from "@/lib/tag-report";
 
-const blockStyles = StyleSheet.create({
-  block: { marginBottom: 12, paddingBottom: 10, borderBottomWidth: 0.5, borderBottomColor: "#e2e8f0" },
-  procedureName: { fontSize: 10.5, fontWeight: 700, color: "#0f172a" },
-  statusLine: { fontSize: 8.5, color: "#64748b", marginTop: 2 },
-  label: { fontSize: 8, fontWeight: 700, color: "#0f172a", marginTop: 6 },
-  paragraph: { fontSize: 9, color: "#1e293b", marginTop: 2, lineHeight: 1.4 },
-  outcomeSummary: { fontSize: 8.5, color: "#1e293b", marginTop: 4, lineHeight: 1.3 },
-  actionRow: { fontSize: 8.5, color: "#1e293b", marginTop: 2 },
-  neverReviewed: { fontSize: 9, color: "#b45309", marginTop: 2 },
+// Shared PDF for the Child safety standards report and the Quality area
+// report. Everything flows: table rows grow to fit their text, nothing is
+// absolutely positioned except the page footer, each area starts on its own
+// page, rows never split across a page break, and the procedure table's
+// header row repeats on every page the table runs onto. Neutral tones only:
+// outcomes data is never coloured as a score.
+
+const s = StyleSheet.create({
+  page: { paddingTop: 36, paddingHorizontal: 36, paddingBottom: 56, fontSize: 9, fontFamily: "Helvetica", color: "#1e293b" },
+  chrome: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderBottomWidth: 1.5,
+    borderBottomColor: "#0f172a",
+    paddingBottom: 6,
+    marginBottom: 14,
+  },
+  chromeOrg: { fontSize: 9, fontWeight: 700, color: "#0f172a" },
+  chromeTitle: { fontSize: 8.5, color: "#475569", marginTop: 1 },
+  chromeRight: { fontSize: 8.5, color: "#475569", textAlign: "right", maxWidth: 260 },
+  footer: {
+    position: "absolute",
+    bottom: 22,
+    left: 36,
+    right: 36,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    fontSize: 8,
+    color: "#64748b",
+  },
+  h1: { fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 },
+  h2: { fontSize: 10.5, fontWeight: 700, color: "#0f172a", marginTop: 14, marginBottom: 5 },
+  lead: { fontSize: 9, color: "#475569", marginBottom: 8, lineHeight: 1.4 },
+  note: { fontSize: 8, color: "#64748b", marginTop: 4, lineHeight: 1.35 },
+  paragraph: { fontSize: 9.5, lineHeight: 1.5, color: "#1e293b" },
+  listLine: { fontSize: 9, marginTop: 2, lineHeight: 1.35 },
+  tableHead: { flexDirection: "row", backgroundColor: "#f1f5f9", borderBottomWidth: 0.75, borderBottomColor: "#94a3b8", paddingVertical: 4 },
+  tableRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#e2e8f0", paddingVertical: 4 },
+  th: { fontSize: 8, fontWeight: 700, color: "#334155", paddingHorizontal: 4 },
+  td: { fontSize: 8.5, paddingHorizontal: 4, lineHeight: 1.3 },
+  subLabel: { fontSize: 8, fontWeight: 700, color: "#475569", paddingHorizontal: 4 },
 });
 
-const DECISION_LABEL: Record<string, string> = {
-  stands: "Procedure stands as written",
-  needs_revision: "Procedure needs revision",
-};
+type Col = { header: string; width: string; align?: "left" | "right" };
 
-const ACTION_STATUS_LABEL: Record<string, string> = {
-  open: "open",
-  done: "done",
-  cancelled: "cancelled",
-};
-
-const EFFECTIVENESS_LABEL: Record<string, string> = {
-  worked: "worked",
-  did_not_work: "didn't work",
-  too_early: "too early",
-};
-
-// Step 59, B9: one line per reviewed procedure summarising why it was
-// reviewed and what came of it. Only records/flags actually attached to the
-// review (via TagSectionSop.outcomeRecordCount/staffFlagCount) are counted -
-// nothing unconfirmed or still pending ever reaches this line.
-function outcomeSummaryLine(s: {
-  lastReviewedDate: string | null;
-  reviewReason: string | null;
-  outcomeRecordCount: number;
-  citedExcerptCount: number;
-  staffFlagCount: number;
-  actions: { effectiveness: string | null }[];
-  decision: string | null;
-}): string {
-  const parts = [`Reviewed ${s.lastReviewedDate}.`];
-  if (s.reviewReason) parts.push(`Why: ${s.reviewReason}.`);
-  parts.push(
-    `Evidence: ${s.outcomeRecordCount} outcome record${s.outcomeRecordCount === 1 ? "" : "s"} (${s.citedExcerptCount} cited excerpt${s.citedExcerptCount === 1 ? "" : "s"}), ${s.staffFlagCount} staff flag${s.staffFlagCount === 1 ? "" : "s"}.`,
-  );
-  const verdicts = s.actions.map((a) => a.effectiveness).filter((e): e is string => Boolean(e));
-  if (verdicts.length > 0) {
-    parts.push(`Previous action${verdicts.length === 1 ? "" : "s"}: ${verdicts.map((v) => EFFECTIVENESS_LABEL[v] ?? v).join(", ")}.`);
-  }
-  if (s.decision) parts.push(`Decision: ${DECISION_LABEL[s.decision].replace("Procedure ", "")}.`);
-  return parts.join(" ");
-}
-
-// Shared body for the child safety standards report and its NQS equivalent:
-// one section per tag, each tagged procedure rendered as a full block (a
-// reflection is a paragraph, not a table cell). A procedure tagged to more
-// than one standard appears in full under each one - the duplication is
-// intended, since each standard has to stand alone as evidence.
-export function TagReportPdf({
-  orgName,
-  title,
-  sections,
-  timezone,
-}: {
-  orgName: string;
-  title: string;
-  sections: TagSection[];
-  timezone: string;
-}) {
+function Table({ cols, rows, fixedHeader = false }: { cols: Col[]; rows: ReactNode[][]; fixedHeader?: boolean }) {
   return (
-    <ReportShell orgName={orgName} title={title} timezone={timezone}>
-      {sections.map((section) => (
-        <View key={section.option.id} style={styles.section} wrap={false}>
-          <Text style={styles.sectionTitle}>
-            {section.option.code} — {section.option.name}
+    <View>
+      <View style={s.tableHead} fixed={fixedHeader} wrap={false}>
+        {cols.map((c, i) => (
+          <Text key={i} style={[s.th, { width: c.width, textAlign: c.align ?? "left" }]}>
+            {c.header}
           </Text>
-          {section.sops.length === 0 ? (
-            <Text style={styles.emptyState}>No procedure tagged to this standard.</Text>
-          ) : (
-            section.sops.map((s) => (
-              <View key={s.id} style={blockStyles.block}>
-                <Text style={blockStyles.procedureName}>{s.name}</Text>
-                <Text style={blockStyles.statusLine}>
-                  {s.policyNames.length > 0
-                    ? `Serves: ${s.policyNames.join(", ")}`
-                    : "Serves: no policy linked"}
-                  {"  ·  "}
-                  {s.everReviewed
-                    ? `Last review ${s.lastReviewedDate}`
-                    : "Not yet reviewed"}
-                  {"  ·  "}
-                  {s.nextReviewDueDate
-                    ? `Next review due ${s.nextReviewDueDate}`
-                    : "Next review due date not set"}
-                  {s.decision && `  ·  ${DECISION_LABEL[s.decision]}`}
-                </Text>
-
-                {!s.everReviewed ? (
-                  <Text style={blockStyles.neverReviewed}>
-                    This procedure has not yet been reviewed.
-                    {s.nextReviewDueDate && ` Review due ${s.nextReviewDueDate}.`}
-                  </Text>
-                ) : (
-                  <>
-                    <Text style={blockStyles.outcomeSummary}>{outcomeSummaryLine(s)}</Text>
-
-                    <Text style={blockStyles.label}>Practice (level 3)</Text>
-                    <Text style={blockStyles.paragraph}>{s.practiceReflection}</Text>
-
-                    <Text style={blockStyles.label}>Outcomes (level 4)</Text>
-                    <Text style={blockStyles.paragraph}>{s.outcomeReflection}</Text>
-
-                    <Text style={blockStyles.label}>Actions</Text>
-                    {s.actions.length === 0 ? (
-                      <Text style={blockStyles.paragraph}>None raised.</Text>
-                    ) : (
-                      s.actions.map((a, i) => (
-                        <Text key={i} style={blockStyles.actionRow}>
-                          {a.description} — {a.ownerName}, due {a.dueDate} (
-                          {ACTION_STATUS_LABEL[a.status]})
-                        </Text>
-                      ))
-                    )}
-
-                    <Text style={blockStyles.label}>Evidence</Text>
-                    <Text style={blockStyles.paragraph}>
-                      {s.evidenceFileName
-                        ? `Attached: ${s.evidenceFileName}`
-                        : "None attached."}
-                    </Text>
-                  </>
-                )}
-              </View>
-            ))
-          )}
+        ))}
+      </View>
+      {rows.map((row, r) => (
+        <View key={r} style={s.tableRow} wrap={false}>
+          {row.map((cell, i) => (
+            <Text key={i} style={[s.td, { width: cols[i].width, textAlign: cols[i].align ?? "left" }]}>
+              {cell}
+            </Text>
+          ))}
         </View>
       ))}
-    </ReportShell>
+    </View>
+  );
+}
+
+// First column takes the remaining width, the data columns share the rest.
+function metricCols(report: TagReport, first = "Metric"): Col[] {
+  const dataWidth = report.columns.length > 2 ? 15 : 22;
+  return [
+    { header: first, width: `${100 - dataWidth * report.columns.length}%` },
+    ...report.columns.map((c) => ({ header: c, width: `${dataWidth}%`, align: "right" as const })),
+  ];
+}
+
+const count = (n: SmallCount | number | null) => (n === null ? "n/a" : String(n));
+
+function Chrome({ report, orgName, area }: { report: TagReport; orgName: string; area?: AreaReport }) {
+  return (
+    <>
+      <View style={s.chrome} fixed>
+        <View>
+          <Text style={s.chromeOrg}>{orgName}</Text>
+          <Text style={s.chromeTitle}>
+            {report.title}
+            {area ? `: ${area.option.code}` : ""}
+          </Text>
+        </View>
+        <View>
+          <Text style={s.chromeRight}>Service: {report.serviceLabel}</Text>
+          <Text style={s.chromeRight}>
+            Period: {fmtDateLong(report.period.start)} to {fmtDateLong(report.period.end)}
+          </Text>
+        </View>
+      </View>
+      <View style={s.footer} fixed>
+        <Text>Generated {fmtDateLong(report.asOf)}</Text>
+        <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+      </View>
+    </>
+  );
+}
+
+function AreaPages({ report, area, orgName, statement }: { report: TagReport; area: AreaReport; orgName: string; statement: string }) {
+  const months = report.period.months;
+  const reviewedLabel = `Reviewed in last ${months} months`;
+  const single = !report.isAllServices;
+
+  const section1: ReactNode[][] = [
+    ["Aligned", ...area.section1.map((c) => count(c.aligned))],
+    [reviewedLabel, ...area.section1.map((c) => count(c.reviewed))],
+    ["Overdue", ...area.section1.map((c) => count(c.overdue))],
+    ["Due in next 90 days", ...area.section1.map((c) => count(c.dueSoon))],
+    ["Never reviewed", ...area.section1.map((c) => count(c.neverReviewed))],
+  ];
+
+  const s2 = area.section2;
+  const section2: ReactNode[][] = [
+    [
+      "Viewed and signed off",
+      ...s2.pct.map((p, i) => (p === null ? "No required staff" : `${p}% (${s2.signed[i]} of ${s2.required[i]})`)),
+    ],
+    ...s2.byRole.map((r) => [`Sign-offs: ${r.role}`, ...r.counts.map(count)]),
+  ];
+
+  const s3 = area.section3;
+  const section3: ReactNode[][] = [
+    ["Collected: uploads", ...s3.uploads.map(count)],
+    ["Collected: staff flags", ...s3.flags.map(count)],
+    ["Reflected on", ...s3.reflected.map(count)],
+    ["Procedure reviews that drew on outcomes data", ...s3.reviewsDrew.map(count)],
+  ];
+
+  const procRows: ReactNode[][] = area.procedures.map((p) => [
+    p.name,
+    p.roles.length > 0 ? p.roles.join(", ") : "Not assigned",
+    p.policyNames.length > 0 ? p.policyNames.join(", ") : "No policy linked",
+    p.lastReviewed ?? "Not yet reviewed",
+    p.nextDue ? (p.overdue ? `${p.nextDue} (overdue)` : p.nextDue) : "Not set",
+    p.signOffPct === null ? "n/a" : `${p.signOffPct}%`,
+  ]);
+
+  return (
+    <>
+      <Page size="A4" style={s.page}>
+        <Chrome report={report} orgName={orgName} area={area} />
+        <Text style={s.h1}>
+          {area.option.code}: {area.option.name}
+        </Text>
+
+        <Text style={s.h2}>1. Procedures aligned to this area</Text>
+        <Table cols={metricCols(report)} rows={section1} />
+
+        <Text style={s.h2}>2. Staff engagement with these procedures</Text>
+        <Table cols={metricCols(report)} rows={section2} />
+
+        <Text style={s.h2}>3. Outcomes data feeding reflection</Text>
+        <Table cols={metricCols(report)} rows={section3} />
+        <Text style={s.note}>These reviews are a subset of the reviews counted in section 1.</Text>
+        <Text style={s.note}>
+          Staff flags are held for the whole organisation and are not split by service.
+          {report.isAllServices
+            ? " Whole-of-organisation uploads appear in each service column and are counted once under All Services."
+            : ""}
+        </Text>
+        {s3.uploadListing.length > 0 && (
+          <View wrap={false} style={{ marginTop: 6 }}>
+            <Text style={s.subLabel}>Data uploads this period</Text>
+            {s3.uploadListing.map((u, i) => {
+              const tag = single ? (u.wholeOfOrg ? WHOLE_OF_ORG_LABEL : null) : u.serviceName;
+              return (
+                <Text key={i} style={s.listLine}>
+                  {u.typeLabel}, {u.month}
+                  {tag ? ` (${tag})` : ""}
+                </Text>
+              );
+            })}
+          </View>
+        )}
+      </Page>
+
+      <Page size="A4" style={s.page}>
+        <Chrome report={report} orgName={orgName} area={area} />
+        <Text style={s.h1}>
+          {area.option.code}: {area.option.name}
+        </Text>
+        <Text style={s.h2}>4. Procedure detail</Text>
+        {procRows.length === 0 ? (
+          <Text style={s.note}>No procedure is aligned to this area.</Text>
+        ) : (
+          <Table
+            fixedHeader
+            cols={[
+              { header: "Procedure", width: "30%" },
+              { header: "Role", width: "14%" },
+              { header: "Policies served", width: "24%" },
+              { header: "Last reviewed", width: "12%" },
+              { header: "Next due", width: "12%" },
+              { header: "Sign-off %", width: "8%", align: "right" },
+            ]}
+            rows={procRows}
+          />
+        )}
+
+        <View wrap={false}>
+          <Text style={s.h2}>5. QIP statement</Text>
+          <Text style={s.paragraph}>{statement}</Text>
+        </View>
+      </Page>
+    </>
+  );
+}
+
+export function TagReportPdf({
+  orgName,
+  report,
+  statements,
+}: {
+  orgName: string;
+  report: TagReport;
+  // Edited QIP statements keyed by area id. A missing key falls back to the
+  // auto-drafted statement.
+  statements?: Record<string, string>;
+}) {
+  return (
+    <Document title={`${report.title} - ${report.serviceLabel}`} author={orgName}>
+      <Page size="A4" style={s.page}>
+        <Chrome report={report} orgName={orgName} />
+        <Text style={s.h1}>Summary</Text>
+        <Text style={s.lead}>
+          Procedures aligned to each area, with their review status as at {fmtDateLong(report.asOf)}. Detail for each
+          area follows, one area to a page.
+        </Text>
+        <Table
+          fixedHeader
+          cols={[
+            { header: "Area", width: "40%" },
+            { header: "Aligned", width: "10%", align: "right" },
+            { header: `Reviewed in last ${report.period.months} months`, width: "15%", align: "right" },
+            { header: "Overdue", width: "10%", align: "right" },
+            { header: "Due in next 90 days", width: "13%", align: "right" },
+            { header: "Never reviewed", width: "12%", align: "right" },
+          ]}
+          rows={report.summary.map((r) => [
+            r.label,
+            count(r.counts.aligned),
+            count(r.counts.reviewed),
+            count(r.counts.overdue),
+            count(r.counts.dueSoon),
+            count(r.counts.neverReviewed),
+          ])}
+        />
+      </Page>
+      {report.areas.map((area) => (
+        <AreaPages
+          key={area.option.id}
+          report={report}
+          area={area}
+          orgName={orgName}
+          statement={statements?.[String(area.option.id)]?.trim() || area.statement}
+        />
+      ))}
+    </Document>
   );
 }

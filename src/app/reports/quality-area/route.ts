@@ -1,28 +1,14 @@
-import { reportsProfileOrResponse } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { qualityAreaReport, organisationName } from "@/lib/reports";
-import { pdfResponse } from "@/lib/pdf";
-import { TagReportPdf } from "../_pdf/tag-report";
+import { tagReportResponse, statementsFrom } from "../_pdf/tag-report-route";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const auth = await reportsProfileOrResponse();
-  if (!auth.ok) return auth.response;
+export async function GET(req: Request) {
+  const service = new URL(req.url).searchParams.get("service");
+  return tagReportResponse("quality_area", service);
+}
 
-  const supabase = createClient();
-  const [orgName, sections] = await Promise.all([
-    organisationName(supabase, auth.profile.organisation_id),
-    qualityAreaReport(supabase),
-  ]);
-
-  return pdfResponse(
-    TagReportPdf({
-      orgName,
-      title: "Quality area report",
-      sections,
-      timezone: auth.profile.organisation_timezone,
-    }),
-    "Quality area report.pdf",
-  );
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => null);
+  const service = typeof body?.service === "string" ? body.service : null;
+  return tagReportResponse("quality_area", service, statementsFrom(body));
 }

@@ -4,6 +4,7 @@ import { coverageReport } from "@/lib/reports";
 import { ReportDownloadButton } from "./report-download-button";
 import { ServiceReportCard } from "./service-report-card";
 import { StaffReportCard } from "./staff-report-card";
+import { TagReportCard } from "./tag-report-card";
 
 export const dynamic = "force-dynamic";
 
@@ -92,16 +93,24 @@ export default async function ReportsPage() {
           allowAll={false}
         />
 
-        <SimpleReportCard
+        <TagReportCard
           title="Child safety standards report"
-          description="One section per Child Safe Standard: every procedure tagged to it, its latest review, and what would show it is working."
-          href="/reports/child-safety-standards"
+          description="One section per Child Safe Standard: the procedures aligned to it, their review status, staff engagement and the outcomes data feeding reflection."
+          slug="child-safety-standards"
+          services={serviceList}
+          broadReach={broadReach}
+          ownServiceId={me.service_id}
+          ownServiceName={ownServiceName}
         />
 
-        <SimpleReportCard
+        <TagReportCard
           title="Quality area report"
           description="Same structure, one section per NQS quality area."
-          href="/reports/quality-area"
+          slug="quality-area"
+          services={serviceList}
+          broadReach={broadReach}
+          ownServiceId={me.service_id}
+          ownServiceName={ownServiceName}
         />
 
         <ServiceReportCard

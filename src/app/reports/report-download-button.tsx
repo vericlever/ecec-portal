@@ -8,10 +8,14 @@ export function ReportDownloadButton({
   href,
   label,
   className,
+  body,
 }: {
   href: string;
   label: string;
   className?: string;
+  // When set, the report is requested with a POST carrying this JSON body
+  // (used by the tag reports to send the edited QIP statements).
+  body?: unknown;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +24,12 @@ export function ReportDownloadButton({
     setPending(true);
     setError(null);
     try {
-      const res = await fetch(href);
+      const res = await fetch(
+        href,
+        body === undefined
+          ? undefined
+          : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+      );
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(text || `Could not generate the report (${res.status}).`);
