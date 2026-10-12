@@ -33,8 +33,10 @@ export function NavDropdown({ label, groups }: { label: string; groups: NavGroup
     };
   }, []);
 
+  // /admin is the overview itself, a prefix of every other admin page, so it
+  // only counts as active on an exact match.
   const isActiveHref = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+    pathname === href || (href !== "/admin" && pathname.startsWith(href + "/"));
   const active = groups.some((g) => g.items.some((it) => isActiveHref(it.href)));
 
   return (

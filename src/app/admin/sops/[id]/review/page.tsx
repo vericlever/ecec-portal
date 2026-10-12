@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { documentTags } from "@/lib/document-tags";
 import { CHILD_SAFE_STANDARDS, NQS_QUALITY_AREAS } from "@/lib/tags";
 import { fmtReviewDate } from "@/lib/sop-review";
+import { buildReviewContext } from "@/lib/review-context";
 import { ReviewForm } from "./review-form";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function ReviewSopPage({
 
   const { data: sop } = await supabase
     .from("sops")
-    .select("id, name, organisation_id, published_version")
+    .select("id, name, organisation_id, published_version, last_reviewed_at")
     .eq("id", params.id)
     .maybeSingle();
   if (!sop || sop.organisation_id !== me.organisation_id) notFound();
@@ -114,12 +115,55 @@ export default async function ReviewSopPage({
     }));
   }
 
+  // B7, action effectiveness: any action still awaiting a verdict, whether
+  // raised at the immediately previous review or carried forward by a
+  // "too_early" verdict at an earlier one. Excludes cancelled actions -
+  // there is nothing to judge the effectiveness of.
+  const { data: pendingActionRows } = await supabase
+    .from("sop_review_actions")
+    .select("id, description, owner_id, due_date, status, effectiveness")
+    .eq("sop_id", sop.id)
+    .neq("status", "cancelled")
+    .or("effectiveness.is.null,effectiveness.eq.too_early");
+  const pendingOwnerIds = [...new Set((pendingActionRows ?? []).map((a) => a.owner_id as string))];
+  const { data: pendingOwners } = pendingOwnerIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", pendingOwnerIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const pendingOwnerName = new Map((pendingOwners ?? []).map((o) => [o.id as string, o.full_name as string]));
+  const actionsNeedingVerdict = (pendingActionRows ?? []).map((a) => ({
+    id: a.id as string,
+    description: a.description as string,
+    ownerName: pendingOwnerName.get(a.owner_id as string) ?? "Someone",
+    dueDate: fmtReviewDate(a.due_date as string),
+    wasTooEarly: a.effectiveness === "too_early",
+  }));
+
+  const reviewContext = await buildReviewContext(
+    supabase,
+    me.organisation_id!,
+    sop.id,
+    sop.last_reviewed_at as string | null,
+  );
+
   return (
     <div className="max-w-2xl">
       <Link href={`/admin/sops/${sop.id}`} className="text-sm text-slate-500 hover:text-slate-900">
         ← {sop.name}
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Review: {sop.name}</h1>
+
+      {reviewContext.linkedItems.length > 0 && (
+        <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Linked records and flags ({reviewContext.linkedItems.length})
+          </h2>
+          <ul className="mt-2 space-y-1.5">
+            {reviewContext.linkedItems.map((item) => (
+              <li key={item.id} className="text-slate-700">{item.summary}</li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {outcomeFlags.length > 0 && (
         <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
@@ -197,7 +241,14 @@ export default async function ReviewSopPage({
         )}
       </section>
 
-      <ReviewForm sopId={sop.id} staff={(staff ?? []) as { id: string; full_name: string }[]} />
+      <ReviewForm
+        sopId={sop.id}
+        staff={(staff ?? []) as { id: string; full_name: string }[]}
+        initialTrigger={reviewContext.trigger}
+        initialReason={reviewContext.reason}
+        actionsNeedingVerdict={actionsNeedingVerdict}
+        governingPolicies={(policyRows ?? []) as { id: string; name: string }[]}
+      />
     </div>
   );
 }

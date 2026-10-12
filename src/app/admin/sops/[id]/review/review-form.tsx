@@ -11,6 +11,23 @@ type ActionDraft = {
   dueDate: string;
 };
 
+type ActionNeedingVerdict = {
+  id: string;
+  description: string;
+  ownerName: string;
+  dueDate: string;
+  wasTooEarly: boolean;
+};
+
+type Trigger = "scheduled" | "outcome_data" | "staff_feedback" | "management_decision";
+
+const TRIGGER_LABEL: Record<Trigger, string> = {
+  scheduled: "Scheduled",
+  outcome_data: "Outcome data",
+  staff_feedback: "Staff feedback",
+  management_decision: "Management decision",
+};
+
 function isoInDays(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -20,9 +37,17 @@ function isoInDays(days: number): string {
 export function ReviewForm({
   sopId,
   staff,
+  initialTrigger,
+  initialReason,
+  actionsNeedingVerdict,
+  governingPolicies,
 }: {
   sopId: string;
   staff: { id: string; full_name: string }[];
+  initialTrigger: Trigger;
+  initialReason: string;
+  actionsNeedingVerdict: ActionNeedingVerdict[];
+  governingPolicies: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -34,6 +59,15 @@ export function ReviewForm({
   const [outcome, setOutcome] = useState("");
   const [decision, setDecision] = useState<"" | "stands" | "needs_revision">("");
   const [actions, setActions] = useState<ActionDraft[]>([]);
+
+  const [trigger, setTrigger] = useState<Trigger>(initialTrigger);
+  const [reason, setReason] = useState(initialReason);
+  const [verdicts, setVerdicts] = useState<Record<string, "worked" | "did_not_work" | "too_early" | "">>(
+    Object.fromEntries(actionsNeedingVerdict.map((a) => [a.id, ""])),
+  );
+
+  const [flagPolicy, setFlagPolicy] = useState(false);
+  const [flagPolicyId, setFlagPolicyId] = useState(governingPolicies[0]?.id ?? "");
 
   function addAction(raisedFrom: "practice" | "outcome") {
     setActions((cur) => [
@@ -55,6 +89,9 @@ export function ReviewForm({
     if (!decision) return setErr("Choose a decision.");
     const badAction = actions.find((a) => !a.description.trim() || !a.ownerId || !a.dueDate);
     if (badAction) return setErr("Fill in every action, or remove it.");
+    const missingVerdict = actionsNeedingVerdict.find((a) => !verdicts[a.id]);
+    if (missingVerdict) return setErr("Mark whether every previous action worked.");
+    if (flagPolicy && !flagPolicyId) return setErr("Choose which policy to flag.");
 
     start(async () => {
       const fd = new FormData();
@@ -62,6 +99,10 @@ export function ReviewForm({
       fd.set("outcome", outcome);
       fd.set("decision", decision);
       fd.set("actions", JSON.stringify(actions));
+      fd.set("trigger", trigger);
+      fd.set("reason", reason);
+      fd.set("verdicts", JSON.stringify(verdicts));
+      if (flagPolicy) fd.set("flagPolicyId", flagPolicyId);
       const f = fileRef.current?.files?.[0];
       if (f) fd.set("file", f);
 
@@ -85,6 +126,61 @@ export function ReviewForm({
 
   return (
     <div className="mt-4 space-y-5 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="text-xs font-medium text-slate-600">Trigger</span>
+          <select
+            value={trigger}
+            onChange={(e) => setTrigger(e.target.value as Trigger)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            {(Object.keys(TRIGGER_LABEL) as Trigger[]).map((t) => (
+              <option key={t} value={t}>{TRIGGER_LABEL[t]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="text-xs font-medium text-slate-600">Reason</span>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+        </label>
+      </div>
+
+      {actionsNeedingVerdict.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+            Did it work? Actions from previous reviews
+          </p>
+          <div className="mt-2 space-y-3">
+            {actionsNeedingVerdict.map((a) => (
+              <div key={a.id} className="border-t border-amber-200 pt-2 first:border-t-0 first:pt-0">
+                <p className="text-sm text-slate-800">
+                  {a.description} — {a.ownerName}, due {a.dueDate}
+                  {a.wasTooEarly && <span className="ml-1 text-xs text-amber-700">(marked too early last time)</span>}
+                </p>
+                <div className="mt-1.5 flex gap-3 text-sm">
+                  {(["worked", "did_not_work", "too_early"] as const).map((v) => (
+                    <label key={v} className="flex items-center gap-1">
+                      <input
+                        type="radio"
+                        name={`verdict-${a.id}`}
+                        checked={verdicts[a.id] === v}
+                        onChange={() => setVerdicts((cur) => ({ ...cur, [a.id]: v }))}
+                      />
+                      {v === "worked" ? "Worked" : v === "did_not_work" ? "Didn't work" : "Too early"}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-medium text-slate-700">
           Are staff following this procedure as trained, and was the training adequate?
@@ -118,6 +214,9 @@ export function ReviewForm({
         </label>
         <p className="mt-0.5 text-xs text-slate-500">
           Draws on incidents, complaints, family feedback and observable conditions.
+        </p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          What else changed in this period that might explain the results?
         </p>
         <textarea
           value={outcome}
@@ -214,6 +313,25 @@ export function ReviewForm({
             Procedure needs revision
           </label>
         </div>
+        {governingPolicies.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={flagPolicy} onChange={(e) => setFlagPolicy(e.target.checked)} />
+              Flag the governing policy
+            </label>
+            {flagPolicy && governingPolicies.length > 1 && (
+              <select
+                value={flagPolicyId}
+                onChange={(e) => setFlagPolicyId(e.target.value)}
+                className="ml-6 rounded-md border border-slate-300 px-2 py-1 text-sm"
+              >
+                {governingPolicies.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
       </div>
 
       {err && <p className="text-sm text-red-600">{err}</p>}

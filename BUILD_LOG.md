@@ -129,6 +129,10 @@ project. `main` is in sync with `origin/main` as of this reconciliation.
 | 54 | Split leader nav into My Portal, Our Staff and Our Workflow | Done, on `main`. Extended 21 September: Our Workflow's items renamed "Our Policies" / "Our Procedures" to read as distinct from the personal "My" pages, Parent portal access moved to the end of that menu, and the plain-staff flat nav (no admin duplicate to disambiguate from) renamed to match | 0039 to 0073, none specific to this step | `498a1a4`, `74d8822` | The original split not recorded in this log. The 21 September rename checked live by Claude against both tenants, confirmed by Zeke against a live screenshot |
 | 55 | Training status page | Done, on `main` | (none) | `9337d93` | Not recorded in this log |
 | 56 | Convert docx/html/pdf uploads to Markdown; backfill all 151 existing RSG documents; let a procedure link to its governing policies, not just the reverse | Done, on `main` | 0071, 0072, 0073 | `3ed7065`, `db50b6f` | Yes. Verified end to end against a hand-built test docx and against real RSG content (`scripts/reprocess-documents.ts` dry run then apply, `scripts/bulk-republish.ts`), including catching and fixing a real bug (an embedded image was being inlined as base64 into the stored body). Policy-procedure linking verified live on the Science Kinder tenant in both directions, then the test link removed |
+| AI Q&A | Staff "Ask a question" assistant: retrieval-augmented Q&A over an org's own published policies/procedures. Built ad hoc alongside other steps and not recorded here until Step 58 asked for it. Call path: `src/app/ask/actions.ts` -> `src/lib/ai/service.ts:answerQuestion()` -> Voyage `voyage-3.5-lite` embeddings (REST, 1024 dimensions) for retrieval + Anthropic direct API (`claude-haiku-4-5-20251001`) for generation. Chunking by heading (`src/lib/ai/chunk.ts`), stored in `content_chunks.embedding vector(1024)`. Per-tenant flag `organisations.ai_qa_enabled`, RSG only. Superseded by Step 58, which moves both providers onto AWS Bedrock | Done, on `main`, pre-Step 58 | 0074-0081 | (built across several unlabelled commits) | Not independently verified before now. 50 real questions logged in `ai_interactions` from manual testing |
+| 57 Part A | Contract signing produces a real signed PDF (drawn signature via signature pad, merged as an execution page); countersignature no longer optional; "Staff Agreements" moved into Our Staff nav, "My Agreements" added to top-level staff nav and My Portal | Done, on `main` | 0082, 0083, 0084 | (this session) | Live-tested: caught and fixed `executionState()` silently misreporting (missing column selects) and `deleteContract` orphaning signature/signed-copy documents |
+| 58 | Onshore AI: Claude inference and search embeddings both move to AWS Bedrock (`au.*` profiles, Sydney), replacing Anthropic's direct API and Voyage AI. One supplier, one bill | Code complete, unverified | 0085, 0086, 0087 | (this session) | Not yet - blocked on A4a's live model comparison and re-embed, which need real AWS Bedrock access this environment doesn't have. See "Outstanding and blocked" |
+| 59 | Our Outcomes: redacted outcome-record upload (Textract/Comprehend), AI-suggested procedure links, manager-editable review dates, review triggers/reasons/effectiveness verdicts, policy flags, report line | Code complete, unverified | 0088-0092 | (this session) | Not yet - the redaction/Textract path needs live AWS access this environment doesn't have; everything else (schema, RLS, review form, policy flags, dates, reports) is built and passes `rls-check.mjs` but has not been exercised through the UI on a deployed site. See "Outstanding and blocked" |
 
 ## Migration register
 
@@ -210,6 +214,28 @@ written.
 | 0071_conversion_review_flag.sql | Step 56. `needs_review` boolean on `bulk_upload_staging` and `documents`, set automatically for every PDF and any docx/html the grouping-row heuristic couldn't confidently resolve |
 | 0072_bulk_sop_needs_review.sql | Step 56. Carries `bulk_upload_staging.needs_review` through to the `documents` row `commit_bulk_sops` creates |
 | 0073_bulk_policy_needs_review.sql | Step 56. Same change as 0072, on the policy side |
+| 0074_pgvector.sql | AI Staff Q&A (built ad hoc, not recorded until now - see "AI Q&A" row in the step table). Enables the pgvector extension |
+| 0075_content_chunks.sql | AI Staff Q&A. `content_chunks`: embedded policy/procedure Markdown chunks, `policy_visible()`/`sop_visible()`-gated, `match_content_chunks()` RPC |
+| 0076_embedding_jobs.sql | AI Staff Q&A. `embedding_jobs`: queue and evidence log for the cron re-embed worker |
+| 0077_ai_interactions.sql | AI Staff Q&A. `ai_interactions`: audit trail of every question asked and answer given, manager-readable |
+| 0078_ai_qa_enabled.sql | AI Staff Q&A. `organisations.ai_qa_enabled`, per-tenant flag, off by default |
+| 0079_content_chunks_org_wide_search.sql | AI Staff Q&A. Fixes retrieval RLS: admins (no job role) and managers (any service) could not see chunks that `policy_visible()`/`sop_visible()` gated to a specific job role/service |
+| 0080_exact_vector_search.sql | AI Staff Q&A. Drops the ivfflat approximate index - it was silently returning wrong results (0.0 rows for a real match at 0.58 similarity) |
+| 0081_boilerplate_chunk_detection.sql | AI Staff Q&A. Tenant-agnostic detection and suppression of the repeated regulatory-footer boilerplate that was dominating retrieval |
+| 0082_contract_signed_copy.sql | Step 57 Part A. Columns for a drawn signature and a generated signed copy (original + execution page) |
+| 0083_contract_signed_copy_write.sql | Step 57 Part A. Narrow write path for `generateContractSignedCopy()` past the self-management lock (0063) |
+| 0084_contracts_always_countersigned.sql | Step 57 Part A follow-up. Countersignature is no longer optional - backfilled and locked with a check constraint |
+| 0085_ai_call_log.sql | Step 58. `ai_call_log`: metadata-only audit trail (no prompt/response content) for every Bedrock call, admin-read only |
+| 0086_content_chunks_bedrock_embedding.sql | Step 58, A4a. Added `content_chunks.embedding_bedrock` for a planned Voyage-to-Bedrock cutover. Reversed by 0094 once live testing found Titan (the only Sydney-available Bedrock embedding model) missed retrieval on a safety-critical question - see the 28 September 2026 chronological entry |
+| 0087 | Written as the planned cutover migration, never applied, deleted once the cutover was cancelled (see 0086's row). This number is skipped rather than reused |
+| 0088_outcome_records.sql | Step 59. `outcome_records` (redacted uploads) and `outcome_record_links` (AI-suggested/confirmed procedure links), manager/admin only both ways |
+| 0089_review_dates_and_reason.sql | Step 59, B2/B7. `review_date_override` on `sops`/`policies`, `review_date_changes` audit log, `sop_review_status` view updated to prefer the override; `trigger`/`reason` on `sop_reviews`; `effectiveness`/`effectiveness_review_id`/`effectiveness_by`/`effectiveness_at` on `sop_review_actions` |
+| 0090_policy_flags.sql | Step 59, B7a. `policy_flags`, manager/admin only both ways, cleared by policy version publish (no policy review event exists - see chronological log) |
+| 0091_review_date_rpc.sql | Step 59, B2. `policy_review_status` view (mirrors `sop_review_status` for policies) and `set_review_date_override()`, a SECURITY DEFINER RPC so a `manager_staff` (who cannot otherwise write `sops`/`policies` - `can_edit_content()` excludes that tier) can still move a review date, since "anyone who can complete a review" (`is_manager()`) is the spec's actual gate |
+| 0092_outcome_quarantine_bucket.sql | Step 59, B5.1. Private `outcome-quarantine` Storage bucket, 20 MB limit. No `storage.objects` policy - the browser uploads via a signed upload URL the app hands out after its own authorisation check |
+| 0093_multi_service_reach.sql | Concurrent work by another session while this one was mid-Step-58 - not this log's to describe. `profiles.all_services` and `resolveReportScope()` in `src/lib/reports.ts` reference it |
+| 0094_drop_unused_bedrock_embedding_column.sql | Step 58, A4a. Drops `content_chunks.embedding_bedrock` (0086) - the Voyage-to-Bedrock embedding cutover it was added for was cancelled after live testing found a real retrieval-quality regression. Originally written and applied as 0093, renumbered to 0094 after discovering another concurrent session had independently taken 0093 for unrelated work (see the 28 September 2026 chronological entry) |
+| 0095_outcome_records_periods.sql | Step 59, revision A. `outcome_records` becomes a periodic bulk record: `source_type` enum replaced (`incident_reports`, `staff_feedback`, `parent_feedback`, `regulator`, `other`), `event_date` replaced by `period_start`/`period_end` with a check constraint, overlap index added; `outcome_record_links.evidence` (jsonb, verified `{line, excerpt}` citations). The tables were confirmed empty first, so 0088's enum was dropped and recreated rather than migrated |
 
 ## Chronological log
 
@@ -457,11 +483,331 @@ plain-staff flat nav (no admin-facing duplicate to disambiguate from, so previou
 unlabelled as just "Procedures"/"Policies") renamed to match for the same reason.
 Extended to every "← Our X" / "← My X" back-link on the corresponding editor pages.
 
+### 24 September 2026
+
+**Step 58 started: Onshore AI.** Spec (`step-58-59-onshore-ai-and-outcomes.md`) reserved
+migrations from 0076, written against a stale "last applied 0073" - the AI Q&A build and
+Step 57 Part A had already consumed 0074-0084 by the time work started. Renumbered to
+start at 0085, recorded here per the spec's own instruction. Recorded the previously
+unlogged AI Q&A implementation and its Voyage/Anthropic call path in the step table above,
+since the spec's "current state" section asked for it to be found and written down before
+building on top of it (50 real questions already logged in `ai_interactions` from earlier
+manual testing, 776 chunks across 43 procedures and 103 policies already embedded).
+
+Built: `src/lib/ai/client.ts`, the shared Bedrock client (`AnthropicBedrock` for Claude,
+raw `@aws-sdk/client-bedrock-runtime` `InvokeModelCommand` for embeddings - the Bedrock
+Anthropic SDK only covers Claude, not Titan/Cohere). Migration 0085 (`ai_call_log`).
+Migrated `src/lib/ai/service.ts` off `src/lib/ai/anthropic.ts`/`voyage.ts` (both deleted)
+onto the shared client; `src/instrumentation.ts` added so a misconfigured model ID (not
+`au.*`, or an embedding model outside the Sydney allow-list) fails at server startup
+rather than on first request, per the spec's "done when" #3. Removed `@anthropic-ai/sdk`
+from `package.json` (kept transitively via `@anthropic-ai/bedrock-sdk`'s own dependency).
+`.env.local.example` updated: `ANTHROPIC_API_KEY`/`VOYAGE_API_KEY` replaced with
+`AI_MODEL_FAST`/`AI_EMBED_MODEL`, no static AWS keys (OIDC federation per A3).
+
+A4a (choosing the embedding model): built `scripts/compare-embedding-models.ts` (ranks
+Titan Text Embeddings V2 and Cohere Embed against the 20 most recent distinct real
+questions from `ai_interactions`, alongside the current live Voyage result, for a human
+to judge) and `scripts/reembed-corpus.ts` (re-embeds every existing `content_chunks` row
+in place into a new `embedding_bedrock` column - migration 0086 - once a model is chosen,
+never re-deriving chunk boundaries, so a document that changed since its last Voyage
+embed can't produce a row with no valid vector mid-migration). Migration 0087 cuts
+`match_content_chunks()` over to the populated column and drops the Voyage one; it
+refuses to run while any row is still missing `embedding_bedrock`.
+
+**Blocked on live AWS access.** This build environment has no AWS credentials - the A4a
+model comparison, the corpus re-embed, and the AI Q&A/Textract/Comprehend verification in
+the spec all require Bedrock calls this session cannot make. Zeke confirmed A1-A3 (Bedrock
+enabled in ap-southeast-2, `vericlever-ai` IAM role, Vercel OIDC federation) are done in
+the AWS console; A4a itself, `AI_MODEL_FAST`'s actual `au.*` profile ID, and everything
+under "Step 58 done when" still need running from a machine or deploy that has the role.
+Drafted (not published - needs David's review first) an addition to the Platform Terms of
+Use and Privacy Notice's Schedule 1 clause 9, covering both the Step 58 onshoring and the
+pre-existing, previously-undisclosed use of Anthropic's direct API and Voyage AI - see
+`PRIVACY_NOTICE_UPDATE_DRAFT_STEP58.md`.
+
+**Step 59 built the same session: Our Outcomes.** Migrations 0088-0092 (outcome records
+and links, review date overrides plus the `set_review_date_override()` RPC, extended
+`sop_reviews`/`sop_review_actions`, policy flags, the quarantine Storage bucket), all
+applied and passing an extended `rls-check.mjs` (new scenarios added for every new table
+plus the RPC, including the `manager_staff`-via-RPC case specifically since it bypasses
+the normal `sops`/`policies` write gate on purpose).
+
+Application code, all written this session, none of it exercised through the UI yet:
+- **Our Outcomes page** (`src/app/admin/our-outcomes/`): renamed from Staff outcome flags
+  (old route now redirects), restructured per B1 - To sort, staff flags (unchanged), policy
+  flags, outcome records with archive, procedure schedule with an editable date field.
+- **Upload pipeline**: browser uploads straight to the `outcome-quarantine` bucket via a
+  signed URL (`src/lib/supabase/browser.ts` is a new browser-side Supabase client - this
+  codebase had none before, every prior upload went through a Server Action's own body).
+  Extraction (`src/lib/documents/outcome-extract.ts`) reuses Step 56's `extractDocument`
+  for text formats, adds Textract (scanned PDF split page-by-page via `pdf-lib`, images),
+  HEIC/WebP-to-PNG conversion (`sharp` + `heic-convert`), and spreadsheet flattening.
+  Redaction (`src/lib/redaction.ts`) is Comprehend `DetectPiiEntities` plus a second
+  Australia-specific regex pass (Medicare, CRN, WWCC, phone formats, this tenant's own
+  staff names). An `xlsx` (SheetJS) install was reverted mid-build after `npm audit`
+  flagged an unfixed prototype-pollution/ReDoS advisory in the exact npm-published
+  package - switched to `exceljs` + `papaparse` instead, which parse the same untrusted
+  upload path without that history.
+- **AI suggestions**: `suggestProcedureLink()` in the Our Outcomes actions file, using the
+  shared Bedrock client from Step 58.
+- **Review form** (`src/app/admin/sops/[id]/review/`): linked records/flags section,
+  auto-detected trigger (`src/lib/review-context.ts`), AI-proposed reason line (falls back
+  to the fixed "Scheduled review..." text with no AI call when nothing is linked),
+  required effectiveness verdicts on every action still pending one (re-checked
+  server-side, not just in the client form), the "Flag the governing policy" checkbox.
+  Saving a review now also attaches confirmed outcome links, clears the review date
+  override, and inserts a policy flag if the checkbox was ticked.
+- **Policy editor**: shows open policy flags at the top (policies have no review page -
+  see the B2 confirmation above); `publishPolicy()` now clears both the review date
+  override and open policy flags on every new version, since that is policies' equivalent
+  of "completing a review".
+- **Reports** (`src/lib/reports.ts`, `src/app/reports/_pdf/tag-report.tsx`): the child
+  safety standards and NQS quality area reports (they share the same underlying function)
+  now print the B9 summary line under every reviewed procedure.
+- **Quarantine cleanup cron** (`src/app/api/cron/quarantine-cleanup/route.ts`, registered
+  hourly in `vercel.json`): backstop for an abandoned upload; the app itself already
+  deletes the quarantine file on save or cancel. The existing two crons run once daily -
+  worth confirming with Zeke that the Vercel plan in use actually supports an hourly
+  schedule before relying on it.
+
+**Judgement calls made without Zeke, flagged for confirmation:**
+- Action effectiveness is stored as the single latest verdict per action (overwritten each
+  time), not a history of every verdict given - the spec's "the earlier one kept in the
+  procedure's history" for a superseded `too_early` verdict is not literally implemented as
+  a per-action history table. `sop_reviews` themselves remain the append-only history.
+- The B7 "helper line" ("What else changed in this period...") was implemented as added
+  guidance text under the existing Outcomes question, not a new stored field - re-read as
+  a prompt, not a new database column, since the form's four questions are specified
+  elsewhere as staying exactly as they are.
+
 Also noted while investigating: running `npm run build` (production build) while the
 dev server is also running corrupts the shared `.next` cache and produces flaky,
 misleading UI symptoms (a button that looks permanently disabled, a stale hydration
 mismatch) that have nothing to do with the code under test. Stop the dev server before
 a production build from now on.
+
+### 28 September 2026
+
+**Step 58's AWS setup (A1-A3) completed and verified live, with Zeke in the AWS console.**
+
+- **A1.** Bedrock, Textract and Comprehend confirmed working in ap-southeast-2. AWS has
+  retired the old "Model access" activation page - serverless models now auto-enable on
+  first invocation (Anthropic models still show a one-time use-case form the first time,
+  which Zeke completed). A monthly cost budget was already set up from an earlier AWS
+  Activate/credits step. **A1 step 5/6 resolved**: the `au.anthropic.claude-haiku-4-5-*`
+  cross-region inference profile routes only to Sydney (ap-southeast-2) and Melbourne
+  (ap-southeast-4) - confirmed directly in the Bedrock console's inference profile detail
+  page. No New Zealand routing. The privacy notice draft
+  (`PRIVACY_NOTICE_UPDATE_DRAFT_STEP58.md`) can say "Australia" only, not "Australia and
+  New Zealand" - that conditional in A1 step 6 is resolved in the "Australia-only" direction.
+- **A4a partially resolved by elimination, not comparison.** Checked the Bedrock model
+  catalog directly: Cohere Embed has zero serverless listings in ap-southeast-2 (the
+  Cohere provider filter shows 0 models). Titan Text Embeddings V2 is the only Sydney-
+  available embedding model, so there is no real two-candidate choice to make - Titan
+  wins by elimination. `scripts/compare-embedding-models.ts` still needs updating to drop
+  the Cohere branch (it currently assumes two live candidates); can be simplified to a
+  single-candidate sanity check against the old Voyage results rather than a bake-off.
+  Titan's default output size is 1024 dimensions, matching `content_chunks.embedding`
+  exactly - no dimension migration needed regardless.
+- **A2.** `vericlever-ai` IAM role created with the exact permission set A2 specifies:
+  `bedrock:InvokeModel`/`InvokeModelWithResponseStream` on the Claude Haiku `au.*`
+  inference profile plus its two underlying regional foundation models (Sydney and
+  Melbourne - Bedrock requires permission on both the profile ARN and the destination
+  model ARN), `bedrock:InvokeModel` on Titan embeddings (Sydney only), `textract:Detect
+  DocumentText`/`comprehend:DetectPiiEntities` region-locked to ap-southeast-2 via an
+  `aws:RequestedRegion` condition (no per-resource ARNs exist for those two actions), and
+  two explicit-deny statements (any `global.*` inference profile; anything requested
+  outside Sydney/Melbourne) as the defense-in-depth backstop A2 asks for.
+- **A3.** Vercel's OIDC Federation was already configured on the `ecec-portal` project
+  (Team issuer mode, `https://oidc.vercel.com/vericlever`). Registered it as an IAM OIDC
+  identity provider and built the `vericlever-ai` trust policy with both `aud` and `sub`
+  conditions - the role is assumable only by a token where
+  `sub = owner:vericlever:project:ecec-portal:environment:production`, so no other
+  Vercel project or non-production deployment on the team can assume it. (The role
+  wizard's own web-identity flow didn't offer a `sub` condition up front - added by
+  editing the trust policy directly after role creation, which has the identical effect.)
+- **Local dev access.** Vercel's OIDC federation only authenticates the deployed app, not
+  this session, so a separate IAM user (`vericlever-ai-local-dev`) was created with the
+  same permission policy attached directly (not the trust-policy/OIDC route, since there's
+  no equivalent identity federation available for a local script) and a long-lived access
+  key pair. **One incident along the way**: an over-broad `grep` accidentally printed the
+  first access key pair's actual values into the session transcript while checking
+  `.env.local` for which variables were set. Flagged immediately, that key was rotated
+  (deactivated and deleted, a fresh one issued) before it was used for anything - treat
+  any credential that surfaces somewhere unintended as compromised, even in a low-exposure
+  case like this one, rather than deciding case-by-case whether it "probably" matters.
+- **Verified end to end** with a throwaway script (`generateText()` and `embed()` called
+  directly, not through any UI): Claude Haiku 4.5 responded correctly, Titan returned a
+  1024-dimension vector. `AI_MODEL_FAST=au.anthropic.claude-haiku-4-5-20251001-v1:0` and
+  `AI_EMBED_MODEL=amazon.titan-embed-text-v2:0` are both live in `.env.local` for this
+  session. Vercel's production environment variables still need the same two set before
+  a real deploy will work - not done yet, since OIDC federation only supplies the AWS
+  credentials, not these two config values.
+
+**A4a's outcome reverses the "one supplier, one bill" plan - embeddings stay on Voyage.**
+Ran `scripts/compare-embedding-models.ts` (simplified to a single-candidate sanity check,
+since Cohere isn't available in-region) against the 20 most recent distinct real staff
+questions from `ai_interactions`, first at the top 3 retrieved chunks, then again at the
+top 8 (production's actual `MATCH_COUNT`) once the first pass raised concerns, to rule out
+a narrow-view artifact before deciding anything:
+
+- Two of the three initially-concerning questions resolved at top 8 ("who's in charge if
+  the director is away" actually surfaces good content once the full retrieved set is
+  considered; "extreme heat" partially improves but still misses the Adverse Weather and
+  Sun Protection policies specifically).
+- **One did not resolve, and it's the one that matters most**: "What do I do if a child
+  has an allergic reaction?" - Titan's top 8 results contain no mention of anaphylaxis,
+  asthma or medical conditions at all, at any retrieval depth tested. Voyage correctly
+  surfaces the Anaphylaxis Management Policy, Asthma Management Policy and Medical
+  Conditions Policy, all within its own top 8. Titan's raw similarity scores also ran
+  systematically far lower than Voyage's across all 20 questions (roughly 0.15-0.5 vs
+  0.4-0.65), which would have needed its own threshold retune regardless of the ranking
+  question.
+- **Decision (Zeke, 28 September 2026): keep Voyage AI for search embeddings.** Claude
+  inference stays on Bedrock - that part of Step 58 is complete and verified. Only the
+  embeddings/retrieval layer stays on the existing provider, since Titan is a genuine
+  quality regression on at least one safety-critical question and there is no second
+  Bedrock candidate available in Sydney to fall back on instead.
+
+**Reverted accordingly**: `src/lib/ai/voyage.ts` restored (with a header comment recording
+why), `src/lib/ai/service.ts` imports embeddings from it again while keeping `generateText`
+from the Bedrock client, `src/lib/ai/client.ts` dropped its now-unused production
+`embed()`/`embedOne()` (kept `embedWithModel()` only, for re-testing later if AWS adds
+another Sydney embedding model), and `validateAiSetup()` no longer requires
+`AI_EMBED_MODEL` at startup - it's not a production dependency any more. Deleted
+`scripts/reembed-corpus.ts` and migration 0087 (the cutover it would have unblocked) since
+neither ever ran and both are now moot. Migration 0094 drops `content_chunks.embedding_bedrock`
+(added by 0086 for the cutover that didn't happen) rather than leaving a permanently-null
+column in place. (Originally written and applied as 0093 - renumbered after discovering a
+second, concurrent session had independently taken that number for an unrelated
+`multi_service_reach` migration. Both migrations touch different tables, so there was no
+data conflict, only a filename collision; the file itself was renamed, and its content
+already applied to the database was unaffected since this project has no migration-tracking
+table to reconcile.) `PRIVACY_NOTICE_UPDATE_DRAFT_STEP58.md` rewritten - it previously assumed
+Voyage would be removed entirely (a real error if it had gone to David unreviewed); it now
+discloses Voyage as an ongoing external provider (US-based, receives only question text and
+the org's own published policy/procedure content, never personal information) alongside the
+new Bedrock disclosure. `.env.local.example` updated to match: `VOYAGE_API_KEY` is back,
+`AI_EMBED_MODEL` is now documented as script-only, not a production requirement.
+
+**Verified end to end** with a throwaway script calling `answerQuestion()` directly (the
+real production function, not a mock): asked the exact allergic-reaction question that
+failed under Titan, through the real Voyage-retrieval-plus-Bedrock-generation pipeline.
+It correctly surfaced the Anaphylaxis Management Policy, Medical Conditions Policy and
+Asthma Management Policy, and produced a grounded, genuinely useful answer citing them
+by name.
+
+**Same session, continued: two real bugs found and fixed while running Step 59's Textract/
+Comprehend security checks live for the first time**, using synthetic test files (an SVG
+rendered to PNG via `sharp`, and a two-page PDF built from embedded PNG pages rather than
+`drawText()` - the latter matters, since a `drawText()` PDF has a real text layer and would
+exercise the wrong branch of `extractOutcomeDocument()`):
+
+1. **Redaction under-coverage** (`scripts/test-redaction.ts`, new - a permanent test, not a
+   one-off). Comprehend does not reliably tag every mention of a name in the same text - a
+   planted test identity's first name ("Jordan") was correctly redacted twice but leaked
+   through unredacted once, in a possessive form ("Jordan's mother"). Fixed in
+   `src/lib/redaction.ts`: after Comprehend's first pass, the name fragments it DID find are
+   swept a second time across the whole text (with an optional trailing possessive) to catch
+   repeated mentions it missed. Re-tested with a stricter check (planted name, DOB, Medicare
+   number, WWCC number, address, two phone formats) - passes clean.
+2. **Scanned-PDF extraction was silently broken** (`scripts/test-outcome-extraction.ts`, new).
+   `extractOutcomeDocument()` tries a text-layer read first (`extractDocument`, Step 56, via
+   `unpdf`/PDF.js) and falls back to Textract-per-page only if that comes back near-empty. PDF.js
+   transfers (detaches) the input `ArrayBuffer` while parsing - so by the time the Textract
+   fallback tried to load the SAME bytes reference, it found an empty buffer and threw "No PDF
+   header found". This meant the fallback was broken for exactly the documents it exists to
+   handle: a genuinely scanned, image-only PDF with no meaningful text layer. Fixed in
+   `src/lib/documents/outcome-extract.ts` by passing a copy (`bytes.slice()`) to the text-layer
+   check, leaving the original reference intact for the Textract fallback. Re-tested with a
+   real two-page image-only PDF - both pages now OCR correctly.
+
+Both fixes are exactly the kind of thing "Made-up test documents only until every step passes"
+(the spec's own verification instruction) is for - neither bug was visible from reading the
+code, only from actually running it against live AWS.
+
+**Still not done**: the full Step 59 UI click-through (uploading through the actual Our
+Outcomes page rather than calling the extraction/redaction functions directly, the
+confidential-check refusal, AI-suggested links, review-date changes, the extended review
+form, policy flags, the report line), setting `AI_MODEL_FAST` in Vercel's production
+environment (local `.env.local` only so far), and David's privacy notice review - now
+against the rewritten version above, not the one drafted before this session's testing.
+
+**One incident worth remembering**: an over-broad `grep` while checking which `.env.local`
+variables were set printed the actual AWS secret access key into the session transcript.
+Caught immediately, the key was rotated before use. When checking whether a secret is set,
+match on the variable name only (e.g. `grep -q "^VAR=.\+"`) and never print the matched
+line itself.
+
+**Another session was found editing this repository concurrently** (an unrelated
+"multi-service reach" feature: `profiles.all_services`, a new `staff_service_assignments`
+table, changes to `src/lib/reports.ts` and `scripts/rls-check.mjs`). Caused one real
+collision - both sessions independently used migration number 0093 - resolved by
+renumbering this session's migration to 0094 (see that row in the migration register); the
+two migrations touch different tables, so there was no data conflict, only a filename one.
+`rls-check.mjs` currently fails 3 of the other session's own scenarios (referencing a
+column and a table that don't exist in the database yet) - not a regression from this
+session's work, left alone as their in-progress work to finish.
+
+### 12 October 2026
+
+**Step 59, revision A: bulk outcome uploads with cited evidence.** Zeke's real use is a
+periodic upload (the sample incident print is 50 pages, a text layer, about 22,000
+characters), not one record per event. Changes: record types are Incident Reports, Staff
+Feedback, Parent Feedback, Regulator Report / Documents and Other; the date is a period
+(from/to); a non-blocking warning shows when the same type for the same service (or both
+"all services") already covers part of the period; the AI now nominates up to four
+procedures per record, each with up to four cited excerpts, and the manager confirms each
+one separately in To sort. One file is still one record.
+
+- Migration 0095 (see register). Applied after confirming 0 records, 0 links and 0 policy
+  flags referencing a record, so no data migration was needed.
+- Records are stored as markdown only where structure already exists: spreadsheets and CSV
+  become markdown tables (`rowsToMarkdownTable` in `outcome-extract.ts`); Word, HTML and
+  text PDFs already came through `extractDocument` as markdown. Scans and photos stay plain
+  paragraphs. No AI restructuring, so redaction remains the last transformation.
+- Evidence is verified, not trusted: the record goes to the model as numbered lines, and
+  `verifySuggestions()` (`src/lib/outcome-suggest.ts`) drops any excerpt that is not
+  really in the line it cites, and any procedure left with none. Checked against real
+  Bedrock with a made-up register and the 115 real published procedures
+  (`scripts/test-outcome-suggest.ts`): 3 procedures nominated, every excerpt verbatim.
+  Procedure picks are suggestions and some are debatable (an unlatched-gate exit was
+  matched to the working-at-height procedure rather than a missing-child one), which is
+  why a manager confirms each.
+- The B9 report line now reads "N outcome records (M cited excerpts), K staff flags".
+  The review form's linked items show type, period and the confirmed excerpts.
+- **Real redaction gap found and fixed**: a spaced Medicare number came out as
+  `2123 [ID NUMBER] 1` because Comprehend tags only the middle group before the regex pass
+  can see the whole number. `redaction.ts` now absorbs digit groups touching an ID
+  placeholder. `scripts/test-redaction-table.ts` (planted identity inside CSV and XLSX
+  table cells) and the original `scripts/test-redaction.ts` both pass.
+- `rls-check.mjs`: existing outcome probes moved to the new columns; new probes for the
+  period constraint and for cross-tenant and staff reads of link evidence all pass. Three
+  unrelated failures remain from the multi-service reach work (migration 0093, commit
+  9a419f1): non-covering managers at a different service can countersign, upsert
+  worker_details and update a staff-tier colleague. Not caused by Step 59, not fixed here.
+- Scanned PDFs are still capped at 20 pages (Textract is one page per call). Zeke's sample
+  is a text layer and unaffected. Raise the cap with background processing if scanned bulk
+  uploads are expected.
+- **Since then**: Zeke click-tested the revised upload on localhost with a real incident
+  file; the upload now lands on To sort, and records with no usable suggestion show an Add
+  procedure card (manual link saved as confirmed; Archive for records needing none).
+  `our-outcomes` is also in the Our Workflow menu, with Our Staff and Staff Flags added.
+  Still to do: the deployed-site checks in the spec's verification list.
+- **Watch item, found in live testing (12 October 2026): child and staff procedures can
+  cross-match.** A real upload's first suggestion was "Equipment, Electrical Items and
+  Working at Height", a workplace-safety procedure, for a child incident (a falling broom
+  and an unsecured dressing hanger). It happened to be right in substance, so it was kept,
+  but the matcher cannot tell a staff-facing procedure from a child-facing one. Cause:
+  `suggestProcedureLinks()` sends each procedure's name and first 200 characters only;
+  B6 specified tags too and they are not sent. Options, in the order to try them if it
+  recurs: (1) send Quality Area and Child Safe Standard tags (migration 0069) in the
+  prompt; (2) add an audience tag on procedures (children, staff or both) and tell the
+  matcher to prefer the fitting audience; (3) have the uploader mark the record as about
+  children, staff or both. Not built: one borderline match is too little evidence, and
+  manual confirmation in To sort already catches a bad one. Revisit if more cross-overs
+  appear.
 
 ## Corrections against BUILD_PLAN.md
 
@@ -522,6 +868,47 @@ as the 7 and 8 September work landed and are corrected here:
   from earlier bulk-upload test cleanups that deleted the SOP but not its attached
   document/storage object). Harmless - nothing queries through them - but worth a
   cleanup pass at some point.
+- **`sops.needs_review` and `sops.next_review_date` still exist live.** Found while building
+  Step 59's `review_date_override` column. Migration 0046 (Review cycle v2) explicitly drops
+  both (`alter table public.sops drop column needs_review/next_review_date`), and the app
+  code already assumes they're gone (`src/lib/sop-review-status.ts`: "sops.next_review_date
+  does not exist ... it is derived ... in the sop_review_status view"), but a live schema
+  check during this session found both columns still present and populated (false/null) on
+  every row. No later migration re-adds them. Harmless as far as I can tell - nothing in
+  `src/` reads the raw columns on `sops` (only on `policies`, which never dropped them) -
+  but it means 0046 did not fully apply against this database however it was run. Left
+  alone rather than guessing at a fix; worth Zeke confirming why before anything relies on
+  those columns being absent.
+- **Step 59, B2 confirmation (spec asked this be recorded here):** policies have no
+  review-event table - only `sops` got one, in Review cycle v2 (0046/0047). No
+  `policy_reviews` exists anywhere in the codebase. So for policies,
+  `review_date_override` is cleared by **publishing a new version of the policy**
+  (`publishPolicy()`), not by completing a review - there is no review to complete.
+  Same reasoning applies to B7a's policy flags: they clear on policy version publish
+  too, and are shown at the top of the policy **editor** (there is no policy review
+  page to put them on).
+- **Step 58 AWS access is live as of 28 September** (see that day's chronological entry) -
+  no longer blocked. `AI_MODEL_FAST` and `AI_EMBED_MODEL` are confirmed working end to end
+  against real Bedrock calls. Still to do: simplify `scripts/compare-embedding-models.ts`
+  now that Cohere isn't available in-region (single-candidate check, not a bake-off), run
+  the actual corpus re-embed, apply migration 0087's cutover, set the same two env vars in
+  Vercel's production environment (not done yet - local `.env.local` only), and the
+  "Step 58 done when" / "Verification" checklist. The Platform Terms of Use and Privacy
+  Notice update is drafted, and its one open conditional (Australia-only vs. Australia and
+  New Zealand) is now resolved in the Australia-only direction, but it's still not
+  published pending David's review - `PRIVACY_NOTICE_UPDATE_DRAFT_STEP58.md` needs that
+  resolution folded in.
+- **Step 59 needs full live verification.** Migrations 0088-0092 are applied and
+  `rls-check.mjs` passes, but no part of the feature has been exercised through the actual
+  UI: uploading a file in every B4 format, the redaction preview against a planted test
+  identity, the confidential-check refusal, AI-suggested links, the "To sort" inbox
+  actions, review-date changes from all three places, the extended review form (trigger,
+  reason, effectiveness verdicts, policy flag checkbox), policy flags from all three raise
+  points, and the report line. The Textract/Comprehend/Bedrock parts of this can now
+  actually be tested, live AWS access being sorted; the rest (page, forms, RLS, review
+  form, reports) needs a normal click-through pass regardless. Follow the spec's own "Verification"
+  section (10 numbered checks) once Step 58 is verified - the spec is explicit that no real
+  outcome data should be uploaded before then.
 
 ## Companion documents
 

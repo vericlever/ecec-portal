@@ -189,6 +189,8 @@ export default async function AdminPoliciesPage({
         {filtersActive && " matching the current filters"}
         {" · "}
         {publishedCount} published
+        {!filtersActive &&
+          " · a policy in several categories is listed under each, so category counts add up to more than the total"}
       </p>
 
       {rows.length === 0 ? (
@@ -198,7 +200,7 @@ export default async function AdminPoliciesPage({
           {rows.map((p) => renderRow(p))}
         </ul>
       ) : (
-        <div className="mt-6 space-y-8">
+        <div className="mt-6 space-y-2">
           {(() => {
             const groups: { key: string; label: string; rows: PolicyRow[] }[] =
               categories.map((c) => ({ key: c.id, label: c.name, rows: [] }));
@@ -215,15 +217,24 @@ export default async function AdminPoliciesPage({
             return groups
               .filter((g) => g.rows.length > 0)
               .map((g) => (
-                <section key={g.key}>
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                <details
+                  key={g.key}
+                  className="group rounded-lg border border-slate-200 bg-white"
+                >
+                  <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                    <span
+                      aria-hidden
+                      className="inline-block text-slate-400 transition-transform group-open:rotate-90"
+                    >
+                      ›
+                    </span>
                     {g.label}
-                    <span className="ml-2 font-normal text-slate-400">{g.rows.length}</span>
-                  </h2>
-                  <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+                    <span className="font-normal text-slate-400">{g.rows.length}</span>
+                  </summary>
+                  <ul className="divide-y divide-slate-200 border-t border-slate-200">
                     {g.rows.map((p) => renderRow(p))}
                   </ul>
-                </section>
+                </details>
               ));
           })()}
         </div>

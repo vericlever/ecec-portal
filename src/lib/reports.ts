@@ -279,6 +279,7 @@ export type TagSectionSop = {
   // still pending ever appears here.
   reviewReason: string | null;
   outcomeRecordCount: number;
+  citedExcerptCount: number;
   staffFlagCount: number;
 };
 
@@ -353,15 +354,17 @@ async function tagSectionsReport(
   // B9: evidence counts - only records/flags actually attached to the
   // latest completed review.
   const { data: linkRows } = latestReviewIds.length
-    ? await supabase.from("outcome_record_links").select("review_id").in("review_id", latestReviewIds)
-    : { data: [] as { review_id: string }[] };
+    ? await supabase.from("outcome_record_links").select("review_id, evidence").in("review_id", latestReviewIds)
+    : { data: [] as { review_id: string; evidence: unknown[] | null }[] };
   const { data: flagRows } = latestReviewIds.length
     ? await supabase.from("sop_outcome_flags").select("resolved_review_id").in("resolved_review_id", latestReviewIds)
     : { data: [] as { resolved_review_id: string }[] };
   const recordCountByReview = new Map<string, number>();
+  const excerptCountByReview = new Map<string, number>();
   for (const l of linkRows ?? []) {
     const id = l.review_id as string;
     recordCountByReview.set(id, (recordCountByReview.get(id) ?? 0) + 1);
+    excerptCountByReview.set(id, (excerptCountByReview.get(id) ?? 0) + (Array.isArray(l.evidence) ? l.evidence.length : 0));
   }
   const flagCountByReview = new Map<string, number>();
   for (const f of flagRows ?? []) {
@@ -419,6 +422,7 @@ async function tagSectionsReport(
         actions: review ? (actionsByReview.get(review.id) ?? []) : [],
         reviewReason: review?.reason ?? null,
         outcomeRecordCount: review ? (recordCountByReview.get(review.id) ?? 0) : 0,
+        citedExcerptCount: review ? (excerptCountByReview.get(review.id) ?? 0) : 0,
         staffFlagCount: review ? (flagCountByReview.get(review.id) ?? 0) : 0,
       };
     });

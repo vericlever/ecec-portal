@@ -137,19 +137,29 @@ export function SiteNav(props: SiteNavProps) {
   const ourWorkflowGroups: NavGroup[] = [];
   if (canEditContent || canCountersign || canViewReports || canViewParentPortal) {
     const items: Item[] = [];
+    const moreItems: Item[] = [];
     if (canEditContent) items.push({ href: "/admin/policies", label: "Our Policies" });
     if (canEditContent || canCountersign) {
       items.push({ href: "/admin/sops", label: "Our Procedures" });
     }
+    // Our Staff is only a way back to the admin overview here, so the menu
+    // reads in the order of the workflow: policy, procedure, staff, outcomes.
+    // (The separate Our Staff dropdown holds the staff management pages.)
+    items.push({ href: "/admin", label: "Our Staff" });
     if (canCountersign) {
-      items.push({ href: "/admin/outcome-flags", label: "Outcome flags" });
+      items.push({ href: "/admin/our-outcomes", label: "Our Outcomes" });
     }
-    if (canViewReports) items.push({ href: "/reports", label: "Reports" });
-    if (isAdmin) items.push({ href: "/admin/organisation", label: "Organisation" });
+    // Below a divider: the rest of the manager's tools, outside the
+    // policy-to-outcomes sequence above. Staff Flags jumps to that section
+    // of Our Outcomes.
+    if (canCountersign) moreItems.push({ href: "/admin/our-outcomes#staff-flags", label: "Staff Flags" });
+    if (canViewReports) moreItems.push({ href: "/reports", label: "Reports" });
+    if (isAdmin) moreItems.push({ href: "/admin/organisation", label: "Organisation" });
     if (canViewParentPortal) {
-      items.push({ href: "/admin/parent-portal", label: "Parent portal access" });
+      moreItems.push({ href: "/admin/parent-portal", label: "Parent portal access" });
     }
     ourWorkflowGroups.push({ label: null, items });
+    if (moreItems.length > 0) ourWorkflowGroups.push({ label: null, items: moreItems });
   }
   const showOurWorkflow = ourWorkflowGroups.length > 0;
 

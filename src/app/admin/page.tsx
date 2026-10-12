@@ -309,7 +309,7 @@ export default async function DashboardPage() {
     },
     {
       show: manager,
-      href: "/admin/outcome-flags",
+      href: "/admin/our-outcomes",
       label: "Staff outcome flags awaiting review",
       count: openOutcomeFlags ?? 0,
       detail:
