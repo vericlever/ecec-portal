@@ -8,6 +8,7 @@ const blockStyles = StyleSheet.create({
   statusLine: { fontSize: 8.5, color: "#64748b", marginTop: 2 },
   label: { fontSize: 8, fontWeight: 700, color: "#0f172a", marginTop: 6 },
   paragraph: { fontSize: 9, color: "#1e293b", marginTop: 2, lineHeight: 1.4 },
+  outcomeSummary: { fontSize: 8.5, color: "#1e293b", marginTop: 4, lineHeight: 1.3 },
   actionRow: { fontSize: 8.5, color: "#1e293b", marginTop: 2 },
   neverReviewed: { fontSize: 9, color: "#b45309", marginTop: 2 },
 });
@@ -22,6 +23,38 @@ const ACTION_STATUS_LABEL: Record<string, string> = {
   done: "done",
   cancelled: "cancelled",
 };
+
+const EFFECTIVENESS_LABEL: Record<string, string> = {
+  worked: "worked",
+  did_not_work: "didn't work",
+  too_early: "too early",
+};
+
+// Step 59, B9: one line per reviewed procedure summarising why it was
+// reviewed and what came of it. Only records/flags actually attached to the
+// review (via TagSectionSop.outcomeRecordCount/staffFlagCount) are counted -
+// nothing unconfirmed or still pending ever reaches this line.
+function outcomeSummaryLine(s: {
+  lastReviewedDate: string | null;
+  reviewReason: string | null;
+  outcomeRecordCount: number;
+  citedExcerptCount: number;
+  staffFlagCount: number;
+  actions: { effectiveness: string | null }[];
+  decision: string | null;
+}): string {
+  const parts = [`Reviewed ${s.lastReviewedDate}.`];
+  if (s.reviewReason) parts.push(`Why: ${s.reviewReason}.`);
+  parts.push(
+    `Evidence: ${s.outcomeRecordCount} outcome record${s.outcomeRecordCount === 1 ? "" : "s"} (${s.citedExcerptCount} cited excerpt${s.citedExcerptCount === 1 ? "" : "s"}), ${s.staffFlagCount} staff flag${s.staffFlagCount === 1 ? "" : "s"}.`,
+  );
+  const verdicts = s.actions.map((a) => a.effectiveness).filter((e): e is string => Boolean(e));
+  if (verdicts.length > 0) {
+    parts.push(`Previous action${verdicts.length === 1 ? "" : "s"}: ${verdicts.map((v) => EFFECTIVENESS_LABEL[v] ?? v).join(", ")}.`);
+  }
+  if (s.decision) parts.push(`Decision: ${DECISION_LABEL[s.decision].replace("Procedure ", "")}.`);
+  return parts.join(" ");
+}
 
 // Shared body for the child safety standards report and its NQS equivalent:
 // one section per tag, each tagged procedure rendered as a full block (a
@@ -74,6 +107,8 @@ export function TagReportPdf({
                   </Text>
                 ) : (
                   <>
+                    <Text style={blockStyles.outcomeSummary}>{outcomeSummaryLine(s)}</Text>
+
                     <Text style={blockStyles.label}>Practice (level 3)</Text>
                     <Text style={blockStyles.paragraph}>{s.practiceReflection}</Text>
 

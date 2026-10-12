@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/embed",
       "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/quarantine-cleanup",
+      "schedule": "0 20 * * *"
     }
   ]
 }

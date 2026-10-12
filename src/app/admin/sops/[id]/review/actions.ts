@@ -28,6 +28,9 @@ export async function submitReview(sopId: string, formData: FormData): Promise<R
   const outcome = String(formData.get("outcome") ?? "").trim();
   const decision = String(formData.get("decision") ?? "");
   const file = formData.get("file");
+  const trigger = String(formData.get("trigger") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const flagPolicyId = formData.get("flagPolicyId");
 
   if (!practice) {
     return { ok: false, error: "Describe practice across the team." };
@@ -37,6 +40,20 @@ export async function submitReview(sopId: string, formData: FormData): Promise<R
   }
   if (decision !== "stands" && decision !== "needs_revision") {
     return { ok: false, error: "Choose a decision." };
+  }
+  if (!["scheduled", "outcome_data", "staff_feedback", "management_decision"].includes(trigger)) {
+    return { ok: false, error: "Choose a trigger." };
+  }
+  if (!reason) {
+    return { ok: false, error: "The reason line cannot be empty." };
+  }
+
+  let verdicts: Record<string, "worked" | "did_not_work" | "too_early"> = {};
+  try {
+    const raw = JSON.parse(String(formData.get("verdicts") ?? "{}"));
+    if (raw && typeof raw === "object") verdicts = raw;
+  } catch {
+    return { ok: false, error: "Could not read the action verdicts." };
   }
 
   let actions: ActionInput[] = [];
@@ -86,6 +103,35 @@ export async function submitReview(sopId: string, formData: FormData): Promise<R
     if (invalid) return { ok: false, error: "Choose a valid owner for every action." };
   }
 
+  // Server-side re-check (done when #7): every action still awaiting a
+  // verdict must have one in the payload, whatever the client sent.
+  const { data: pendingActions } = await supabase
+    .from("sop_review_actions")
+    .select("id")
+    .eq("sop_id", sopId)
+    .neq("status", "cancelled")
+    .or("effectiveness.is.null,effectiveness.eq.too_early");
+  const missingVerdict = (pendingActions ?? []).some(
+    (a) => !["worked", "did_not_work", "too_early"].includes(verdicts[a.id as string]),
+  );
+  if (missingVerdict) {
+    return { ok: false, error: "Mark whether every previous action worked." };
+  }
+
+  // If a policy flag was requested, the policy must genuinely be linked to
+  // this procedure - not an arbitrary id handed back from the client.
+  let flagPolicyIdValidated: string | null = null;
+  if (typeof flagPolicyId === "string" && flagPolicyId) {
+    const { data: link } = await supabase
+      .from("policy_sop_links")
+      .select("policy_id")
+      .eq("sop_id", sopId)
+      .eq("policy_id", flagPolicyId)
+      .maybeSingle();
+    if (!link) return { ok: false, error: "That policy is not linked to this procedure." };
+    flagPolicyIdValidated = flagPolicyId;
+  }
+
   let evidencePath: string | null = null;
   if (file instanceof File && file.size > 0) {
     if (file.size > 15 * 1024 * 1024) {
@@ -124,11 +170,60 @@ export async function submitReview(sopId: string, formData: FormData): Promise<R
       decision,
       evidence_path: evidencePath,
       previous_review_id: prev?.id ?? null,
+      trigger,
+      reason,
     })
     .select("id")
     .single();
   if (error || !review) {
     return { ok: false, error: error?.message ?? "Could not save the review." };
+  }
+
+  // B7, action effectiveness: apply every verdict for this sop's pending
+  // actions. A "too_early" verdict is simply overwritten again next time -
+  // this row holds only the current verdict, not a history of past ones.
+  for (const action of pendingActions ?? []) {
+    const verdict = verdicts[action.id as string];
+    await supabase
+      .from("sop_review_actions")
+      .update({
+        effectiveness: verdict,
+        effectiveness_review_id: review.id,
+        effectiveness_by: me.id,
+        effectiveness_at: new Date().toISOString(),
+      })
+      .eq("id", action.id);
+  }
+
+  // B6/B7: every confirmed-but-unattached outcome record link for this
+  // procedure is now absorbed into this review - it leaves the "to sort"
+  // count and stops appearing as "waiting" on the procedure schedule.
+  await supabase
+    .from("outcome_record_links")
+    .update({ review_id: review.id })
+    .eq("sop_id", sopId)
+    .eq("status", "confirmed")
+    .is("review_id", null);
+
+  // B2: completing a review clears the override - the calculated date takes
+  // over again. Only relevant if one was actually set.
+  await supabase
+    .from("sops")
+    .update({ review_date_override: null })
+    .eq("id", sopId)
+    .not("review_date_override", "is", null);
+
+  // B7, policy flag checkbox: the review's own reason line becomes the
+  // flag's note, this review is its source.
+  if (flagPolicyIdValidated) {
+    await supabase.from("policy_flags").insert({
+      organisation_id: me.organisation_id,
+      policy_id: flagPolicyIdValidated,
+      note: reason,
+      source: "procedure_review",
+      sop_review_id: review.id,
+      raised_by: me.id,
+    });
   }
 
   for (const a of actions) {
@@ -158,6 +253,7 @@ export async function submitReview(sopId: string, formData: FormData): Promise<R
   revalidatePath(`/admin/sops/${sopId}/review`);
   revalidatePath("/admin/sops");
   revalidatePath("/admin");
+  revalidatePath("/admin/our-outcomes");
   return { ok: true };
 }
 

@@ -275,6 +275,16 @@ export async function publishPolicy(id: string): Promise<Result> {
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
+  // Step 59, B2/B7a: policies have no review event to complete, so a version
+  // publish is what clears review_date_override and open policy flags for a
+  // policy (see BUILD_LOG.md, Step 59 B2 confirmation).
+  await db.from("policies").update({ review_date_override: null }).eq("id", id).not("review_date_override", "is", null);
+  await db
+    .from("policy_flags")
+    .update({ cleared_at: new Date().toISOString(), cleared_by_version: next })
+    .eq("policy_id", id)
+    .is("cleared_at", null);
+
   // AI Staff Q&A (build spec, migration 0076): queue a re-embed, only for a
   // tenant with the feature on (aiQaEnabledFor - see src/lib/ai/service.ts).
   // Failure here must never turn a successful publish into an error - the

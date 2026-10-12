@@ -1,0 +1,21 @@
+-- Step 58, A4a: reverses migration 0086. That migration added
+-- content_chunks.embedding_bedrock ahead of a planned cutover from Voyage to
+-- a Bedrock embedding model, populated by scripts/reembed-corpus.ts (also
+-- removed).
+--
+-- The cutover never happened. Tested Amazon Titan Text Embeddings V2 - the
+-- only Bedrock embedding model available in ap-southeast-2 (Cohere Embed has
+-- no serverless listing in this region at all) - against this tenant's real
+-- corpus and 20 real staff questions. Titan missed retrieval on several,
+-- including a safety-critical one: "What do I do if a child has an allergic
+-- reaction?" never surfaced the Anaphylaxis Management Policy, even across
+-- the top 8 chunks production actually retrieves (MATCH_COUNT), while Voyage
+-- found it correctly. See BUILD_LOG.md, 28 September 2026.
+--
+-- Decision: Claude inference stays on Bedrock (au.* profile, already live).
+-- Embeddings/search stay on Voyage. This column was never populated in
+-- production (migration 0087, the cutover that would have used it, was
+-- never applied) - safe to drop outright rather than leaving a permanently
+-- null, confusing column in place.
+
+alter table public.content_chunks drop column embedding_bedrock;

@@ -4,6 +4,7 @@ import { requireContentEditor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { policyCategories } from "@/lib/policy-categories";
 import { documentTags } from "@/lib/document-tags";
+import { fmtReviewDate } from "@/lib/sop-review";
 import { PolicyEditor } from "./policy-editor";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,21 @@ export default async function PolicyDetailPage({
   const sopName = new Map((allSops ?? []).map((s) => [s.id, s.name]));
   const tags = await documentTags(supabase, "policy", params.id);
 
+  // Step 59, B7a: policies have no review page, so open flags show at the
+  // top of the editor instead - same position/style a procedure review gives
+  // its linked items.
+  const { data: openFlags } = await supabase
+    .from("policy_flags")
+    .select("id, note, source, raised_by, raised_at")
+    .eq("policy_id", params.id)
+    .is("cleared_at", null)
+    .order("raised_at", { ascending: false });
+  const raiserIds = [...new Set((openFlags ?? []).map((f) => f.raised_by as string))];
+  const { data: raisers } = raiserIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", raiserIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const raiserName = new Map((raisers ?? []).map((p) => [p.id as string, p.full_name as string]));
+
   return (
     <div className="max-w-2xl">
       <Link
@@ -57,6 +73,28 @@ export default async function PolicyDetailPage({
       >
         ← Our Policies
       </Link>
+
+      {(openFlags ?? []).length > 0 && (
+        <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+            Policy flags ({(openFlags ?? []).length})
+          </h2>
+          <p className="mt-1 text-xs text-amber-700">
+            Clears when this policy is next published as a new version.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {(openFlags ?? []).map((f) => (
+              <li key={f.id as string} className="border-t border-amber-200 pt-2 first:border-t-0 first:pt-0">
+                <p className="text-slate-800">{f.note as string}</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  {raiserName.get(f.raised_by as string) ?? "A manager"} · {fmtReviewDate(f.raised_at as string)} ·{" "}
+                  {f.source === "procedure_review" ? "from a procedure review" : "raised directly"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <PolicyEditor
         policy={{

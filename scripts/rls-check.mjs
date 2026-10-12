@@ -1401,8 +1401,8 @@ const appScenarios = () => [
     as: RSG_REAL_MANAGER,
     probe: (c) =>
       c.query(
-        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
-         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2)`,
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2)`,
         [RSG, RSG_REAL_MANAGER],
       ),
   },
@@ -1412,8 +1412,8 @@ const appScenarios = () => [
     as: STAFF,
     probe: (c) =>
       c.query(
-        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
-         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2)`,
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2)`,
         [RSG, STAFF],
       ),
   },
@@ -1422,8 +1422,8 @@ const appScenarios = () => [
     expectOk: false,
     setup: async (c) => {
       const r = await c.query(
-        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
-         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
         [RSG, RSG_REAL_MANAGER],
       );
       c._recordId = r.rows[0].id;
@@ -1436,8 +1436,8 @@ const appScenarios = () => [
     expectOk: false,
     setup: async (c) => {
       const r = await c.query(
-        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
-         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
         [RSG, RSG_REAL_MANAGER],
       );
       c._recordId = r.rows[0].id;
@@ -1446,12 +1446,59 @@ const appScenarios = () => [
     probe: (c) => c.query(`select id from public.outcome_records where id=$1`, [c._recordId]),
   },
   {
+    label: "outcome record with period_end before period_start (rejected by check constraint)",
+    expectOk: false,
+    as: RSG_REAL_MANAGER,
+    probe: (c) =>
+      c.query(
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports','2026-06-30','2026-01-01','[NAME] fell over.','pdf','deadbeef',$2)`,
+        [RSG, RSG_REAL_MANAGER],
+      ),
+  },
+  {
+    label: "SK admin reads RSG link evidence (cross-tenant, blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      const rec = await c.query(
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        [RSG, RSG_REAL_MANAGER],
+      );
+      const link = await c.query(
+        `insert into public.outcome_record_links (organisation_id, record_id, sop_id, status, evidence) values ($1,$2,$3,'suggested','[{"line":1,"excerpt":"fell over"}]') returning id`,
+        [RSG, rec.rows[0].id, RSG_REAL_SOP],
+      );
+      c._linkId = link.rows[0].id;
+    },
+    as: SK_ADMIN,
+    probe: (c) => c.query(`select evidence from public.outcome_record_links where id=$1`, [c._linkId]),
+  },
+  {
+    label: "plain staff reads RSG link evidence (blocked)",
+    expectOk: false,
+    setup: async (c) => {
+      const rec = await c.query(
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        [RSG, RSG_REAL_MANAGER],
+      );
+      const link = await c.query(
+        `insert into public.outcome_record_links (organisation_id, record_id, sop_id, status, evidence) values ($1,$2,$3,'suggested','[{"line":1,"excerpt":"fell over"}]') returning id`,
+        [RSG, rec.rows[0].id, RSG_REAL_SOP],
+      );
+      c._linkId = link.rows[0].id;
+    },
+    as: STAFF,
+    probe: (c) => c.query(`select evidence from public.outcome_record_links where id=$1`, [c._linkId]),
+  },
+  {
     label: "manager confirms a suggested outcome_record_link",
     expectOk: true,
     setup: async (c) => {
       const rec = await c.query(
-        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
-         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
         [RSG, RSG_REAL_MANAGER],
       );
       const link = await c.query(
@@ -1472,8 +1519,8 @@ const appScenarios = () => [
     expectOk: false,
     setup: async (c) => {
       const rec = await c.query(
-        `insert into public.outcome_records (organisation_id, source_type, event_date, redacted_body, original_format, original_sha256, uploaded_by)
-         values ($1,'incident',current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
+        `insert into public.outcome_records (organisation_id, source_type, period_start, period_end, redacted_body, original_format, original_sha256, uploaded_by)
+         values ($1,'incident_reports',current_date,current_date,'[NAME] fell over.','pdf','deadbeef',$2) returning id`,
         [RSG, RSG_REAL_MANAGER],
       );
       const link = await c.query(
