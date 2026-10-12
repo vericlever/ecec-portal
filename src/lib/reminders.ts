@@ -18,7 +18,7 @@ import {
 type Admin = ReturnType<typeof createAdminClient>;
 
 const CADENCE_DAYS = 7; // a person hears from us at most weekly
-const CRED_WINDOW_DAYS = 60; // flag a credential this close to expiry, or past
+const CRED_WINDOW_DAYS = 30; // flag a credential this close to expiry, or past
 const CONTRACT_WINDOW_DAYS = 28; // 4 weeks of contract-renewal run-up
 const REVIEW_WINDOW_DAYS = 14; // flag a SOP or policy review this close, or past
 
@@ -119,7 +119,6 @@ export async function runReminders(opts?: {
     { data: sopReviewStatusRows },
     { data: pubPolicies },
     { data: signOffs },
-    { data: policyViews },
     { data: worker },
     { data: wwcc },
     { data: teacher },
@@ -148,7 +147,6 @@ export async function runReminders(opts?: {
       .select("id, name, organisation_id, service_id, published_version, next_review_date")
       .not("published_version", "is", null),
     admin.from("sign_offs").select("user_id, sop_id, sop_version, verified_at"),
-    admin.from("policy_views").select("user_id, policy_id, policy_version"),
     admin
       .from("worker_details")
       .select("profile_id, onboarding_completed_at, visa_expiry"),
@@ -223,13 +221,6 @@ export async function runReminders(opts?: {
     const m = signedByUser.get(s.user_id as string) ?? new Map<string, boolean>();
     m.set(`${s.sop_id}:${s.sop_version}`, Boolean(s.verified_at));
     signedByUser.set(s.user_id as string, m);
-  }
-
-  const viewedByUser = new Map<string, Set<string>>();
-  for (const v of policyViews ?? []) {
-    const set = viewedByUser.get(v.user_id as string) ?? new Set<string>();
-    set.add(`${v.policy_id}:${v.policy_version}`);
-    viewedByUser.set(v.user_id as string, set);
   }
 
   const workerByProfile = new Map(
@@ -364,20 +355,8 @@ export async function runReminders(opts?: {
       sections.push({ heading: "Procedures to sign", items: unsignedSops });
     }
 
-    // unviewed policies
-    const expectedPolicies = (pubPolicies ?? []).filter(
-      (pol) =>
-        pol.organisation_id === p.organisation_id &&
-        (pol.service_id == null || pol.service_id === p.service_id),
-    );
-    const viewed = viewedByUser.get(p.id) ?? new Set<string>();
-    const unviewed = expectedPolicies
-      .filter((pol) => !viewed.has(`${pol.id}:${pol.published_version}`))
-      .map((pol) => pol.name as string)
-      .sort();
-    if (unviewed.length) {
-      sections.push({ heading: "Policies to read", items: unviewed });
-    }
+    // Unread policies are deliberately never chased by email: policies are
+    // not something staff sign off on, only procedures are.
 
     // agreements
     const ua = unsignedAgreements(p);
